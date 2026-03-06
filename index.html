@@ -3,6 +3,12 @@
 <head>
 <title>Official Ballots</title>
 
+<!-- Open Graph meta for thumbnail -->
+<meta property="og:title" content="Official Ballots">
+<meta property="og:description" content="Comparison of NCAA ballots from users">
+<meta property="og:image" content="https://les-champs.github.io/cbb-ballots/preview.png">
+<meta property="og:type" content="website">
+
 <style>
 body {
     font-family: sans-serif;
@@ -66,14 +72,24 @@ thead th {
 /* highlight classes for up to 10 colors */
 .team-highlight-1 { outline: 3px solid #ffcc00; border-radius: 4px; }
 .team-highlight-2 { outline: 3px solid #66ccff; border-radius: 4px; }
-.team-highlight-3 { outline: 3px solid #33cc33; border-radius: 4px; }
-.team-highlight-4 { outline: 3px solid #ff6666; border-radius: 4px; }
+.team-highlight-3 { outline: 3px solid #ff6666; border-radius: 4px; }
+.team-highlight-4 { outline: 3px solid #33cc33; border-radius: 4px; }
 .team-highlight-5 { outline: 3px solid #cc66ff; border-radius: 4px; }
 .team-highlight-6 { outline: 3px solid #ff9966; border-radius: 4px; }
 .team-highlight-7 { outline: 3px solid #ff3399; border-radius: 4px; }
 .team-highlight-8 { outline: 3px solid #339966; border-radius: 4px; }
 .team-highlight-9 { outline: 3px solid #3366cc; border-radius: 4px; }
 .team-highlight-10 { outline: 3px solid #999933; border-radius: 4px; }
+
+/* hide preview image on page but still visible to OG scrapers */
+.preview img {
+    display: block;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    position: absolute;
+    pointer-events: none;
+}
 </style>
 
 </head>
@@ -81,6 +97,7 @@ thead th {
 
 <div class="preview">
 <h1>Official Ballots</h1>
+<img src="https://les-champs.github.io/cbb-ballots/preview.png" alt="Preview thumbnail">
 </div>
 
 
@@ -105,14 +122,11 @@ document.querySelectorAll(".team-logo").forEach(logo => {
         const team = logo.dataset.team;
         const teamElements = Array.from(document.querySelectorAll(`.team-logo[data-team="${team}"]`));
 
-        // check if any instance is already highlighted
         const current = teamElements.find(el => highlightClasses.some(c => el.classList.contains(c)));
 
         if(current){
-            // remove highlight from all instances
             teamElements.forEach(el => highlightClasses.forEach(c => el.classList.remove(c)));
         } else {
-            // find first available color globally
             const usedColors = Array.from(document.querySelectorAll(".team-logo"))
                 .flatMap(el => highlightClasses.filter(c => el.classList.contains(c)));
             const availableColor = highlightClasses.find(c => !usedColors.includes(c));
