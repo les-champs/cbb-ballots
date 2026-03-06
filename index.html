@@ -5,7 +5,7 @@
 
 <!-- Open Graph meta for thumbnail -->
 <meta property="og:title" content="Userpoll Landscape">
-<meta property="og:description" content="Landscape view of userpoll ballots">
+<meta property="og:description" content="Landscape view of userpoll ballots.">
 <meta property="og:image" content="https://les-champs.github.io/cbb-ballots/preview.png">
 <meta property="og:type" content="website">
 
@@ -70,56 +70,11 @@ thead th {
 }
 
 /* highlight classes for up to 10 colors with glow inside logo */
-.team-highlight-1 {
-    outline: 2px solid #ffcc00;
-    border-radius: 4px;
-    box-shadow: 0 0 20px 6px #ffcc00;
-}
-.team-highlight-2 {
-    outline: 2px solid #66ccff;
-    border-radius: 4px;
-    box-shadow: 0 0 20px 6px #66ccff;
-}
-.team-highlight-3 {
-    outline: 2px solid #ff6666;
-    border-radius: 4px;
-    box-shadow: 0 0 20px 6px #ff6666;
-}
-.team-highlight-4 {
-    outline: 2px solid #33cc33;
-    border-radius: 4px;
-    box-shadow: 0 0 20px 6px #33cc33;
-}
-.team-highlight-5 {
-    outline: 2px solid #cc66ff;
-    border-radius: 4px;
-    box-shadow: 0 0 20px 6px #cc66ff;
-}
-.team-highlight-6 {
-    outline: 2px solid #ff9966;
-    border-radius: 4px;
-    box-shadow: 0 0 20px 6px #ff9966;
-}
-.team-highlight-7 {
-    outline: 2px solid #ff3399;
-    border-radius: 4px;
-    box-shadow: 0 0 20px 6px #ff3399;
-}
-.team-highlight-8 {
-    outline: 2px solid #339966;
-    border-radius: 4px;
-    box-shadow: 0 0 20px 6px #339966;
-}
-.team-highlight-9 {
-    outline: 2px solid #3366cc;
-    border-radius: 4px;
-    box-shadow: 0 0 20px 6px #3366cc;
-}
-.team-highlight-10 {
-    outline: 2px solid #999933;
-    border-radius: 4px;
-    box-shadow: 0 0 20px 6px #999933;
-}
+.team-highlight-1 { outline: 2px solid #ffcc00; border-radius: 4px; box-shadow: 0 0 20px 6px #ffcc00; }
+.team-highlight-2 { outline: 2px solid #66ccff; border-radius: 4px; box-shadow: 0 0 20px 6px #66ccff; }
+.team-highlight-3 { outline: 2px solid #ff6666; border-radius: 4px; box-shadow: 0 0 20px 6px #ff6666; }
+.team-highlight-4 { outline: 2px solid #33cc33; border-radius: 4px; box-shadow: 0 0 20px 6px #33cc33; }
+.team-highlight-5 { outline: 2px solid #cc66ff; border-radius: 4px; box-shadow: 0 0 20px 6px #cc66ff; }
 
 /* hide preview image on page but still visible to OG scrapers */
 .preview img {
@@ -131,8 +86,10 @@ thead th {
     pointer-events: none;
 }
 
-h1 {
+h1 span {
     cursor: pointer;
+    color: #333;
+    margin-bottom: 1px;
 }
 </style>
 
@@ -140,7 +97,7 @@ h1 {
 <body>
 
 <div class="preview">
-<h1 id="toggle-header">Official Ballots</h1>
+<h1><span id="toggle-text">Official Ballots</span></h1>
 <img src="https://les-champs.github.io/cbb-ballots/preview.png" alt="Preview thumbnail">
 </div>
 
@@ -163,27 +120,25 @@ h1 {
 
 <script>
 // =============================
-// Toggle Official/Provisional Table
-// =============================
-const toggleHeader = document.getElementById("toggle-header");
+// Toggle Official/Provisional Table (text only)
+const toggleText = document.getElementById("toggle-text");
 const officialTable = document.getElementById("official-table");
 const provisionalTable = document.getElementById("provisional-table");
 
-toggleHeader.addEventListener("click", () => {
+toggleText.addEventListener("click", () => {
     if (officialTable.style.display === "none") {
         officialTable.style.display = "block";
         provisionalTable.style.display = "none";
-        toggleHeader.innerText = "Official Ballots";
+        toggleText.innerText = "Official Ballots";
     } else {
         officialTable.style.display = "none";
         provisionalTable.style.display = "block";
-        toggleHeader.innerText = "Provisional Ballots";
+        toggleText.innerText = "Provisional Ballots";
     }
 });
 
 // =============================
 // Team click highlight with glow
-// =============================
 const highlightClasses = [
     "team-highlight-1","team-highlight-2","team-highlight-3","team-highlight-4",
     "team-highlight-5","team-highlight-6","team-highlight-7","team-highlight-8",
