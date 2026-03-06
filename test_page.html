@@ -81,9 +81,14 @@ thead th {
 .team-highlight-9 { outline: 3px solid #3366cc; border-radius: 4px; }
 .team-highlight-10 { outline: 3px solid #999933; border-radius: 4px; }
 
-/* hide preview image on page (still used for OG thumbnail) */
+/* hide preview image on page but still visible to OG scrapers */
 .preview img {
-    display: none;
+    display: block;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    position: absolute;
+    pointer-events: none;
 }
 </style>
 
@@ -92,7 +97,7 @@ thead th {
 
 <div class="preview">
 <h1>Official Ballots</h1>
-<img src="preview.png" alt="Preview thumbnail">
+<img src="https://les-champs.github.io/cbb-ballots/preview.png" alt="Preview thumbnail">
 </div>
 
 
@@ -117,14 +122,11 @@ document.querySelectorAll(".team-logo").forEach(logo => {
         const team = logo.dataset.team;
         const teamElements = Array.from(document.querySelectorAll(`.team-logo[data-team="${team}"]`));
 
-        // check if any instance is already highlighted
         const current = teamElements.find(el => highlightClasses.some(c => el.classList.contains(c)));
 
         if(current){
-            // remove highlight from all instances
             teamElements.forEach(el => highlightClasses.forEach(c => el.classList.remove(c)));
         } else {
-            // find first available color globally
             const usedColors = Array.from(document.querySelectorAll(".team-logo"))
                 .flatMap(el => highlightClasses.filter(c => el.classList.contains(c)));
             const availableColor = highlightClasses.find(c => !usedColors.includes(c));
