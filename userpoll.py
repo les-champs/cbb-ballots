@@ -9,8 +9,8 @@ from urllib.parse import unquote
 from PIL import Image
 
 # Output directory for logos
-OUTPUT_DIR = "/Users/adam/Library/Mobile Documents/com~apple~CloudDocs/Code/Userpoll/cbb-logos"
-BASE_HTML_DIR = "/Users/adam/Library/Mobile Documents/com~apple~CloudDocs/Code/Userpoll"
+BASE_HTML_DIR = os.path.dirname(os.path.abspath(__file__))
+OUTPUT_DIR = os.path.join(BASE_HTML_DIR, "cbb-logos")
 HTML_PATH = os.path.join(BASE_HTML_DIR, "index.html")
 
 BASE_URL = "https://www.cbbpoll.net"
@@ -86,7 +86,7 @@ def fetch_ballot_logos(ballot_url):
         print(f"  ✗ Could not fetch ballot {ballot_url}: {e}")
         return []
 
-def fetch_ballot_url_for_week(username, week, year=None):
+def fetch_ballot_url_for_week(username, week):
     """Fallback: fetch ballot URL from user profile page. Less reliable across years."""
     try:
         user_url = f"{BASE_URL}/users/{username}"
@@ -181,7 +181,7 @@ def process_voters(voters, label, week=None, year=None, ballot_map=None):
                 ballot_url = ballot_map[username]
                 print(f"    → found ballot via page JSON (year-scoped)")
             else:
-                ballot_url = fetch_ballot_url_for_week(username, week, year=year)
+                ballot_url = fetch_ballot_url_for_week(username, week)
                 if ballot_url:
                     print(f"    → found ballot via archive")
                 else:
@@ -238,15 +238,15 @@ def build_aggregate_row(official):
     )
     return f'<tr class="voter-row"><td>{voter_cell}</td>{ballot_logo_cells}</tr>\n'
 
-RANK_HEADERS = "".join(f"<th>{i+1}</th>" for i in range(25))
+RANK_HEADERS = "".join(f"<th><span class='rank-header-num'>{i+1}</span></th>" for i in range(25))
 THEAD_HTML = (
     f"<thead><tr>"
     f"<th><span class='voters-toggle' style='cursor:pointer; display:inline-block; transition:transform 0.1s ease;'>Alphabetic</span>"
     f"<span class='sort-picker'>"
     f"<span class='sort-option active' data-sort='alphabetic'>Alphabetic</span>"
     f"<span class='sort-option' data-sort='consensus'>Consensus</span>"
-    f"<span class='sort-option' data-sort='ranking'>Précision</span>"
-    f"<span class='sort-option' data-sort='tenure'>Tenure</span>"
+    f"<span class='sort-option' data-sort='ranking'>Précision <span class='sort-lock'>🔒</span></span>"
+    f"<span class='sort-option' data-sort='tenure'>Tenure <span class='sort-lock'>🔒</span></span>"
     f"</span></th>"
     f"{RANK_HEADERS}</tr></thead>"
 )
@@ -288,6 +288,7 @@ body {
     font-family: sans-serif;
     margin: 20px;
     background-color: #f8f8f8;
+    overflow-x: auto;
 }
 
 .header {
@@ -383,11 +384,22 @@ h1 span:hover {
 
 .table-scroll {
     width: 100%;
-    overflow-x: auto;
 }
 
 .table-container {
     width: 100%;
+    position: relative;
+}
+
+.avg-rank-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    pointer-events: none;
+    opacity: 0.45;
+    transform: translateX(-50%);
+    z-index: 1;
 }
 
 table {
@@ -611,6 +623,7 @@ td.logo-cell .logo {
 .sort-picker.open {
     display: flex;
     gap: 6px;
+    align-items: center;
 }
 
 .sort-option {
@@ -634,6 +647,24 @@ td.logo-cell .logo {
     color: inherit;
     background: transparent;
     border: none;
+}
+
+.sort-lock {
+    display: inline-block;
+    vertical-align: middle;
+    font-size: 0.75em;
+    line-height: 1;
+    margin-left: 2px;
+    filter: grayscale(1) brightness(0);
+}
+
+.sort-option.locked {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.sort-option.locked:hover {
+    opacity: 0.5;
 }
 
 .team-logo {
@@ -660,6 +691,9 @@ thead th {
     z-index: 2;
 }
 
+.rank-header-num {
+    cursor: pointer;
+}
 thead th:first-child {
     z-index: 3;
     overflow: visible;
@@ -678,7 +712,7 @@ thead th:first-child {
 .row-delta .team-highlight-4,
 .row-delta .team-highlight-5 { box-shadow: none; }
 
-#voter-history-modal {
+#voter-history-modal, #keybind-legend-modal {
     display: none;
     position: fixed;
     inset: 0;
@@ -687,8 +721,60 @@ thead th:first-child {
     justify-content: center;
     align-items: center;
 }
-#voter-history-modal.open {
+#voter-history-modal.open, #keybind-legend-modal.open {
     display: flex;
+}
+#keybind-legend-box {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    max-width: 520px;
+    width: 95vw;
+    max-height: 88vh;
+    overflow: auto;
+    padding: 20px 24px 20px;
+}
+#keybind-legend-box h2 {
+    margin: 0 0 14px;
+    font-size: 1.05rem;
+    color: #333;
+}
+.keybind-section {
+    margin-bottom: 12px;
+}
+.keybind-section-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #999;
+    margin-bottom: 5px;
+}
+.keybind-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 3px 0;
+    font-size: 13px;
+    color: #444;
+}
+.keybind-keys {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    min-width: 130px;
+    justify-content: flex-end;
+}
+kbd {
+    display: inline-block;
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    border-bottom: 2px solid #bbb;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: inherit;
+    font-size: 11px;
+    color: #333;
+    line-height: 1.5;
 }
 #voter-history-box {
     background: #fff;
@@ -750,6 +836,114 @@ thead th:first-child {
     letter-spacing: 1px;
 }
 
+#avg-rank-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+#avg-rank-modal.open {
+    display: flex;
+}
+#avg-rank-box {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    max-width: 420px;
+    width: 95vw;
+    max-height: 88vh;
+    overflow: auto;
+    padding: 20px 24px 16px;
+}
+#avg-rank-box h2 {
+    margin: 0 0 12px;
+    font-size: 1.05rem;
+    color: #333;
+}
+#avg-rank-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+}
+#avg-rank-table th {
+    font-size: 11px;
+    color: #888;
+    font-weight: normal;
+    padding: 4px 8px;
+    text-align: center;
+    border-bottom: 1px solid #ddd;
+    white-space: nowrap;
+}
+#avg-rank-table th.team-col { text-align: left; }
+#avg-rank-table td {
+    padding: 3px 6px;
+    text-align: center;
+    border-bottom: 1px solid #f4f4f4;
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+}
+#avg-rank-table td:first-child { color: #aaa; font-size: 11px; }
+#avg-rank-table td.team-col { text-align: left; font-size: 12px; color: #444; white-space: nowrap; }
+#avg-rank-table .logo-sm { height: 20px; width: 20px; object-fit: contain; vertical-align: middle; }
+#avg-rank-table tr.rv-divider td { padding: 6px 0 2px; color: #aaa; font-size: 11px; text-align: left; border-bottom: none; }
+
+#season-stats-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+#season-stats-modal.open {
+    display: flex;
+}
+#season-stats-box {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    max-width: 580px;
+    width: 95vw;
+    max-height: 88vh;
+    overflow: auto;
+    padding: 20px 24px 16px;
+}
+#season-stats-box h2 {
+    margin: 0 0 12px;
+    font-size: 1.05rem;
+    color: #333;
+}
+#season-stats-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+}
+#season-stats-table th {
+    font-size: 11px;
+    color: #888;
+    font-weight: normal;
+    padding: 4px 8px;
+    text-align: center;
+    border-bottom: 1px solid #ddd;
+    white-space: nowrap;
+}
+#season-stats-table th.team-col { text-align: left; }
+#season-stats-table td {
+    padding: 3px 6px;
+    text-align: center;
+    border-bottom: 1px solid #f4f4f4;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+#season-stats-table td.team-col { text-align: left; font-size: 12px; color: #444; }
+#season-stats-table td:first-child { color: #aaa; font-size: 11px; }
+#season-stats-table .logo-sm { height: 20px; width: 20px; object-fit: contain; vertical-align: middle; }
+
 @media (max-device-width: 768px) {
     .header {
         display: none !important;
@@ -771,6 +965,96 @@ const highlightClasses = [
     "team-highlight-1","team-highlight-2","team-highlight-3",
     "team-highlight-4","team-highlight-5"
 ];
+const highlightColors = {
+    "team-highlight-1": "#ffcc00",
+    "team-highlight-2": "#0077cc",
+    "team-highlight-3": "#ff6666",
+    "team-highlight-4": "#33cc33",
+    "team-highlight-5": "#cc66ff"
+};
+
+function getOffsetLeftInContainer(el, container) {
+    let x = 0;
+    while (el && el !== container) {
+        x += el.offsetLeft;
+        el = el.offsetParent;
+    }
+    return x;
+}
+
+function updateAvgRankLines() {
+    document.querySelectorAll(".avg-rank-line").forEach(el => el.remove());
+    // Clear previous consensus header highlights
+    document.querySelectorAll("th[data-consensus-highlight]").forEach(th => {
+        th.style.color = "";
+        delete th.dataset.consensusHighlight;
+        delete th.dataset.consensusColor;
+    });
+    const activeTab = document.querySelector(".week-tab.active");
+    if (!activeTab) return;
+    const block = document.getElementById(activeTab.dataset.week);
+    if (!block) return;
+    const officialSection = block.querySelectorAll(".ballot-section")[0];
+    if (!officialSection || officialSection.style.display === "none") return;
+    const container = officialSection.querySelector(".table-container");
+    if (!container) return;
+    const voterRows = Array.from(officialSection.querySelectorAll(".voter-row"))
+        .filter(r => !r.classList.contains("row-pinned-agg") && !r.classList.contains("row-weighted-ranking"));
+    if (voterRows.length === 0) return;
+    const sampleCells = voterRows[0].querySelectorAll("td");
+
+    // Get the aggregate row for consensus rank lookup
+    const aggSection = block.querySelectorAll(".ballot-section")[2];
+    const aggRow = aggSection ? aggSection.querySelector(".voter-row") : null;
+
+    // Official table header ths: th[0]=voter, th[1..25]=ranks
+    const headerThs = officialSection.querySelectorAll("thead th");
+
+    highlightClasses.forEach(cls => {
+        const sample = document.querySelector(`.team-logo.${cls}`);
+        if (!sample) return;
+        const team = sample.dataset.team;
+        const color = highlightColors[cls];
+        const ranks = [];
+        voterRows.forEach(row => {
+            let found = false;
+            row.querySelectorAll("td.logo-cell").forEach((cell, idx) => {
+                if (cell.querySelector(`.team-logo[data-team="${team}"]`)) { ranks.push(idx + 1); found = true; }
+            });
+            if (!found) ranks.push(26);
+        });
+        const avg = ranks.reduce((a, b) => a + b, 0) / ranks.length;
+        if (avg > 25) return;
+        const floorR = Math.floor(avg);
+        const ceilR = Math.ceil(avg);
+        const frac = avg - floorR;
+        const getX = r => {
+            const cell = sampleCells[r];
+            if (!cell) return 0;
+            return getOffsetLeftInContainer(cell, container) + cell.offsetWidth / 2;
+        };
+        const x = floorR === ceilR ? getX(floorR) : getX(floorR) + (getX(ceilR) - getX(floorR)) * frac;
+        const line = document.createElement("div");
+        line.className = "avg-rank-line";
+        line.style.left = x + "px";
+        line.style.background = color;
+        container.appendChild(line);
+
+        // Color the consensus rank header number
+        if (aggRow) {
+            let consensusRank = -1;
+            aggRow.querySelectorAll("td.logo-cell").forEach((cell, idx) => {
+                if (cell.querySelector(`.team-logo[data-team="${team}"]`)) consensusRank = idx + 1;
+            });
+            if (consensusRank >= 1 && consensusRank <= 25 && headerThs[consensusRank]) {
+                const th = headerThs[consensusRank];
+                th.style.color = color;
+                th.dataset.consensusHighlight = "1";
+                th.dataset.consensusColor = color;
+            }
+        }
+    });
+}
 
 function lazyLoadWeek(block) {
     if (!block) return;
@@ -909,6 +1193,20 @@ function toggleAllDeltas() {
     }
 }
 
+function expandAllDeltas() {
+    const allRows = Array.from(document.querySelectorAll(".voter-row"));
+    const deltaData = buildDeltaData();
+    const sortedTabs = getSortedTabs();
+    allRows.forEach(r => {
+        if (!r.classList.contains("row-delta")) {
+            r.classList.add("row-delta");
+            if (r.classList.contains("row-weighted-ranking")) return;
+            const weekId = r.closest(".week-block")?.id;
+            if (weekId) applyDeltaToRow(r, weekId, deltaData, sortedTabs);
+        }
+    });
+}
+
 function hideRankHeaders(block) {
     if (!block) return;
     block.querySelectorAll("table thead th:not(:first-child)").forEach(th => { th.style.color = "transparent"; th.style.borderRight = "none"; });
@@ -916,7 +1214,7 @@ function hideRankHeaders(block) {
 
 function showRankHeaders(block) {
     if (!block) return;
-    block.querySelectorAll("table thead th:not(:first-child)").forEach(th => { th.style.color = ""; th.style.borderRight = ""; });
+    block.querySelectorAll("table thead th:not(:first-child)").forEach(th => { th.style.color = th.dataset.consensusColor || ""; th.style.borderRight = ""; });
 }
 
 function bindVotersToggle() {
@@ -965,10 +1263,14 @@ document.addEventListener("mousedown", e => {
     const opt = e.target.closest(".sort-option");
     if (!opt) return;
     e.stopPropagation();
+    const sort = opt.dataset.sort;
+    // Check if locked and prevent interaction with locked tabs
+    if (sortTabsLocked && (sort === "ranking" || sort === "tenure")) {
+        return;
+    }
     document.querySelectorAll(".consensus-dist").forEach(el => el.remove());
     document.querySelectorAll(".rank-score-label").forEach(el => el.remove());
     rankingSortActive = false;
-    const sort = opt.dataset.sort;
     const picker = opt.closest(".sort-picker");
     // Show the toggle again
     if (picker._toggle) picker._toggle.style.display = "";
@@ -1050,8 +1352,6 @@ function applyTableSort(sort, clickedTable) {
         // Sort by deviation from official consensus (most conformist first)
         // Read consensus directly from the rendered aggregate row so it always
         // matches the Official Overall row exactly (avoids recompute divergence).
-        const weekId = activeTab.dataset.week;
-        const sections = block.querySelectorAll(".ballot-section");
         const aggRow = sections[2]?.querySelector(".voter-row:not(.row-weighted-ranking)");
         const consensus = aggRow
             ? Array.from(aggRow.querySelectorAll(".team-logo")).map(img => img.dataset.team)
@@ -1205,42 +1505,81 @@ function bindVoterCells() {
     });
 }
 
-function showVoterHistory(username) {
-    const allTabsSorted = getSortedTabs();
-
-    // Build merged ballot data (official + provisional) for all weeks
-    const mergedData = {};
-    document.querySelectorAll(".week-tab").forEach(tab => {
-        const weekId = tab.dataset.week;
-        const block = document.getElementById(weekId);
-        if (!block) return;
-        mergedData[weekId] = {};
-        block.querySelectorAll(".ballot-section").forEach(section => {
-            section.querySelectorAll(".voter-row").forEach(row => {
-                const uname = getVoterName(row);
-                if (!uname || uname === "Official Overall") return;
-                if (!mergedData[weekId][uname]) {
-                    mergedData[weekId][uname] = Array.from(row.querySelectorAll(".team-logo")).map(img => img.dataset.team);
-                }
-            });
+// Compute the 5-Week Weighted top-25 teams for a given week.
+// Accepts pre-built deltaData and the year's tabs (sorted oldest-last, i.e. getSortedTabs() order).
+function compute5WeekWeightedTeams(weekId, deltaData, yearTabs) {
+    const currIdx = yearTabs.findIndex(t => t.dataset.week === weekId);
+    if (currIdx === -1) return null;
+    const last5WeekIds = [];
+    for (let i = currIdx; i < yearTabs.length && last5WeekIds.length < 5; i++) {
+        last5WeekIds.push(yearTabs[i].dataset.week);
+    }
+    if (last5WeekIds.length === 0) return null;
+    const currentVoters = Object.keys(deltaData[weekId] || {}).filter(u => u !== "Official Overall");
+    if (currentVoters.length === 0) return null;
+    const allTeamsSeen = new Set();
+    last5WeekIds.forEach(wid => {
+        Object.entries(deltaData[wid] || {}).forEach(([u, ballot]) => {
+            if (u !== "Official Overall" && ballot?.length) ballot.forEach(t => allTeamsSeen.add(t));
         });
     });
+    const teamAvgRankSum = {};
+    currentVoters.forEach(username => {
+        const voterLast5 = last5WeekIds.map(wid => deltaData[wid]?.[username] || null);
+        allTeamsSeen.forEach(team => {
+            let weightedSum = 0, totalWeight = 0;
+            voterLast5.forEach((ballot, wi) => {
+                if (!ballot) return;
+                const weight = last5WeekIds.length - wi;
+                const pos = ballot.indexOf(team);
+                weightedSum += (pos === -1 ? 26 : pos + 1) * weight;
+                totalWeight += weight;
+            });
+            if (totalWeight > 0) teamAvgRankSum[team] = (teamAvgRankSum[team] || 0) + weightedSum / totalWeight;
+        });
+    });
+    const ranked = Object.entries(teamAvgRankSum).sort((a, b) => a[1] - b[1]).slice(0, 25).map(([team]) => team);
+    return ranked.length > 0 ? ranked : null;
+}
 
-    // Use the active week's year
-    const activeTab = document.querySelector(".week-tab.active");
-    const currentYear = activeTab?.dataset.year || allTabsSorted[0]?.dataset.year;
-    const yearTabs = allTabsSorted
-        .filter(t => t.dataset.year === currentYear)
-        .reverse();
+// Build a map of { weekId -> teams[] | null } for the given username across all loaded weeks.
+// Works for regular voters, "Official Overall" (aggregate row), and "5-Week Weighted" (computed).
+function buildSeasonDataForUser(username) {
+    const result = {};
+    const allTabsSorted = getSortedTabs();
+    if (username === "5-Week Weighted") {
+        const deltaData = buildDeltaData();
+        const yearGroups = {};
+        allTabsSorted.forEach(tab => {
+            if (!yearGroups[tab.dataset.year]) yearGroups[tab.dataset.year] = [];
+            yearGroups[tab.dataset.year].push(tab);
+        });
+        allTabsSorted.forEach(tab => {
+            result[tab.dataset.week] = compute5WeekWeightedTeams(tab.dataset.week, deltaData, yearGroups[tab.dataset.year]) || null;
+        });
+        return result;
+    }
+    // For all named rows (regular voters and "Official Overall"):
+    allTabsSorted.forEach(tab => {
+        const weekId = tab.dataset.week;
+        const block = document.getElementById(weekId);
+        result[weekId] = null;
+        if (!block) return;
+        outer: for (const section of block.querySelectorAll(".ballot-section")) {
+            for (const row of section.querySelectorAll(".voter-row")) {
+                if (getVoterName(row) !== username) continue;
+                result[weekId] = Array.from(row.querySelectorAll(".team-logo")).map(img => img.dataset.team);
+                break outer;
+            }
+        }
+    });
+    return result;
+}
 
-    const modal = document.getElementById("voter-history-modal");
-    const title = document.getElementById("voter-history-title");
-    const table = document.getElementById("voter-history-table");
+function renderVoterHistoryTable(mergedData, yearTabs, container) {
+    container.innerHTML = "";
+    container.style.cssText = "";
 
-    title.textContent = username + " — Season Ballots";
-    table.innerHTML = "";
-
-    // Header row: rank columns 1–25
     const thead = document.createElement("thead");
     const headerRow = document.createElement("tr");
     const weekTh = document.createElement("th");
@@ -1254,12 +1593,12 @@ function showVoterHistory(username) {
         headerRow.appendChild(th);
     }
     thead.appendChild(headerRow);
-    table.appendChild(thead);
+    container.appendChild(thead);
 
     const tbody = document.createElement("tbody");
     yearTabs.forEach(tab => {
         const weekId = tab.dataset.week;
-        const teams = mergedData[weekId]?.[username];
+        const teams = mergedData[weekId];
         if (!teams || teams.length === 0) return;
         const tr = document.createElement("tr");
 
@@ -1281,7 +1620,30 @@ function showVoterHistory(username) {
         });
         tbody.appendChild(tr);
     });
-    table.appendChild(tbody);
+    container.appendChild(tbody);
+}
+
+
+function showVoterHistory(username) {
+    const allTabsSorted = getSortedTabs();
+
+    // Build ballot data for all weeks
+    const mergedData = buildSeasonDataForUser(username);
+
+    // Use the active week's year
+    const activeTab = document.querySelector(".week-tab.active");
+    const currentYear = activeTab?.dataset.year || allTabsSorted[0]?.dataset.year;
+    const yearTabs = allTabsSorted
+        .filter(t => t.dataset.year === currentYear)
+        .reverse();
+
+    const modal = document.getElementById("voter-history-modal");
+    const title = document.getElementById("voter-history-title");
+    const table = document.getElementById("voter-history-table");
+
+    title.textContent = username + " \u2013 " + currentYear + " Ballots";
+
+    renderVoterHistoryTable(mergedData, yearTabs, table);
     modal.classList.add("open");
     bindTeamLogos();
     // Apply any active highlight classes to the newly created logos
@@ -1298,11 +1660,20 @@ document.getElementById("voter-history-modal").addEventListener("click", e => {
     if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
 });
 
+
 function bindTeamLogos() {
     document.querySelectorAll(".team-logo").forEach(logo => {
         if (logo.dataset.bound) return;
         logo.dataset.bound = "1";
-        logo.addEventListener("click", () => {
+        logo.addEventListener("click", (e) => {
+            if (e.shiftKey) {
+                e.stopPropagation();
+                const team = logo.dataset.team;
+                const row = logo.closest(".voter-row");
+                const username = row ? getVoterName(row) : null;
+                showTeamRankChart(team, username);
+                return;
+            }
             const team = logo.dataset.team;
             const teamElements = Array.from(document.querySelectorAll(`.team-logo[data-team="${team}"]`));
             const isHighlighted = teamElements.some(el => highlightClasses.some(c => el.classList.contains(c)));
@@ -1313,12 +1684,250 @@ function bindTeamLogos() {
                 const availableColor = highlightClasses.find(c => !usedColors.includes(c));
                 if (availableColor) teamElements.forEach(el => el.classList.add(availableColor));
             }
+            updateAvgRankLines();
         });
     });
 }
 
+function bindRankHeaders() {
+    const activeTab = document.querySelector(".week-tab.active");
+    if (!activeTab) return;
+    const block = document.getElementById(activeTab.dataset.week);
+    if (!block) return;
+    const officialSection = block.querySelectorAll(".ballot-section")[0];
+    if (!officialSection) return;
+    officialSection.querySelectorAll("thead .rank-header-num").forEach((span, i) => {
+        if (span.dataset.rankBound) return;
+        span.dataset.rankBound = "1";
+        const rank = i + 1;
+        span.addEventListener("click", () => {
+            const aggSection = block.querySelectorAll(".ballot-section")[2];
+            if (!aggSection) return;
+            const aggRow = aggSection.querySelector(".voter-row:not(.row-weighted-ranking)");
+            if (!aggRow) return;
+            const logo = aggRow.querySelectorAll("td.logo-cell")[rank - 1]?.querySelector(".team-logo");
+            if (!logo) return;
+            const team = logo.dataset.team;
+            const teamElements = Array.from(document.querySelectorAll(`.team-logo[data-team="${team}"]`));
+            const isHighlighted = teamElements.some(el => highlightClasses.some(c => el.classList.contains(c)));
+            if (isHighlighted) {
+                teamElements.forEach(el => highlightClasses.forEach(c => el.classList.remove(c)));
+            } else {
+                const usedColors = highlightClasses.filter(c => document.querySelector("." + c));
+                const availableColor = highlightClasses.find(c => !usedColors.includes(c));
+                if (availableColor) teamElements.forEach(el => el.classList.add(availableColor));
+            }
+            updateAvgRankLines();
+        });
+    });
+}
+
+function showTeamRankChart(team, username) {
+    const allTabsSorted = getSortedTabs();
+
+    // Build ballot data for all weeks (works for all row types)
+    const mergedData = username ? buildSeasonDataForUser(username) : {};
+
+    // Current year's weeks in chronological order
+    const activeTab = document.querySelector(".week-tab.active");
+    const currentYear = activeTab?.dataset.year || allTabsSorted[0]?.dataset.year;
+    const yearTabs = allTabsSorted.filter(t => t.dataset.year === currentYear).reverse();
+
+    // Build data points: rank per week (null = not ranked, hasBallot = submitted a ballot that week)
+    const dataPoints = yearTabs.map(tab => {
+        const weekId = tab.dataset.week;
+        const weekNum = parseInt(tab.dataset.weeknum);
+        let rank = null;
+        const teams = username ? mergedData[weekId] : null;
+        const hasBallot = !!teams;
+        if (teams) {
+            const idx = teams.indexOf(team);
+            if (idx !== -1) rank = idx + 1;
+        }
+        return { weekNum, rank, hasBallot };
+    });
+
+    const modal = document.getElementById("voter-history-modal");
+    const title = document.getElementById("voter-history-title");
+    const table = document.getElementById("voter-history-table");
+
+    title.innerHTML = `<img class="logo" src="cbb-logos/${team}.webp" style="height:22px;vertical-align:middle;margin-right:6px;">${team} — ${username || "Unknown"}`;
+    table.innerHTML = "";
+    table.style.cssText = "display:block; white-space:normal; width:100%;";
+
+    // SVG chart
+    const svgNS = "http://www.w3.org/2000/svg";
+    const W = 900, H = 500;
+    const mL = 44, mR = 20, mT = 28, mB = 40;
+    const cW = W - mL - mR, cH = H - mT - mB;
+
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.style.cssText = "width:min(860px,90vw);display:block;margin:0 auto;";
+
+    const weeks = dataPoints.map(d => d.weekNum);
+    const minW = Math.min(...weeks), maxW = Math.max(...weeks);
+    const wRange = Math.max(maxW - minW, 1);
+    const xPos = w => mL + ((w - minW) / wRange) * cW;
+    const yPos = r => mT + ((r - 1) / 24) * cH;  // rank 1 at top
+
+    const axisColor = "#999", gridColor = "#e8e8e8";
+
+    // Rank gridlines + y-axis labels
+    [1, 5, 10, 15, 20, 25].forEach(r => {
+        const y = yPos(r);
+        const line = document.createElementNS(svgNS, "line");
+        line.setAttribute("x1", mL); line.setAttribute("x2", mL + cW);
+        line.setAttribute("y1", y); line.setAttribute("y2", y);
+        line.setAttribute("stroke", gridColor); line.setAttribute("stroke-width", "1");
+        svg.appendChild(line);
+        const txt = document.createElementNS(svgNS, "text");
+        txt.setAttribute("x", mL - 6); txt.setAttribute("y", y + 4);
+        txt.setAttribute("text-anchor", "end"); txt.setAttribute("font-size", "11");
+        txt.setAttribute("fill", axisColor);
+        txt.textContent = r;
+        svg.appendChild(txt);
+    });
+
+    // Chart border
+    const border = document.createElementNS(svgNS, "rect");
+    border.setAttribute("x", mL); border.setAttribute("y", mT);
+    border.setAttribute("width", cW); border.setAttribute("height", cH);
+    border.setAttribute("fill", "none"); border.setAttribute("stroke", "#ddd");
+    border.setAttribute("stroke-width", "1");
+    svg.appendChild(border);
+
+    // Y-axis label
+    const yLbl = document.createElementNS(svgNS, "text");
+    yLbl.setAttribute("x", 10); yLbl.setAttribute("y", mT + cH / 2);
+    yLbl.setAttribute("text-anchor", "middle"); yLbl.setAttribute("font-size", "11");
+    yLbl.setAttribute("fill", axisColor);
+    yLbl.setAttribute("transform", `rotate(-90,10,${mT + cH / 2})`);
+    yLbl.textContent = "Rank";
+    svg.appendChild(yLbl);
+
+    // X-axis ticks + week labels
+    dataPoints.forEach(d => {
+        const x = xPos(d.weekNum);
+        const tick = document.createElementNS(svgNS, "line");
+        tick.setAttribute("x1", x); tick.setAttribute("x2", x);
+        tick.setAttribute("y1", mT + cH); tick.setAttribute("y2", mT + cH + 4);
+        tick.setAttribute("stroke", axisColor);
+        svg.appendChild(tick);
+        const txt = document.createElementNS(svgNS, "text");
+        txt.setAttribute("x", x); txt.setAttribute("y", mT + cH + 15);
+        txt.setAttribute("text-anchor", "middle"); txt.setAttribute("font-size", "11");
+        txt.setAttribute("fill", axisColor);
+        txt.textContent = d.weekNum;
+        svg.appendChild(txt);
+    });
+
+    // X-axis label
+    const xLbl = document.createElementNS(svgNS, "text");
+    xLbl.setAttribute("x", mL + cW / 2); xLbl.setAttribute("y", H - 4);
+    xLbl.setAttribute("text-anchor", "middle"); xLbl.setAttribute("font-size", "11");
+    xLbl.setAttribute("fill", axisColor);
+    xLbl.textContent = "Week";
+    svg.appendChild(xLbl);
+
+    // Dashed vertical line for NR weeks (only when ballot was submitted but team not ranked)
+    dataPoints.filter(d => d.rank === null && d.hasBallot).forEach(d => {
+        const x = xPos(d.weekNum);
+        const nrLine = document.createElementNS(svgNS, "line");
+        nrLine.setAttribute("x1", x); nrLine.setAttribute("x2", x);
+        nrLine.setAttribute("y1", mT); nrLine.setAttribute("y2", mT + cH);
+        nrLine.setAttribute("stroke", "#eee"); nrLine.setAttribute("stroke-width", "1");
+        nrLine.setAttribute("stroke-dasharray", "3,3");
+        svg.appendChild(nrLine);
+        const nrTxt = document.createElementNS(svgNS, "text");
+        nrTxt.setAttribute("x", x); nrTxt.setAttribute("y", mT + cH - 5);
+        nrTxt.setAttribute("text-anchor", "middle"); nrTxt.setAttribute("font-size", "9");
+        nrTxt.setAttribute("fill", "#ccc");
+        nrTxt.textContent = "NR";
+        svg.appendChild(nrTxt);
+    });
+
+    // Line connecting ranked weeks
+    const ranked = dataPoints.filter(d => d.rank !== null);
+    if (ranked.length >= 2) {
+        const poly = document.createElementNS(svgNS, "polyline");
+        poly.setAttribute("points", ranked.map(d => `${xPos(d.weekNum)},${yPos(d.rank)}`).join(" "));
+        poly.setAttribute("fill", "none"); poly.setAttribute("stroke", "#2277cc");
+        poly.setAttribute("stroke-width", "2.5"); poly.setAttribute("stroke-linejoin", "round");
+        poly.setAttribute("stroke-linecap", "round");
+        svg.appendChild(poly);
+    }
+
+    // Data point circles + rank labels
+    ranked.forEach(d => {
+        const x = xPos(d.weekNum), y = yPos(d.rank);
+        const circle = document.createElementNS(svgNS, "circle");
+        circle.setAttribute("cx", x); circle.setAttribute("cy", y);
+        circle.setAttribute("r", "5"); circle.setAttribute("fill", "#2277cc");
+        circle.setAttribute("stroke", "#fff"); circle.setAttribute("stroke-width", "2");
+        svg.appendChild(circle);
+        const lbl = document.createElementNS(svgNS, "text");
+        lbl.setAttribute("x", x); lbl.setAttribute("y", y - 9);
+        lbl.setAttribute("text-anchor", "middle"); lbl.setAttribute("font-size", "11");
+        lbl.setAttribute("fill", "#2277cc"); lbl.setAttribute("font-weight", "bold");
+        lbl.textContent = d.rank;
+        svg.appendChild(lbl);
+    });
+
+    // Message if never ranked
+    if (ranked.length === 0) {
+        const msg = document.createElementNS(svgNS, "text");
+        msg.setAttribute("x", mL + cW / 2); msg.setAttribute("y", mT + cH / 2);
+        msg.setAttribute("text-anchor", "middle"); msg.setAttribute("font-size", "14");
+        msg.setAttribute("fill", "#999");
+        msg.textContent = `${team} not ranked by ${username || "this voter"} this season`;
+        svg.appendChild(msg);
+    }
+
+    table.appendChild(svg);
+    modal.classList.add("open");
+}
+
 let weekPickerPinned = false;
 const isMobile = () => screen.width <= 768;
+
+let _lastFaviconWeek = null;
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (_lastFaviconWeek !== null) updateFavicon(_lastFaviconWeek);
+});
+
+function updateFavicon(n) {
+    _lastFaviconWeek = n;
+    const size = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    const label = String(n);
+    let fontSize = size;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    do {
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        fontSize--;
+    } while (ctx.measureText(label).width > size * 0.88 && fontSize > 4);
+
+    ctx.fillStyle = dark ? '#ffffff' : '#222222';
+    ctx.fillText(label, size / 2, size / 2);
+
+    const url = canvas.toDataURL('image/png');
+    const old = document.getElementById('favicon');
+    if (old) old.parentNode.removeChild(old);
+    const link = document.createElement('link');
+    link.id = 'favicon';
+    link.rel = 'icon';
+    link.type = 'image/png';
+    link.href = url;
+    document.head.appendChild(link);
+}
 
 function closeAllPickers(forceCloseYear = false) {
     if (weekPickerPinned && !forceCloseYear) return;
@@ -1435,11 +2044,12 @@ function showWeek(weekId) {
             document.getElementById("year-text").innerText = tab.dataset.year;
             rebuildWeekPicker();
         }
+        updateFavicon(wn);
     }
 
     const toggleText = document.getElementById("toggle-text").innerText;
     const isProvisional = !isMobile() && toggleText === "Provisional Ballots";
-    const isAggregate = !isMobile() && toggleText === "Aggregate Ballots";
+    const isAggregate = !isMobile() && toggleText === "Data Ballots";
     if (block) {
         block.querySelectorAll(".ballot-section").forEach(s => s.style.display = "none");
         const sections = block.querySelectorAll(".ballot-section");
@@ -1457,12 +2067,14 @@ function showWeek(weekId) {
     }
 
     bindTeamLogos();
+    bindRankHeaders();
     bindVoterCells();
     bindVotersToggle();
     updateRankingOptionVisibility();
     if (currentSort && currentSort !== "ranking") {
         applyTableSort(currentSort);
     }
+    updateAvgRankLines();
     if (rankingSortActive) {
         const activeTab2 = document.querySelector(".week-tab.active");
         if (activeTab2) {
@@ -1499,6 +2111,7 @@ document.getElementById("toggle-text").addEventListener("click", () => {
     updateRankingOptionVisibility();
     if (currentSort === "ranking") resetRankingSort();
     applyTableSort(currentSort);
+    updateAvgRankLines();
 });
 
 function updateRankingOptionVisibility() {
@@ -1705,6 +2318,100 @@ function injectWeightedRankingRow(activeTab, activeBlock) {
     bindTeamLogos();
 }
 
+function showAvgRankModal(weekId) {
+    const block = document.getElementById(weekId);
+    if (!block) return;
+    const sections = block.querySelectorAll(".ballot-section");
+    const officialSection = sections[0];
+    if (!officialSection) return;
+
+    // Collect all voter rows (exclude Official Overall)
+    const voterRows = Array.from(officialSection.querySelectorAll(".voter-row"))
+        .filter(r => getVoterName(r) !== "Official Overall");
+    const totalVoters = voterRows.length;
+    if (totalVoters === 0) return;
+
+    // Compute rank sums, voter counts, points, and rank lists per team
+    const teamRankSum = {};
+    const teamVoterCount = {};
+    const teamPoints = {};
+    const teamRanks = {};
+    voterRows.forEach(row => {
+        const teams = Array.from(row.querySelectorAll(".team-logo")).map(img => img.dataset.team);
+        teams.slice(0, 25).forEach((team, i) => {
+            const rank = i + 1;
+            teamRankSum[team] = (teamRankSum[team] || 0) + rank;
+            teamVoterCount[team] = (teamVoterCount[team] || 0) + 1;
+            teamPoints[team] = (teamPoints[team] || 0) + (26 - rank);
+            if (!teamRanks[team]) teamRanks[team] = [];
+            teamRanks[team].push(rank);
+        });
+    });
+
+    const computeMedian = ranks => {
+        const sorted = [...ranks].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+    };
+
+    // Sort by points descending (same order as Official Overall)
+    const allTeams = Object.entries(teamPoints).sort((a, b) => b[1] - a[1]).map(([t]) => t);
+    const top25 = allTeams.slice(0, 25);
+    const receivingVotes = allTeams.slice(25);
+
+    const activeTab = document.querySelector(".week-tab.active");
+    const weekNum = activeTab?.dataset.weeknum || "";
+    const year = activeTab?.dataset.year || "";
+
+    const modal = document.getElementById("avg-rank-modal");
+    const title = document.getElementById("avg-rank-title");
+    const table = document.getElementById("avg-rank-table");
+
+    const weekPad = String(weekNum).padStart(2, "0");
+    title.textContent = `${year} #${weekPad} Statistics`;
+
+    const buildRow = (team, rank) => {
+        const avg = teamRankSum[team] / teamVoterCount[team];
+        const median = computeMedian(teamRanks[team]);
+        const count = teamVoterCount[team];
+        const pts = teamPoints[team];
+        return `<tr>
+            <td>${rank}</td>
+            <td style="padding:2px 4px;"><img class="logo-sm" src="cbb-logos/${team}.webp"></td>
+            <td class="team-col">${team}</td>
+            <td>${avg.toFixed(2)}</td>
+            <td>${Number.isInteger(median) ? median : median.toFixed(1)}</td>
+            <td>${count}/${totalVoters}</td>
+            <td>${pts}</td>
+        </tr>`;
+    };
+
+    let html = `<colgroup>
+        <col style="width:28px">
+        <col style="width:28px">
+        <col>
+        <col style="width:64px">
+        <col style="width:56px">
+        <col style="width:56px">
+        <col style="width:36px">
+    </colgroup><thead><tr>
+        <th>#</th><th></th>
+        <th class="team-col">Team</th>
+        <th>Avg Rank</th>
+        <th>Median</th>
+        <th>Voters</th>
+        <th>Pts</th>
+    </tr></thead><tbody>`;
+    top25.forEach((team, i) => { html += buildRow(team, i + 1); });
+    if (receivingVotes.length > 0) {
+        html += `<tr class="rv-divider"><td colspan="7">Receiving Votes</td></tr>`;
+        receivingVotes.forEach((team, i) => { html += buildRow(team, 26 + i); });
+    }
+    html += "</tbody>";
+    table.innerHTML = html;
+    modal.classList.add("open");
+}
+
 function showAggregateSection() {
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab) return;
@@ -1714,7 +2421,7 @@ function showAggregateSection() {
     if (!sections[2]) return;
     sections.forEach(s => s.style.display = "none");
     sections[2].style.display = "block";
-    document.getElementById("toggle-text").innerText = "Aggregate Ballots";
+    document.getElementById("toggle-text").innerText = "Data Ballots";
     injectWeightedRankingRow(activeTab, activeBlock);
     bindVoterCells();
     bindTeamLogos();
@@ -1761,6 +2468,15 @@ document.getElementById("week-text").addEventListener("click", e => {
         }
     }
 });
+
+// Close sort pickers on scroll
+document.addEventListener("scroll", () => {
+    document.querySelectorAll(".sort-picker.open").forEach(p => {
+        p.classList.remove("open");
+        if (p._toggle) p._toggle.style.display = "";
+        showRankHeaders(p._sourceBlock || p.closest(".week-block"));
+    });
+}, { passive: true });
 
 // Close pickers when clicking elsewhere (respects pinned state)
 document.addEventListener("click", e => {
@@ -2042,8 +2758,103 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
 }
 
 
+function showSeasonStatsModal() {
+    const activeTab = document.querySelector(".week-tab.active");
+    if (!activeTab) return;
+    const currentYear = activeTab.dataset.year;
+
+    const allTabs = getSortedTabs();
+    const yearTabs = allTabs.filter(t => t.dataset.year === currentYear).reverse();
+    if (yearTabs.length === 0) return;
+
+    const totalWeeks = yearTabs.length;
+
+    // Accumulate per-team stats from official ballot sections only
+    const teamTotalPts = {};
+    const teamRankSum = {};
+    const teamVoterWeeks = {};  // total voter-ballot appearances (for avg rank)
+    const teamWeeksRanked = {}; // distinct weeks the team appeared in any ballot
+    const teamFirstPlaceVotes = {};
+    const teamBestRank = {};
+
+    yearTabs.forEach(tab => {
+        const weekId = tab.dataset.week;
+        const block = document.getElementById(weekId);
+        if (!block) return;
+        const officialSection = block.querySelectorAll(".ballot-section")[0];
+        if (!officialSection) return;
+
+        const seenThisWeek = new Set();
+        officialSection.querySelectorAll(".voter-row").forEach(row => {
+            if (getVoterName(row) === "Official Overall") return;
+            const teams = Array.from(row.querySelectorAll(".team-logo")).map(img => img.dataset.team);
+            teams.slice(0, 25).forEach((team, i) => {
+                const rank = i + 1;
+                teamTotalPts[team] = (teamTotalPts[team] || 0) + (25 - i);
+                teamRankSum[team] = (teamRankSum[team] || 0) + rank;
+                teamVoterWeeks[team] = (teamVoterWeeks[team] || 0) + 1;
+                seenThisWeek.add(team);
+                if (rank === 1) teamFirstPlaceVotes[team] = (teamFirstPlaceVotes[team] || 0) + 1;
+                if (!teamBestRank[team] || rank < teamBestRank[team]) teamBestRank[team] = rank;
+            });
+        });
+        seenThisWeek.forEach(team => {
+            teamWeeksRanked[team] = (teamWeeksRanked[team] || 0) + 1;
+        });
+    });
+
+    // Sort by total season points descending
+    const allTeams = Object.keys(teamTotalPts).sort((a, b) => teamTotalPts[b] - teamTotalPts[a]);
+
+    const modal = document.getElementById("season-stats-modal");
+    const title = document.getElementById("season-stats-title");
+    const table = document.getElementById("season-stats-table");
+
+    title.textContent = `${currentYear} Season Statistics`;
+
+    let html = `<colgroup>
+        <col style="width:24px">
+        <col style="width:26px">
+        <col>
+        <col style="width:52px">
+        <col style="width:44px">
+        <col style="width:60px">
+        <col style="width:52px">
+        <col style="width:36px">
+    </colgroup><thead><tr>
+        <th>#</th><th></th>
+        <th class="team-col">Team</th>
+        <th>Weeks</th>
+        <th>Pts</th>
+        <th>Avg Rank</th>
+        <th>#1 Votes</th>
+        <th>Best</th>
+    </tr></thead><tbody>`;
+
+    allTeams.forEach((team, i) => {
+        const avgRank = (teamRankSum[team] / teamVoterWeeks[team]).toFixed(2);
+        const firstPlace = teamFirstPlaceVotes[team] || 0;
+        html += `<tr>
+            <td>${i + 1}</td>
+            <td><img class="logo-sm" src="cbb-logos/${team}.webp"></td>
+            <td class="team-col">${team}</td>
+            <td>${teamWeeksRanked[team]}/${totalWeeks}</td>
+            <td>${teamTotalPts[team]}</td>
+            <td>${avgRank}</td>
+            <td>${firstPlace || "—"}</td>
+            <td>${teamBestRank[team]}</td>
+        </tr>`;
+    });
+
+    html += `</tbody>`;
+    table.innerHTML = html;
+    modal.classList.add("open");
+}
+
 // Keyboard shortcuts
 let rankingSortActive = false;
+let sortTabsLocked = true;
+let lastKeyWasU = false;
 
 function computeVoterAvg(yearTabs, lbData) {
     // Per-week consensus ranking (Official Overall computed from that week's official ballots)
@@ -2265,11 +3076,45 @@ function sortByRanking() {
     rankingSortActive = true;
 }
 
+document.getElementById("keybind-legend-modal").addEventListener("click", e => {
+    if (e.target === document.getElementById("keybind-legend-modal"))
+        document.getElementById("keybind-legend-modal").classList.remove("open");
+});
+
+document.getElementById("avg-rank-modal").addEventListener("click", e => {
+    if (e.target === document.getElementById("avg-rank-modal"))
+        document.getElementById("avg-rank-modal").classList.remove("open");
+});
+
+document.getElementById("season-stats-modal").addEventListener("click", e => {
+    if (e.target === document.getElementById("season-stats-modal"))
+        document.getElementById("season-stats-modal").classList.remove("open");
+});
+
 document.addEventListener("keydown", e => {
     if (e.key === "Escape") {
         document.getElementById("voter-history-modal").classList.remove("open");
+        document.getElementById("keybind-legend-modal").classList.remove("open");
+        document.getElementById("avg-rank-modal").classList.remove("open");
+        document.getElementById("season-stats-modal").classList.remove("open");
     }
-    if (!e.shiftKey) return;
+    // Check for unlock combo: Shift+U then !
+    if (e.shiftKey && (e.key === "!" || e.key === "Shift")) {
+        if (e.key === "!" && lastKeyWasU) {
+            e.preventDefault();
+            sortTabsLocked = false;
+            lastKeyWasU = false;
+            // Update UI to remove locked class from tabs
+            document.querySelectorAll(".sort-option[data-sort='ranking'], .sort-option[data-sort='tenure']").forEach(opt => {
+                opt.classList.remove("locked");
+            });
+            return;
+        }
+    }
+    if (!e.shiftKey) {
+        lastKeyWasU = false;
+        return;
+    }
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab) return;
 
@@ -2278,19 +3123,65 @@ document.addEventListener("keydown", e => {
 
     if (e.key === "A" || e.key === "a") {
         e.preventDefault();
-        showAggregateSection();
+        applyTableSort("alphabetic");
         return;
     }
 
     if (e.key === "D" || e.key === "d") {
         e.preventDefault();
-        toggleAllDeltas();
+        showAggregateSection();
+        return;
+    }
+
+    if (e.key === "E" || e.key === "e") {
+        e.preventDefault();
+        expandAllDeltas();
         return;
     }
 
     if (e.key === "J" || e.key === "j") {
         e.preventDefault();
-        sortByRanking();
+        if (!sortTabsLocked) {
+            applyTableSort("ranking");
+        }
+        return;
+    }
+
+    if (e.key === "C" || e.key === "c") {
+        e.preventDefault();
+        applyTableSort("consensus");
+        return;
+    }
+
+    if (e.key === "R" || e.key === "r") {
+        e.preventDefault();
+        if (!sortTabsLocked) {
+            applyTableSort("ranking");
+        }
+        return;
+    }
+
+    if (e.key === "T" || e.key === "t") {
+        e.preventDefault();
+        if (!sortTabsLocked) {
+            applyTableSort("tenure");
+        }
+        return;
+    }
+
+    if (e.key === "Y" || e.key === "y") {
+        e.preventDefault();
+        const activeTab = document.querySelector(".week-tab.active");
+        if (activeTab) showAvgRankModal(activeTab.dataset.week);
+        return;
+    }
+
+    if (e.key === "U" || e.key === "u") {
+        e.preventDefault();
+        lastKeyWasU = true;
+        // Reset flag after 1 second if no ! is pressed
+        setTimeout(() => { lastKeyWasU = false; }, 1000);
+        showSeasonStatsModal();
         return;
     }
 
@@ -2344,9 +3235,26 @@ document.addEventListener("keydown", e => {
             if (weekPickerPinned) rebuildWeekPicker();
         }
     }
+
+    if (e.key === "?") {
+        e.preventDefault();
+        document.getElementById("keybind-legend-modal").classList.toggle("open");
+    }
 });
 
+// Update locked state UI
+function updateLockedUI() {
+    document.querySelectorAll(".sort-option[data-sort='ranking'], .sort-option[data-sort='tenure']").forEach(opt => {
+        if (sortTabsLocked) {
+            opt.classList.add("locked");
+        } else {
+            opt.classList.remove("locked");
+        }
+    });
+}
+
 // Init
+updateLockedUI();
 rebuildYearPicker();
 rebuildWeekPicker();
 const allTabs = getSortedTabs();
@@ -2366,7 +3274,7 @@ def build_full_html(week_tabs_html, week_data_html):
 <title>Userpoll Landscape</title>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1200, user-scalable=yes">
-<link rel="icon" href="data:,">
+<link id="favicon" rel="icon" type="image/png" href="data:,">
 <!-- Open Graph / link preview -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="Userpoll Landscape">
@@ -2403,6 +3311,52 @@ def build_full_html(week_tabs_html, week_data_html):
   <div id="voter-history-box">
     <h2 id="voter-history-title"></h2>
     <table id="voter-history-table"></table>
+  </div>
+</div>
+
+<div id="keybind-legend-modal">
+  <div id="keybind-legend-box">
+    <h2>Keyboard Shortcuts</h2>
+    <div class="keybind-section">
+      <div class="keybind-section-title">Navigation</div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>→</kbd> / <kbd>←</kbd></span><span>Next / Previous Week</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>↑</kbd> / <kbd>↓</kbd></span><span>Next / Previous Year</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>D</kbd></span><span>Jump to Data Ballots</span></div>
+    </div>
+    <div class="keybind-section">
+      <div class="keybind-section-title">Views</div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>E</kbd></span><span>Expand Deltas</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>1</kbd> – <kbd>9</kbd></span><span>Adjust Delta Lookback Window</span></div>
+    </div>
+    <div class="keybind-section">
+      <div class="keybind-section-title">Sorting</div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>A</kbd></span><span>Sort Alphabetically</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>C</kbd></span><span>Sort by Consensus</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>R</kbd></span><span>Sort by Précision</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>T</kbd></span><span>Sort by Tenure</span></div>
+    </div>
+    <div class="keybind-section">
+      <div class="keybind-section-title">Other</div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>Y</kbd></span><span>Week avg rank table</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>U</kbd></span><span>Season statistics</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>P</kbd></span><span>Save table as PNG</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>?</kbd></span><span>Show legend</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Esc</kbd></span><span>Close</span></div>
+    </div>
+  </div>
+</div>
+
+<div id="avg-rank-modal">
+  <div id="avg-rank-box">
+    <h2 id="avg-rank-title"></h2>
+    <table id="avg-rank-table"></table>
+  </div>
+</div>
+
+<div id="season-stats-modal">
+  <div id="season-stats-box">
+    <h2 id="season-stats-title"></h2>
+    <table id="season-stats-table"></table>
   </div>
 </div>
 
