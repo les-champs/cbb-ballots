@@ -552,6 +552,114 @@ kbd {
     letter-spacing: 1px;
 }
 
+#avg-rank-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+#avg-rank-modal.open {
+    display: flex;
+}
+#avg-rank-box {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    max-width: 420px;
+    width: 95vw;
+    max-height: 88vh;
+    overflow: auto;
+    padding: 20px 24px 16px;
+}
+#avg-rank-box h2 {
+    margin: 0 0 12px;
+    font-size: 1.05rem;
+    color: #333;
+}
+#avg-rank-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+}
+#avg-rank-table th {
+    font-size: 11px;
+    color: #888;
+    font-weight: normal;
+    padding: 4px 8px;
+    text-align: center;
+    border-bottom: 1px solid #ddd;
+    white-space: nowrap;
+}
+#avg-rank-table th.team-col { text-align: left; }
+#avg-rank-table td {
+    padding: 3px 6px;
+    text-align: center;
+    border-bottom: 1px solid #f4f4f4;
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+}
+#avg-rank-table td:first-child { color: #aaa; font-size: 11px; }
+#avg-rank-table td.team-col { text-align: left; font-size: 12px; color: #444; white-space: nowrap; }
+#avg-rank-table .logo-sm { height: 20px; width: 20px; object-fit: contain; vertical-align: middle; }
+#avg-rank-table tr.rv-divider td { padding: 6px 0 2px; color: #aaa; font-size: 11px; text-align: left; border-bottom: none; }
+
+#season-stats-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+#season-stats-modal.open {
+    display: flex;
+}
+#season-stats-box {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    max-width: 580px;
+    width: 95vw;
+    max-height: 88vh;
+    overflow: auto;
+    padding: 20px 24px 16px;
+}
+#season-stats-box h2 {
+    margin: 0 0 12px;
+    font-size: 1.05rem;
+    color: #333;
+}
+#season-stats-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+}
+#season-stats-table th {
+    font-size: 11px;
+    color: #888;
+    font-weight: normal;
+    padding: 4px 8px;
+    text-align: center;
+    border-bottom: 1px solid #ddd;
+    white-space: nowrap;
+}
+#season-stats-table th.team-col { text-align: left; }
+#season-stats-table td {
+    padding: 3px 6px;
+    text-align: center;
+    border-bottom: 1px solid #f4f4f4;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+#season-stats-table td.team-col { text-align: left; font-size: 12px; color: #444; }
+#season-stats-table td:first-child { color: #aaa; font-size: 11px; }
+#season-stats-table .logo-sm { height: 20px; width: 20px; object-fit: contain; vertical-align: middle; }
+
 @media (max-device-width: 768px) {
     .header {
         display: none !important;
@@ -673,10 +781,26 @@ kbd {
     </div>
     <div class="keybind-section">
       <div class="keybind-section-title">Other</div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>Y</kbd></span><span>Week avg rank table</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>U</kbd></span><span>Season statistics</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>P</kbd></span><span>Save table as PNG</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>?</kbd></span><span>Show legend</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Esc</kbd></span><span>Close</span></div>
     </div>
+  </div>
+</div>
+
+<div id="avg-rank-modal">
+  <div id="avg-rank-box">
+    <h2 id="avg-rank-title"></h2>
+    <table id="avg-rank-table"></table>
+  </div>
+</div>
+
+<div id="season-stats-modal">
+  <div id="season-stats-box">
+    <h2 id="season-stats-title"></h2>
+    <table id="season-stats-table"></table>
   </div>
 </div>
 
@@ -6919,7 +7043,7 @@ function showVoterHistory(username) {
     const title = document.getElementById("voter-history-title");
     const table = document.getElementById("voter-history-table");
 
-    title.textContent = username + " — Season Ballots";
+    title.textContent = username + " – " + currentYear + " Ballots";
 
     renderVoterHistoryTable(mergedData, yearTabs, table);
     modal.classList.add("open");
@@ -7596,6 +7720,100 @@ function injectWeightedRankingRow(activeTab, activeBlock) {
     bindTeamLogos();
 }
 
+function showAvgRankModal(weekId) {
+    const block = document.getElementById(weekId);
+    if (!block) return;
+    const sections = block.querySelectorAll(".ballot-section");
+    const officialSection = sections[0];
+    if (!officialSection) return;
+
+    // Collect all voter rows (exclude Official Overall)
+    const voterRows = Array.from(officialSection.querySelectorAll(".voter-row"))
+        .filter(r => getVoterName(r) !== "Official Overall");
+    const totalVoters = voterRows.length;
+    if (totalVoters === 0) return;
+
+    // Compute rank sums, voter counts, points, and rank lists per team
+    const teamRankSum = {};
+    const teamVoterCount = {};
+    const teamPoints = {};
+    const teamRanks = {};
+    voterRows.forEach(row => {
+        const teams = Array.from(row.querySelectorAll(".team-logo")).map(img => img.dataset.team);
+        teams.slice(0, 25).forEach((team, i) => {
+            const rank = i + 1;
+            teamRankSum[team] = (teamRankSum[team] || 0) + rank;
+            teamVoterCount[team] = (teamVoterCount[team] || 0) + 1;
+            teamPoints[team] = (teamPoints[team] || 0) + (26 - rank);
+            if (!teamRanks[team]) teamRanks[team] = [];
+            teamRanks[team].push(rank);
+        });
+    });
+
+    const computeMedian = ranks => {
+        const sorted = [...ranks].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+    };
+
+    // Sort by points descending (same order as Official Overall)
+    const allTeams = Object.entries(teamPoints).sort((a, b) => b[1] - a[1]).map(([t]) => t);
+    const top25 = allTeams.slice(0, 25);
+    const receivingVotes = allTeams.slice(25);
+
+    const activeTab = document.querySelector(".week-tab.active");
+    const weekNum = activeTab?.dataset.weeknum || "";
+    const year = activeTab?.dataset.year || "";
+
+    const modal = document.getElementById("avg-rank-modal");
+    const title = document.getElementById("avg-rank-title");
+    const table = document.getElementById("avg-rank-table");
+
+    const weekPad = String(weekNum).padStart(2, "0");
+    title.textContent = `${year} #${weekPad} Statistics`;
+
+    const buildRow = (team, rank) => {
+        const avg = teamRankSum[team] / teamVoterCount[team];
+        const median = computeMedian(teamRanks[team]);
+        const count = teamVoterCount[team];
+        const pts = teamPoints[team];
+        return `<tr>
+            <td>${rank}</td>
+            <td style="padding:2px 4px;"><img class="logo-sm" src="cbb-logos/${team}.webp"></td>
+            <td class="team-col">${team}</td>
+            <td>${avg.toFixed(2)}</td>
+            <td>${Number.isInteger(median) ? median : median.toFixed(1)}</td>
+            <td>${count}/${totalVoters}</td>
+            <td>${pts}</td>
+        </tr>`;
+    };
+
+    let html = `<colgroup>
+        <col style="width:28px">
+        <col style="width:28px">
+        <col>
+        <col style="width:64px">
+        <col style="width:56px">
+        <col style="width:56px">
+        <col style="width:36px">
+    </colgroup><thead><tr>
+        <th>#</th><th></th>
+        <th class="team-col">Team</th>
+        <th>Avg Rank</th>
+        <th>Median</th>
+        <th>Voters</th>
+        <th>Pts</th>
+    </tr></thead><tbody>`;
+    top25.forEach((team, i) => { html += buildRow(team, i + 1); });
+    if (receivingVotes.length > 0) {
+        html += `<tr class="rv-divider"><td colspan="7">Receiving Votes</td></tr>`;
+        receivingVotes.forEach((team, i) => { html += buildRow(team, 26 + i); });
+    }
+    html += "</tbody>";
+    table.innerHTML = html;
+    modal.classList.add("open");
+}
+
 function showAggregateSection() {
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab) return;
@@ -7942,6 +8160,99 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
 }
 
 
+function showSeasonStatsModal() {
+    const activeTab = document.querySelector(".week-tab.active");
+    if (!activeTab) return;
+    const currentYear = activeTab.dataset.year;
+
+    const allTabs = getSortedTabs();
+    const yearTabs = allTabs.filter(t => t.dataset.year === currentYear).reverse();
+    if (yearTabs.length === 0) return;
+
+    const totalWeeks = yearTabs.length;
+
+    // Accumulate per-team stats from official ballot sections only
+    const teamTotalPts = {};
+    const teamRankSum = {};
+    const teamVoterWeeks = {};  // total voter-ballot appearances (for avg rank)
+    const teamWeeksRanked = {}; // distinct weeks the team appeared in any ballot
+    const teamFirstPlaceVotes = {};
+    const teamBestRank = {};
+
+    yearTabs.forEach(tab => {
+        const weekId = tab.dataset.week;
+        const block = document.getElementById(weekId);
+        if (!block) return;
+        const officialSection = block.querySelectorAll(".ballot-section")[0];
+        if (!officialSection) return;
+
+        const seenThisWeek = new Set();
+        officialSection.querySelectorAll(".voter-row").forEach(row => {
+            if (getVoterName(row) === "Official Overall") return;
+            const teams = Array.from(row.querySelectorAll(".team-logo")).map(img => img.dataset.team);
+            teams.slice(0, 25).forEach((team, i) => {
+                const rank = i + 1;
+                teamTotalPts[team] = (teamTotalPts[team] || 0) + (25 - i);
+                teamRankSum[team] = (teamRankSum[team] || 0) + rank;
+                teamVoterWeeks[team] = (teamVoterWeeks[team] || 0) + 1;
+                seenThisWeek.add(team);
+                if (rank === 1) teamFirstPlaceVotes[team] = (teamFirstPlaceVotes[team] || 0) + 1;
+                if (!teamBestRank[team] || rank < teamBestRank[team]) teamBestRank[team] = rank;
+            });
+        });
+        seenThisWeek.forEach(team => {
+            teamWeeksRanked[team] = (teamWeeksRanked[team] || 0) + 1;
+        });
+    });
+
+    // Sort by total season points descending
+    const allTeams = Object.keys(teamTotalPts).sort((a, b) => teamTotalPts[b] - teamTotalPts[a]);
+
+    const modal = document.getElementById("season-stats-modal");
+    const title = document.getElementById("season-stats-title");
+    const table = document.getElementById("season-stats-table");
+
+    title.textContent = `${currentYear} Season Statistics`;
+
+    let html = `<colgroup>
+        <col style="width:24px">
+        <col style="width:26px">
+        <col>
+        <col style="width:52px">
+        <col style="width:44px">
+        <col style="width:60px">
+        <col style="width:52px">
+        <col style="width:36px">
+    </colgroup><thead><tr>
+        <th>#</th><th></th>
+        <th class="team-col">Team</th>
+        <th>Weeks</th>
+        <th>Pts</th>
+        <th>Avg Rank</th>
+        <th>#1 Votes</th>
+        <th>Best</th>
+    </tr></thead><tbody>`;
+
+    allTeams.forEach((team, i) => {
+        const avgRank = (teamRankSum[team] / teamVoterWeeks[team]).toFixed(2);
+        const firstPlace = teamFirstPlaceVotes[team] || 0;
+        html += `<tr>
+            <td>${i + 1}</td>
+            <td><img class="logo-sm" src="cbb-logos/${team}.webp"></td>
+            <td class="team-col">${team}</td>
+            <td>${teamWeeksRanked[team]}/${totalWeeks}</td>
+            <td>${teamTotalPts[team]}</td>
+            <td>${avgRank}</td>
+            <td>${firstPlace || "—"}</td>
+            <td>${teamBestRank[team]}</td>
+        </tr>`;
+    });
+
+    html += `</tbody>`;
+    table.innerHTML = html;
+    modal.classList.add("open");
+}
+
 // Keyboard shortcuts
 let rankingSortActive = false;
 
@@ -8170,10 +8481,22 @@ document.getElementById("keybind-legend-modal").addEventListener("click", e => {
         document.getElementById("keybind-legend-modal").classList.remove("open");
 });
 
+document.getElementById("avg-rank-modal").addEventListener("click", e => {
+    if (e.target === document.getElementById("avg-rank-modal"))
+        document.getElementById("avg-rank-modal").classList.remove("open");
+});
+
+document.getElementById("season-stats-modal").addEventListener("click", e => {
+    if (e.target === document.getElementById("season-stats-modal"))
+        document.getElementById("season-stats-modal").classList.remove("open");
+});
+
 document.addEventListener("keydown", e => {
     if (e.key === "Escape") {
         document.getElementById("voter-history-modal").classList.remove("open");
         document.getElementById("keybind-legend-modal").classList.remove("open");
+        document.getElementById("avg-rank-modal").classList.remove("open");
+        document.getElementById("season-stats-modal").classList.remove("open");
     }
     if (!e.shiftKey) return;
     const activeTab = document.querySelector(".week-tab.active");
@@ -8221,6 +8544,19 @@ document.addEventListener("keydown", e => {
     if (e.key === "T" || e.key === "t") {
         e.preventDefault();
         applyTableSort("tenure");
+        return;
+    }
+
+    if (e.key === "Y" || e.key === "y") {
+        e.preventDefault();
+        const activeTab = document.querySelector(".week-tab.active");
+        if (activeTab) showAvgRankModal(activeTab.dataset.week);
+        return;
+    }
+
+    if (e.key === "U" || e.key === "u") {
+        e.preventDefault();
+        showSeasonStatsModal();
         return;
     }
 
