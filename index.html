@@ -4379,7 +4379,7 @@ function loadImageQueue(queue) {
     if (queue.length === 0) return Promise.resolve();
     return new Promise(resolve => {
         let index = 0;
-        const CONCURRENCY = 6;
+        const CONCURRENCY = 16;
         let active = 0;
         let resolved = false;
         function loadNext() {
@@ -4410,21 +4410,17 @@ function backgroundLoad() {
         ? new Promise(resolve => setTimeout(() => loadImageQueue(queue).then(resolve), 1000))
         : Promise.resolve();
 
-    // After current year images settle, lazily load other year fragments
+    // After current year images settle, fetch all year fragments in parallel
     if (typeof FRAGMENT_YEARS !== 'undefined' && FRAGMENT_YEARS.length > 0) {
         loadCurrentImages.then(() => {
-            let i = 0;
-            function loadNextYear() {
-                if (i >= FRAGMENT_YEARS.length) return;
-                const year = FRAGMENT_YEARS[i++];
-                loadYear(year).then(() => {
+            setTimeout(() => {
+                Promise.all(FRAGMENT_YEARS.map(year =>
+                    loadYear(year).catch(() => {})
+                )).then(() => {
                     const yearQueue = getBackgroundImageQueue();
-                    return loadImageQueue(yearQueue);
-                }).then(() => {
-                    setTimeout(loadNextYear, 200);
-                }).catch(() => setTimeout(loadNextYear, 2000));
-            }
-            setTimeout(loadNextYear, 3000);
+                    loadImageQueue(yearQueue);
+                });
+            }, 3000);
         });
     }
 }
