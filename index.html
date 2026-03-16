@@ -8,14 +8,14 @@
 <!-- Open Graph / link preview -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="Userpoll Landscape">
-<meta property="og:description" content="College basketball poll voter visualizer">
+<meta property="og:description" content="Landscape view of r/collegebasketball userpoll ballots.">
 <meta property="og:image" content="https://les-champs.github.io/cbb-ballots/thumbnail.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <!-- Twitter/X card -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Userpoll Landscape">
-<meta name="twitter:description" content="College basketball poll voter visualizer">
+<meta name="twitter:description" content="Landscape view of r/collegebasketball userpoll ballots.">
 <meta name="twitter:image" content="https://les-champs.github.io/cbb-ballots/thumbnail.png">
 <style>
 
@@ -212,10 +212,6 @@ td.logo-cell .logo {
     transform: scale(1.05);
 }
 
-.voter-row.row-highlight td {
-    background-color: #fffde7 !important;
-}
-
 .pin-btn {
     display: none;
     cursor: pointer;
@@ -236,41 +232,11 @@ td.logo-cell .logo {
     filter: grayscale(100%) brightness(0.2);
 }
 
-.highlight-btn {
-    display: none;
-    cursor: pointer;
-    font-size: 11px;
-    flex-shrink: 0;
-    opacity: 0.3;
-    filter: grayscale(100%);
-    user-select: none;
-    transition: opacity 0.1s, filter 0.1s;
-}
-
-.highlight-btn:hover {
-    opacity: 0.6;
-}
-
-.highlight-btn.highlighted {
-    opacity: 1;
-    filter: grayscale(100%) brightness(0.2);
-}
-
-.voter-row.voter-cell-hover .pin-btn,
-.voter-row.voter-cell-hover .highlight-btn {
+.voter-row.voter-cell-hover .pin-btn {
     display: inline;
 }
 
 .voter-row.row-pinned .pin-btn {
-    display: inline;
-}
-
-.voter-row.row-highlight .highlight-btn {
-    display: inline;
-}
-
-.voter-row.row-pinned.row-highlight .pin-btn,
-.voter-row.row-pinned.row-highlight .highlight-btn {
     display: inline;
 }
 
@@ -295,6 +261,26 @@ td.logo-cell .logo {
 
 .voter-row.voter-cell-hover .history-btn {
     display: inline;
+}
+
+.ballot-link-btn {
+    display: none;
+    cursor: pointer;
+    flex-shrink: 0;
+    opacity: 0.3;
+    color: #888;
+    user-select: none;
+    transition: opacity 0.1s;
+    line-height: 1;
+}
+
+.ballot-link-btn:hover {
+    opacity: 0.7;
+}
+
+.voter-row.voter-cell-hover .ballot-link-btn {
+    display: inline-flex;
+    align-items: center;
 }
 
 
@@ -2964,7 +2950,7 @@ function syncPinnedToAggregate(username, isPinning) {
                 const clone = officialRow.cloneNode(true);
                 clone.dataset.pinnedUser = username;
                 clone.classList.add("row-pinned-agg");
-                clone.querySelectorAll(".pin-btn, .highlight-btn, .history-btn").forEach(el => el.remove());
+                clone.querySelectorAll(".pin-btn, .history-btn, .ballot-link-btn").forEach(el => el.remove());
                 clone.querySelectorAll(".voter-cell").forEach(el => el.dataset.bound = "");
                 clone.querySelectorAll(".team-logo").forEach(el => el.dataset.bound = "");
                 aggTbody.appendChild(clone);
@@ -3279,25 +3265,6 @@ function bindVoterCells() {
             cell.appendChild(pin);
         }
 
-        // Add highlight button if not already present
-        if (!cell.querySelector(".highlight-btn")) {
-            const hl = document.createElement("span");
-            hl.className = "highlight-btn";
-            hl.textContent = "🖊️";
-            hl.addEventListener("click", e => {
-                e.stopPropagation();
-                const row = cell.closest("tr");
-                const username = getVoterName(row);
-                const allRows = getRowsByUsername(username);
-                const isHighlighted = row.classList.contains("row-highlight");
-                allRows.forEach(r => {
-                    r.classList.toggle("row-highlight", !isHighlighted);
-                    r.querySelector(".highlight-btn")?.classList.toggle("highlighted", !isHighlighted);
-                });
-            });
-            cell.appendChild(hl);
-        }
-
         // Add history button if not already present
         if (!cell.querySelector(".history-btn")) {
             const cal = document.createElement("span");
@@ -3312,6 +3279,19 @@ function bindVoterCells() {
             cell.appendChild(cal);
         }
 
+        // Add ballot link button if not already present and URL exists
+        if (!cell.querySelector(".ballot-link-btn") && cell.dataset.ballotUrl) {
+            const lnk = document.createElement("span");
+            lnk.className = "ballot-link-btn";
+            lnk.title = "Open ballot";
+            lnk.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+            lnk.addEventListener("click", e => {
+                e.stopPropagation();
+                const url = cell.dataset.ballotUrl;
+                if (url) window.open(url, "_blank", "noopener,noreferrer");
+            });
+            cell.appendChild(lnk);
+        }
 
         cell.addEventListener("mouseenter", () => {
             cell.closest("tr")?.classList.add("voter-cell-hover");
@@ -3321,17 +3301,6 @@ function bindVoterCells() {
         });
 
         cell.addEventListener("click", e => {
-            if (e.altKey) {
-                const url = cell.dataset.ballotUrl;
-                if (url) {
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.target = "_blank";
-                    a.rel = "noopener noreferrer";
-                    a.click();
-                }
-                return;
-            }
             const row = cell.closest("tr");
 
             // Special handling for the 5-Week Weighted aggregate row
