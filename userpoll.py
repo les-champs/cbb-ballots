@@ -3085,24 +3085,13 @@ function loadImageQueue(queue) {
 }
 
 function backgroundLoad() {
-    // Load images for the current year (already in DOM)
+    // Load images for the current year (already in DOM) only.
+    // Prior-year fragments are loaded on demand when the user navigates to them.
+    // Eagerly preloading all fragments caused a ~30s DOM explosion that trashed
+    // all three caches and stalled the main thread.
     const queue = getBackgroundImageQueue();
-    const loadCurrentImages = queue.length > 0
-        ? new Promise(resolve => setTimeout(() => loadImageQueue(queue).then(resolve), 1000))
-        : Promise.resolve();
-
-    // After current year images settle, fetch all year fragments in parallel
-    if (typeof FRAGMENT_YEARS !== 'undefined' && FRAGMENT_YEARS.length > 0) {
-        loadCurrentImages.then(() => {
-            setTimeout(() => {
-                Promise.all(FRAGMENT_YEARS.map(year =>
-                    loadYear(year).catch(() => {})
-                )).then(() => {
-                    const yearQueue = getBackgroundImageQueue();
-                    loadImageQueue(yearQueue);
-                });
-            }, 3000);
-        });
+    if (queue.length > 0) {
+        setTimeout(() => loadImageQueue(queue), 1000);
     }
 }
 
