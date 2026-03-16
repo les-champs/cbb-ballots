@@ -3278,14 +3278,14 @@ def build_full_html(week_tabs_html, week_data_html):
 <!-- Open Graph / link preview -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="Userpoll Landscape">
-<meta property="og:description" content="College basketball poll voter visualizer">
+<meta property="og:description" content="Landscape view of r/collegebasketball userpoll ballots.">
 <meta property="og:image" content="https://les-champs.github.io/cbb-ballots/thumbnail.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <!-- Twitter/X card -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Userpoll Landscape">
-<meta name="twitter:description" content="College basketball poll voter visualizer">
+<meta name="twitter:description" content="Landscape view of r/collegebasketball userpoll ballots.">
 <meta name="twitter:image" content="https://les-champs.github.io/cbb-ballots/thumbnail.png">
 <style>
 {CSS}
