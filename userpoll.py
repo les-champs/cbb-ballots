@@ -2,6 +2,7 @@ import os
 import re
 import json
 import time
+import html as html_mod
 import argparse
 import urllib.request
 from io import BytesIO
@@ -15,6 +16,40 @@ HTML_PATH = os.path.join(BASE_HTML_DIR, "index.html")
 
 BASE_URL = "https://www.cbbpoll.net"
 LOGO_PATH_PREFIX = "/static/D1/"
+
+# Maps cbbpoll.net PNG filenames (without extension) to our canonical local logo names
+LOGO_NAME_MAP = {
+    "Miami(Florida)":            "MiamiFL",
+    "MassachusettsAmherst":      "UMass",
+    "Missouri\u2013KansasCity":  "KansasCity",
+    "WisconsinGreenBay":         "GreenBay",
+    "WisconsinMilwaukee":        "Milwaukee",
+    "Boston":                                    "BostonCollege",
+    "NorthCarolinaatCharlotte":                  "Charlotte",
+    "MiamiUniversity(OH)":                       "MiamiOH",
+    "TexasatAustin":                             "Texas",
+    "Pennsylvania":                              "Penn",
+    "MiamiUniversity(Ohio)":                     "MiamiOH",
+    "SouthernIllinoisUniversityCarbondale":      "SouthernIllinois",
+    "AlabamaA&M":                                "AlabamaAM",
+    "UnitedStatesAirForceAcademy":               "AirForce",
+    "PrairieViewA&M":                            "PrairieViewAM",
+    "CollegeofWilliamandMary":                   "WilliamandMary",
+    "NorthCarolinaatGreensboro":                 "UNCGreensboro",
+    "NorthCarolinaatWilmington":                 "UNCWilmington",
+    "TexasA&MUniversityCorpusChristi":                      "TexasAMCorpusChristi",
+    "MiddleTennesseeState":                                 "MiddleTennessee",
+    "HoustonBaptist":                                       "HoustonChristian",
+    "FloridaAgriculturalandMechanical":                     "FloridaAM",
+    "William&Mary":                                         "WilliamandMary",
+    "IndianaUniversityPurdueUniversityIndianapolis":        "Purdue",
+    "SavannahStateUniversity":                              "GeorgiaSouthern",
+}
+
+def canonical_logo_name(png_name):
+    """Strip .png and apply LOGO_NAME_MAP to get the canonical local logo filename stem."""
+    stem = png_name[:-4] if png_name.lower().endswith(".png") else png_name
+    return LOGO_NAME_MAP.get(stem, stem)
 
 # --- DEBUG SETTING ---
 # Set to an integer to limit how many voter ballots are fetched (e.g. 5).
@@ -153,8 +188,8 @@ def convert_all_to_webp():
 
 def download_logos(logos):
     for logo in logos:
-        # Store as WebP regardless of source filename
-        webp_name = logo[:-4] + ".webp" if logo.lower().endswith(".png") else logo
+        # Store as WebP using canonical name (applies LOGO_NAME_MAP)
+        webp_name = canonical_logo_name(logo) + ".webp"
         dest = os.path.join(OUTPUT_DIR, webp_name)
         if os.path.exists(dest):
             continue
@@ -198,22 +233,481 @@ def process_voters(voters, label, week=None, year=None, ballot_map=None):
             results.append((logo_filename, username, None, []))
     return sorted(results, key=lambda x: x[1].lower())
 
+# ── cbbpoll.com Legacy Scraper ──────────────────────────────────────────────
+
+CBBPOLL_BASE = "https://cbbpoll.com"
+
+# Seasons available on cbbpoll.com: year param → valid weeks
+CBBPOLL_SEASONS = {
+    2017: [0] + list(range(3, 20)),   # 2016-17
+    2018: [0] + list(range(2, 21)),   # 2017-18
+    2019: [0] + list(range(2, 22)),   # 2018-19
+    2020: [0] + list(range(2, 21)),   # 2019-20
+    2021: [0] + list(range(2, 19)),   # 2020-21
+    2022: [0] + list(range(2, 21)),   # 2021-22
+}
+
+# Map cbbpoll.com display names → our logo filenames (without extension).
+# Auto-normalization handles most cases; these are manual overrides.
+CBBPOLL_NAME_OVERRIDES = {
+    # Directional / regional qualifiers
+    "NC State": "NCState",
+    "Ole Miss": "OleMiss",
+    "Miami (FL)": "MiamiFL",
+    "Miami (OH)": "MiamiOH",
+    "USC Upstate": "USCUpstate",
+    "Saint Mary's": "SaintMarys",
+    "Saint Mary's (CA)": "SaintMarys",
+    "St. Mary's": "SaintMarys",
+    "St. Mary's (CA)": "SaintMarys",
+    "Saint Joseph's": "SaintJosephs",
+    "St. Joseph's": "SaintJosephs",
+    "Saint Louis": "SaintLouis",
+    "St. Louis": "SaintLouis",
+    "St. John's": "StJohns",
+    "Saint John's": "StJohns",
+    "St. Bonaventure": "StBonaventure",
+    "Saint Bonaventure": "StBonaventure",
+    "Mt. St. Mary's": "MountStMarys",
+    "Mount St. Mary's": "MountStMarys",
+    "Stephen F. Austin": "StephenFAustin",
+    "UNC Greensboro": "UNCGreensboro",
+    "UNC Wilmington": "UNCWilmington",
+    "UT Martin": "UTMartin",
+    "North Carolina": "NorthCarolina",
+    "South Carolina": "SouthCarolina",
+    "North Dakota": "NorthDakota",
+    "South Dakota": "SouthDakota",
+    "South Dakota State": "SouthDakotaState",
+    "North Dakota State": "NorthDakotaState",
+    "West Virginia": "WestVirginia",
+    "San Diego State": "SanDiegoState",
+    "San Jose State": "SanJoseState",
+    "San Francisco": "SanFrancisco",
+    "Santa Clara": "SantaClara",
+    "Boise State": "BoiseState",
+    "Colorado State": "ColoradoState",
+    "Utah State": "UtahState",
+    "Iowa State": "IowaState",
+    "Ohio State": "OhioState",
+    "Penn State": "PennState",
+    "Michigan State": "MichiganState",
+    "Kansas State": "KansasState",
+    "Oklahoma State": "OklahomaState",
+    "Oregon State": "OregonState",
+    "Washington State": "WashingtonState",
+    "Arizona State": "ArizonaState",
+    "Mississippi State": "MississippiState",
+    "Florida State": "FloridaState",
+    "Florida Atlantic": "FloridaAtlantic",
+    "Central Michigan": "CentralMichigan",
+    "Eastern Michigan": "EasternMichigan",
+    "Western Michigan": "WesternMichigan",
+    "Northern Iowa": "NorthernIowa",
+    "Northern Arizona": "NorthernArizona",
+    "Northern Colorado": "NorthernColorado",
+    "North Texas": "NorthTexas",
+    "North Florida": "NorthFlorida",
+    "South Florida": "SouthFlorida",
+    "South Alabama": "SouthAlabama",
+    "Southern Miss": "SouthernMiss",
+    "Southern Mississippi": "SouthernMiss",
+    "Appalachian State": "AppalachianState",
+    "Arkansas State": "ArkansasState",
+    "Indiana State": "IndianaState",
+    "Missouri State": "MissouriState",
+    "Murray State": "MurrayState",
+    "Wichita State": "WichitaState",
+    "Kent State": "KentState",
+    "Bowling Green": "BowlingGreen",
+    "George Mason": "GeorgeMason",
+    "George Washington": "GeorgeWashington",
+    "Georgia Tech": "GeorgiaTech",
+    "Georgia State": "GeorgiaState",
+    "Virginia Tech": "VirginiaTech",
+    "Wake Forest": "WakeForest",
+    "Boston University": "BostonUniversity",
+    "Boston College": "BostonCollege",
+    "Central Connecticut": "CentralConnecticut",
+    "Youngstown State": "YoungstownState",
+    "Weber State": "WeberState",
+    "Morehead State": "MoreheadState",
+    "Western Carolina": "WesternCarolina",
+    "James Madison": "JamesMadison",
+    "West Georgia": "WestGeorgia",
+    "Grand Canyon": "GrandCanyon",
+    "High Point": "HighPoint",
+    "Purdue Fort Wayne": "PurdueFortWayne",
+    "UC Irvine": "UCIrvine",
+    "UC Davis": "UCDavis",
+    "UC Riverside": "UCRiverside",
+    "UC San Diego": "UCSanDiego",
+    "UC Santa Barbara": "UCSantaBarbara",
+    "UMass Lowell": "UMassLowell",
+    "Louisiana Tech": "LouisianaTech",
+    "Texas A&M": "TexasAM",
+    "Texas Tech": "TexasTech",
+    "New Mexico": "NewMexico",
+    "New Mexico State": "NewMexicoState",
+    "Loyola Chicago": "LoyolaChicago",
+    "Loyola-Chicago": "LoyolaChicago",
+    "Loyola Marymount": "LoyolaMarymount",
+    "Rhode Island": "RhodeIsland",
+    "Seton Hall": "SetonHall",
+    "De Paul": "DePaul",
+    "DePaul": "DePaul",
+    "California Baptist": "CaliforniaBaptist",
+    "Notre Dame": "NotreDame",
+    "La Salle": "LaSalle",
+    "Long Island": "LIU",
+    "Long Island University": "LIU",
+    "Delaware State": "DelawareState",
+    "Stony Brook": "StonyBrook",
+    "St. Peter's": "SaintPeters",
+    "Saint Peter's": "SaintPeters",
+    "Loyola-Chicago": "LoyolaChicago",
+    "Loyola Chicago": "LoyolaChicago",
+    "Miami (FL)": "MiamiFL",
+    "Miami (OH)": "MiamiOH",
+    "Chattanooga": "Chattanooga",
+    "Texas A&M": "TexasAM",
+    "URI": "RhodeIsland",
+    "UAB": "UAB",
+    "UNCG": "UNCGreensboro",
+    "UNCW": "UNCWilmington",
+    "UNI": "NorthernIowa",
+    "SDSU": "SanDiegoState",
+    "SJSU": "SanJoseState",
+    "UCSB": "UCSantaBarbara",
+    "UIC": "UIC",
+    "SIUE": "SIUEdwardsville",
+    "SIU Edwardsville": "SIUEdwardsville",
+    "SIU": "SIU",
+    "ETSU": "EastTennesseeState",
+    "MTSU": "MiddleTennesseeState",
+    "MT": "MT",  # Middle Tennessee — logo saved as MT.webp
+    "UTSA": "UTSA",
+    "BC": "BostonCollege",
+    "ECU": "EastCarolina",
+    "Cal Baptist": "CaliforniaBaptist",
+    "Central Connecticut State": "CentralConnecticut",
+    "University of Central Arkansas": "CentralArkansas",
+    "Texas A&M-Corpus Christi": "TexasAMCorpusChristi",
+    "The Citadel": "Citadel",
+    "Alabama A&M": "AlabamaAM",
+    "Prairie View A&M": "PrairieViewAM",
+    "SE Missouri State": "SEMissouriState",
+    "Nebraska-Omaha": "NebraskaOmaha",
+    "Kansas City": "KansasCity",
+    "College of Charleston": "CollegeofCharleston",
+    "Tarleton State": "TarletonState",
+    "Savannah State University": "SavannahState",
+    "Savannah State": "SavannahState",
+    "William & Mary": "WilliamMary",
+    "William and Mary": "WilliamMary",
+    "USF": "USF",
+    "SC State": "SCState",
+    "UMES": "UMES",
+}
+
+# Map cbbpoll.com full university alt text → our logo filenames.
+# e.g., "University of Virginia Logo" → "Virginia"
+CBBPOLL_ALT_OVERRIDES = {
+    "University of California, Los Angeles Logo": "UCLA",
+    "University of Southern California Logo": "USC",
+    "University of Connecticut Logo": "UConn",
+    "University of Central Florida Logo": "UCF",
+    "University of Texas at El Paso Logo": "UTEP",
+    "University of Nevada, Las Vegas Logo": "UNLV",
+    "Brigham Young University Logo": "BYU",
+    "Virginia Commonwealth University Logo": "VCU",
+    "Southern Methodist University Logo": "SMU",
+    "Texas Christian University Logo": "TCU",
+    "Louisiana State University Logo": "LSU",
+    "University of Pittsburgh Logo": "Pitt",
+    "University of Massachusetts Logo": "UMass",
+    "University of Massachusetts Lowell Logo": "UMassLowell",
+    "North Carolina State University Logo": "NCState",
+    "Virginia Polytechnic Institute and State University Logo": "VirginiaTech",
+    "University of Mississippi Logo": "OleMiss",
+    "University of Illinois at Urbana-Champaign Logo": "Illinois",
+    "Georgia Institute of Technology Logo": "GeorgiaTech",
+    "Pennsylvania State University Logo": "PennState",
+    "Indiana University Bloomington Logo": "Indiana",
+    "Arizona State University Logo": "ArizonaState",
+    "Mississippi State University Logo": "MississippiState",
+    "University of California, Irvine Logo": "UCIrvine",
+    "University of California, Davis Logo": "UCDavis",
+    "University of California, Riverside Logo": "UCRiverside",
+    "University of California, San Diego Logo": "UCSanDiego",
+    "University of California, Santa Barbara Logo": "UCSantaBarbara",
+    "University of California, Berkeley Logo": "California",
+    "University of Miami Logo": "MiamiFL",
+    "Miami University Logo": "MiamiOH",
+    "Purdue University Fort Wayne Logo": "PurdueFortWayne",
+    "Stephen F. Austin State University Logo": "StephenFAustin",
+    "Texas A&M University Logo": "TexasAM",
+    "St. Bonaventure University Logo": "StBonaventure",
+    "College of the Holy Cross Logo": "HolyCross",
+    "Saint Mary's College of California Logo": "SaintMarys",
+    "Loyola University Chicago Logo": "LoyolaChicago",
+    "Loyola Marymount University Logo": "LoyolaMarymount",
+    "Seton Hall University Logo": "SetonHall",
+    "Long Island University Logo": "LIU",
+    "Florida International University Logo": "FIU",
+    "University of Hawai'i at Manoa Logo": "Hawaii",
+    "University of Hawaii at Manoa Logo": "Hawaii",
+    "University of Nebraska Omaha Logo": "Omaha",
+    "University of Nebraska-Lincoln Logo": "Nebraska",
+}
+
+def _normalize_team_name(display_name):
+    """Auto-normalize a cbbpoll.com display name to our logo filename format."""
+    # Check manual overrides first
+    if display_name in CBBPOLL_NAME_OVERRIDES:
+        return CBBPOLL_NAME_OVERRIDES[display_name]
+    # Strip periods, apostrophes, hyphens, spaces → PascalCase already matches most
+    normalized = display_name.replace(".", "").replace("'", "").replace("'", "").replace("-", "").replace(" ", "")
+    return normalized
+
+def _normalize_alt_text(alt_text):
+    """Map a cbbpoll.com alt text (e.g. 'University of Virginia Logo') to our logo filename."""
+    if alt_text in CBBPOLL_ALT_OVERRIDES:
+        return CBBPOLL_ALT_OVERRIDES[alt_text]
+    # Try stripping " Logo" and common prefixes
+    name = alt_text
+    if name.endswith(" Logo"):
+        name = name[:-5]
+    # "University of X" → "X"
+    if name.startswith("University of "):
+        name = name[14:]
+        # "University of X at Y" → just "X" for simple cases
+        if ", " in name:
+            name = name.split(", ")[0]
+    elif name.endswith(" University"):
+        name = name[:-11]
+    elif name.endswith(" College"):
+        name = name[:-8]
+    # Now normalize like a display name
+    return _normalize_team_name(name.strip())
+
+def cbbpoll_fetch_poll_page(year, week):
+    """Fetch a cbbpoll.com poll page and extract voters + ballot URLs."""
+    url = f"{CBBPOLL_BASE}/poll/{year}/{week}"
+    html = fetch_page_html(url)
+
+    official = []
+    provisional = []
+
+    # Split into sections
+    off_start = html.find("Official Ballots")
+    prov_start = html.find("Provisional Ballots")
+    nonsub_start = html.find("Voters who failed to submit")
+
+    if off_start == -1:
+        print(f"  WARNING: No 'Official Ballots' section found on {url}")
+        return official, provisional
+
+    # Determine section boundaries
+    off_end = prov_start if prov_start != -1 else (nonsub_start if nonsub_start != -1 else len(html))
+    prov_end = nonsub_start if nonsub_start != -1 else len(html)
+
+    off_section = html[off_start:off_end]
+    prov_section = html[prov_start:prov_end] if prov_start != -1 else ""
+
+    # Extract ballot-list-items: <a href="/ballot/ID"><span class=logo23>...<alt="..."></span>USERNAME</a>
+    pattern = r"<a href=\"/ballot/(\d+)\"><span class=logo23><img[^>]*alt=\"([^\"]*)\"></span>([^<]+)</a>"
+
+    for match in re.finditer(pattern, off_section):
+        ballot_id, flair_alt, username = match.groups()
+        official.append({
+            "username": html_mod.unescape(username.strip()),
+            "flair_alt": html_mod.unescape(flair_alt),
+            "ballot_id": int(ballot_id),
+        })
+
+    for match in re.finditer(pattern, prov_section):
+        ballot_id, flair_alt, username = match.groups()
+        provisional.append({
+            "username": html_mod.unescape(username.strip()),
+            "flair_alt": html_mod.unescape(flair_alt),
+            "ballot_id": int(ballot_id),
+        })
+
+    return official, provisional
+
+def cbbpoll_fetch_ballot(ballot_id):
+    """Fetch a cbbpoll.com ballot page and extract the ordered team list."""
+    url = f"{CBBPOLL_BASE}/ballot/{ballot_id}"
+    html = fetch_page_html(url)
+
+    # Extract team display names from: <span class="team-name">...</span> TEAMNAME</span>
+    pattern = r'class="team-name"><span class=logo30><img[^>]*></span>\s*([^<]+)</span>'
+    teams = [html_mod.unescape(m.strip()) for m in re.findall(pattern, html)]
+    return teams[:25]
+
+def cbbpoll_scrape_season(year):
+    """Scrape an entire season from cbbpoll.com, saving to JSON with resume support."""
+    if year not in CBBPOLL_SEASONS:
+        print(f"✗ Year {year} not available on cbbpoll.com. Valid: {sorted(CBBPOLL_SEASONS.keys())}")
+        return
+
+    json_path = os.path.join(BASE_HTML_DIR, f"cbbpoll-{year}.json")
+
+    # Load existing cache for resume
+    if os.path.exists(json_path):
+        with open(json_path, "r") as f:
+            data = json.load(f)
+        print(f"Loaded existing cache: {json_path}")
+    else:
+        data = {"year": year, "weeks": {}}
+
+    weeks = CBBPOLL_SEASONS[year]
+    unmapped_names = set()
+
+    for week in weeks:
+        week_key = str(week)
+        # Check if week already fully scraped (all voters have teams)
+        if week_key in data["weeks"]:
+            existing = data["weeks"][week_key]
+            all_have_teams = all(
+                v.get("teams") for section in ("official", "provisional")
+                for v in existing.get(section, [])
+            )
+            if all_have_teams:
+                n_off = len(existing.get("official", []))
+                n_prov = len(existing.get("provisional", []))
+                print(f"Week {week}: already cached ({n_off} official, {n_prov} provisional)")
+                continue
+
+        print(f"\nWeek {week}: fetching poll page...")
+        try:
+            official, provisional = cbbpoll_fetch_poll_page(year, week)
+        except Exception as e:
+            print(f"  ✗ Failed to fetch poll page: {e}")
+            continue
+        print(f"  Found {len(official)} official, {len(provisional)} provisional voters")
+        time.sleep(0.5)
+
+        # Build lookup of already-fetched ballots for this week
+        existing_week = data["weeks"].get(week_key, {})
+        existing_ballots = {}
+        for section in ("official", "provisional"):
+            for v in existing_week.get(section, []):
+                if v.get("teams"):
+                    existing_ballots[v["ballot_id"]] = v["teams"]
+
+        # Fetch each ballot
+        for label, voters in [("Official", official), ("Provisional", provisional)]:
+            if DEBUG_LIMIT is not None:
+                voters_to_fetch = voters[:DEBUG_LIMIT]
+                print(f"  DEBUG MODE: limiting to {DEBUG_LIMIT} {label} voters.")
+            else:
+                voters_to_fetch = voters
+            for i, voter in enumerate(voters_to_fetch):
+                bid = voter["ballot_id"]
+                if bid in existing_ballots:
+                    voter["teams"] = existing_ballots[bid]
+                    continue
+                print(f"  [{i+1}/{len(voters_to_fetch)}] {label}: {voter['username']}")
+                try:
+                    teams = cbbpoll_fetch_ballot(bid)
+                    voter["teams"] = teams
+                except Exception as e:
+                    print(f"    ✗ Failed: {e}")
+                    voter["teams"] = []
+                time.sleep(0.3)
+
+        # Track unmapped names
+        for section in (official, provisional):
+            for v in section:
+                for team_name in v.get("teams", []):
+                    logo = _normalize_team_name(team_name)
+                    if not os.path.exists(os.path.join(OUTPUT_DIR, f"{logo}.webp")):
+                        unmapped_names.add(team_name)
+
+        data["weeks"][week_key] = {
+            "official": official,
+            "provisional": provisional,
+        }
+
+        # Save after each week for resume support
+        with open(json_path, "w") as f:
+            json.dump(data, f, indent=2)
+        print(f"  ✓ Saved week {week} to {json_path}")
+
+    if unmapped_names:
+        print(f"\n⚠️  Unmapped team names (no matching logo file):")
+        for name in sorted(unmapped_names):
+            print(f"    {name!r} → {_normalize_team_name(name)!r}")
+
+    print(f"\n✓ Done scraping {year}. Data saved to {json_path}")
+
+def cbbpoll_build_season(year):
+    """Build HTML week blocks from cached cbbpoll.com JSON data."""
+    json_path = os.path.join(BASE_HTML_DIR, f"cbbpoll-{year}.json")
+    if not os.path.exists(json_path):
+        print(f"✗ No cached data found at {json_path}. Run --cbbpoll --year {year} first.")
+        return
+
+    with open(json_path, "r") as f:
+        data = json.load(f)
+
+    weeks = sorted(data["weeks"].keys(), key=lambda w: int(w))
+    print(f"Building HTML for {year}: {len(weeks)} weeks")
+
+    for week_key in weeks:
+        week = int(week_key)
+        week_data = data["weeks"][week_key]
+
+        official = _cbbpoll_voters_to_tuples(week_data.get("official", []))
+        provisional = _cbbpoll_voters_to_tuples(week_data.get("provisional", []))
+
+        if not official and not provisional:
+            print(f"  Week {week}: no voter data, skipping")
+            continue
+
+        week_block = build_week_block(week, year, official, provisional)
+        save_html(week, year, week_block, HTML_PATH)
+        print(f"  ✓ Week {week}: {len(official)} official + {len(provisional)} provisional")
+
+    print(f"\n✓ Built HTML for {year}.")
+
+def _cbbpoll_voters_to_tuples(voters):
+    """Convert cbbpoll.com JSON voter dicts to the (logo_filename, username, ballot_url, ballot_logos) tuples
+    expected by build_week_block."""
+    results = []
+    for v in voters:
+        username = v["username"]
+        ballot_id = v.get("ballot_id")
+        ballot_url = f"{CBBPOLL_BASE}/ballot/{ballot_id}" if ballot_id else None
+
+        # Voter flair logo
+        flair_alt = v.get("flair_alt", "")
+        flair_logo = _normalize_alt_text(flair_alt) + ".png" if flair_alt else "unknown.png"
+
+        # Ballot team logos
+        teams = v.get("teams", [])
+        ballot_logos = [_normalize_team_name(t) + ".png" for t in teams]
+
+        results.append((flair_logo, username, ballot_url, ballot_logos))
+    return sorted(results, key=lambda x: x[1].lower())
+
 # ── HTML Building ────────────────────────────────────────────────────────────
 
 def build_table_rows(voters_with_ballots):
     rows = ""
     for logo_filename, username, ballot_url, ballot_logos in voters_with_ballots:
-        team_name = logo_filename.replace(".png", "")
+        team_name = canonical_logo_name(logo_filename)
         ballot_attr = f' data-ballot-url="{ballot_url}"' if ballot_url else ''
-        # Use actual src so images load when opening the file locally; keep data-src for compatibility
-        img_path = logo_filename[:-4]  # team name only e.g. "Duke"
+        img_path = team_name
         inner = (
             f'<img class="logo" data-src="{img_path}" alt="{team_name}">'
             f'<span class="voter-name">{username}</span>'
         )
         voter_cell = f'<div class="voter-cell" {ballot_attr}>{inner}</div>'
         ballot_logo_cells = "".join(
-            f'<td class="logo-cell"><img class="logo team-logo" data-team="{bl.replace(".png","")}" data-src="{bl[:-4]}"></td>'
+            f'<td class="logo-cell"><img class="logo team-logo" data-team="{canonical_logo_name(bl)}" data-src="{canonical_logo_name(bl)}"></td>'
             for bl in ballot_logos
         )
         rows += f'<tr class="voter-row"><td>{voter_cell}</td>{ballot_logo_cells}</tr>\n'
@@ -224,7 +718,7 @@ def build_aggregate_row(official):
     points = {}
     for _, _, _, ballot_logos in official:
         for i, logo in enumerate(ballot_logos[:25]):
-            team = logo.replace(".png", "")
+            team = canonical_logo_name(logo)
             points[team] = points.get(team, 0) + (25 - i)
     ranked = sorted(points.items(), key=lambda x: -x[1])[:25]
     ballot_logo_cells = "".join(
@@ -944,6 +1438,21 @@ kbd {
 #season-stats-table td:first-child { color: #aaa; font-size: 11px; }
 #season-stats-table .logo-sm { height: 20px; width: 20px; object-fit: contain; vertical-align: middle; }
 
+body.year-loading::after {
+    content: "Loading…";
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 14px;
+    z-index: 9999;
+    pointer-events: none;
+}
+
 @media (max-device-width: 768px) {
     .header {
         display: none !important;
@@ -961,6 +1470,44 @@ kbd {
 """
 
 JS = """
+let _sortedTabsCache = null;
+let _leaderboardDataCache = null;
+let _deltaDataCache = null;
+let _deltaDataCacheIsProvisional = null;
+
+const _loadedYears = new Set();
+const _loadingYears = {};
+
+async function loadYear(year) {
+    if (_loadedYears.has(year)) return;
+    if (_loadingYears[year]) return _loadingYears[year];
+    if (typeof FRAGMENT_YEARS === 'undefined' || !FRAGMENT_YEARS.includes(year)) {
+        _loadedYears.add(year);
+        return;
+    }
+    _loadingYears[year] = (async () => {
+        try {
+            document.body.classList.add('year-loading');
+            const resp = await fetch(`data-${year}.html`);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const html = await resp.text();
+            const container = document.getElementById('year-data-container');
+            container.insertAdjacentHTML('beforeend', html);
+            _loadedYears.add(year);
+            _sortedTabsCache = null;
+            _leaderboardDataCache = null;
+            _deltaDataCache = null;
+        } catch (e) {
+            console.error(`Failed to load year ${year}:`, e);
+            throw e;
+        } finally {
+            delete _loadingYears[year];
+            document.body.classList.remove('year-loading');
+        }
+    })();
+    return _loadingYears[year];
+}
+
 const highlightClasses = [
     "team-highlight-1","team-highlight-2","team-highlight-3",
     "team-highlight-4","team-highlight-5"
@@ -972,6 +1519,26 @@ const highlightColors = {
     "team-highlight-4": "#33cc33",
     "team-highlight-5": "#cc66ff"
 };
+
+const highlightedTeams = {}; // "team-highlight-1" → team name, etc.
+
+function applyHighlightStyles() {
+    let el = document.getElementById("team-highlight-styles");
+    if (!el) {
+        el = document.createElement("style");
+        el.id = "team-highlight-styles";
+        document.head.appendChild(el);
+    }
+    const rules = [];
+    highlightClasses.forEach(cls => {
+        const team = highlightedTeams[cls];
+        if (!team) return;
+        const color = highlightColors[cls];
+        rules.push(`.team-logo[data-team="${team}"] { outline: 2px solid ${color}; border-radius: 4px; box-shadow: 0 0 20px 6px ${color}; }`);
+        rules.push(`.row-delta .team-logo[data-team="${team}"] { box-shadow: none; }`);
+    });
+    el.textContent = rules.join(" ");
+}
 
 function getOffsetLeftInContainer(el, container) {
     let x = 0;
@@ -1011,9 +1578,8 @@ function updateAvgRankLines() {
     const headerThs = officialSection.querySelectorAll("thead th");
 
     highlightClasses.forEach(cls => {
-        const sample = document.querySelector(`.team-logo.${cls}`);
-        if (!sample) return;
-        const team = sample.dataset.team;
+        const team = highlightedTeams[cls];
+        if (!team) return;
         const color = highlightColors[cls];
         const ranks = [];
         voterRows.forEach(row => {
@@ -1065,8 +1631,10 @@ function lazyLoadWeek(block) {
 }
 
 function getSortedTabs() {
-    return Array.from(document.querySelectorAll(".week-tab"))
+    if (_sortedTabsCache) return _sortedTabsCache;
+    _sortedTabsCache = Array.from(document.querySelectorAll(".week-tab"))
         .sort((a, b) => parseInt(b.dataset.year) - parseInt(a.dataset.year) || parseInt(b.dataset.weeknum) - parseInt(a.dataset.weeknum));
+    return _sortedTabsCache;
 }
 
 function getVoterName(row) {
@@ -1646,14 +2214,6 @@ function showVoterHistory(username) {
     renderVoterHistoryTable(mergedData, yearTabs, table);
     modal.classList.add("open");
     bindTeamLogos();
-    // Apply any active highlight classes to the newly created logos
-    highlightClasses.forEach(cls => {
-        const highlighted = document.querySelector(`.team-logo.${cls}`);
-        if (highlighted) {
-            const team = highlighted.dataset.team;
-            table.querySelectorAll(`.team-logo[data-team="${team}"]`).forEach(img => img.classList.add(cls));
-        }
-    });
 }
 
 document.getElementById("voter-history-modal").addEventListener("click", e => {
@@ -1675,15 +2235,14 @@ function bindTeamLogos() {
                 return;
             }
             const team = logo.dataset.team;
-            const teamElements = Array.from(document.querySelectorAll(`.team-logo[data-team="${team}"]`));
-            const isHighlighted = teamElements.some(el => highlightClasses.some(c => el.classList.contains(c)));
+            const isHighlighted = highlightClasses.some(c => highlightedTeams[c] === team);
             if (isHighlighted) {
-                teamElements.forEach(el => highlightClasses.forEach(c => el.classList.remove(c)));
+                highlightClasses.forEach(c => { if (highlightedTeams[c] === team) delete highlightedTeams[c]; });
             } else {
-                const usedColors = highlightClasses.filter(c => document.querySelector("." + c));
-                const availableColor = highlightClasses.find(c => !usedColors.includes(c));
-                if (availableColor) teamElements.forEach(el => el.classList.add(availableColor));
+                const availableColor = highlightClasses.find(c => !highlightedTeams[c]);
+                if (availableColor) highlightedTeams[availableColor] = team;
             }
+            applyHighlightStyles();
             updateAvgRankLines();
         });
     });
@@ -1708,15 +2267,14 @@ function bindRankHeaders() {
             const logo = aggRow.querySelectorAll("td.logo-cell")[rank - 1]?.querySelector(".team-logo");
             if (!logo) return;
             const team = logo.dataset.team;
-            const teamElements = Array.from(document.querySelectorAll(`.team-logo[data-team="${team}"]`));
-            const isHighlighted = teamElements.some(el => highlightClasses.some(c => el.classList.contains(c)));
+            const isHighlighted = highlightClasses.some(c => highlightedTeams[c] === team);
             if (isHighlighted) {
-                teamElements.forEach(el => highlightClasses.forEach(c => el.classList.remove(c)));
+                highlightClasses.forEach(c => { if (highlightedTeams[c] === team) delete highlightedTeams[c]; });
             } else {
-                const usedColors = highlightClasses.filter(c => document.querySelector("." + c));
-                const availableColor = highlightClasses.find(c => !usedColors.includes(c));
-                if (availableColor) teamElements.forEach(el => el.classList.add(availableColor));
+                const availableColor = highlightClasses.find(c => !highlightedTeams[c]);
+                if (availableColor) highlightedTeams[availableColor] = team;
             }
+            applyHighlightStyles();
             updateAvgRankLines();
         });
     });
@@ -1961,8 +2519,9 @@ function rebuildYearPicker() {
         if (y === activeYear) {
             btn.style.textDecoration = "underline";
         }
-        btn.addEventListener("click", e => {
+        btn.addEventListener("click", async e => {
             e.stopPropagation();
+            try { await loadYear(y); } catch { return; }
             const activeTab = document.querySelector(".week-tab.active");
             const currentWeekNum = activeTab ? parseInt(activeTab.dataset.weeknum) : null;
             const sameWeek = currentWeekNum
@@ -2108,6 +2667,7 @@ document.getElementById("toggle-text").addEventListener("click", () => {
         if (sections[0]) sections[0].style.display = "block";
         document.getElementById("toggle-text").innerText = "Official Ballots";
     }
+    _deltaDataCache = null;
     updateRankingOptionVisibility();
     if (currentSort === "ranking") resetRankingSort();
     applyTableSort(currentSort);
@@ -2422,6 +2982,7 @@ function showAggregateSection() {
     sections.forEach(s => s.style.display = "none");
     sections[2].style.display = "block";
     document.getElementById("toggle-text").innerText = "Data Ballots";
+    _deltaDataCache = null;
     injectWeightedRankingRow(activeTab, activeBlock);
     bindVoterCells();
     bindTeamLogos();
@@ -2526,34 +3087,54 @@ function getBackgroundImageQueue() {
     return imgs;
 }
 
-function backgroundLoad() {
-    const queue = getBackgroundImageQueue();
-    if (queue.length === 0) return;
-
-    let index = 0;
-    const CONCURRENCY = 6; // load 6 images at a time
-    let active = 0;
-
-    function loadNext() {
-        while (active < CONCURRENCY && index < queue.length) {
-            // Skip images already loaded
-            while (index < queue.length && !queue[index].dataset.src) index++;
-            if (index >= queue.length) break;
-            const img = queue[index++];
-            active++;
-            img.src = "cbb-logos/" + img.dataset.src + ".webp";
-            img.removeAttribute("data-src");
-            const onDone = () => {
-                active--;
-                loadNext();
-            };
-            img.addEventListener("load", onDone, { once: true });
-            img.addEventListener("error", onDone, { once: true });
+function loadImageQueue(queue) {
+    if (queue.length === 0) return Promise.resolve();
+    return new Promise(resolve => {
+        let index = 0;
+        const CONCURRENCY = 16;
+        let active = 0;
+        let resolved = false;
+        function loadNext() {
+            while (active < CONCURRENCY && index < queue.length) {
+                while (index < queue.length && !queue[index].dataset.src) index++;
+                if (index >= queue.length) break;
+                const img = queue[index++];
+                active++;
+                img.src = "cbb-logos/" + img.dataset.src + ".webp";
+                img.removeAttribute("data-src");
+                const onDone = () => {
+                    active--;
+                    loadNext();
+                };
+                img.addEventListener("load", onDone, { once: true });
+                img.addEventListener("error", onDone, { once: true });
+            }
+            if (active === 0 && !resolved) { resolved = true; resolve(); }
         }
-    }
+        loadNext();
+    });
+}
 
-    // Stagger the start slightly to not compete with the current week's load
-    setTimeout(loadNext, 1000);
+function backgroundLoad() {
+    // Load images for the current year (already in DOM)
+    const queue = getBackgroundImageQueue();
+    const loadCurrentImages = queue.length > 0
+        ? new Promise(resolve => setTimeout(() => loadImageQueue(queue).then(resolve), 1000))
+        : Promise.resolve();
+
+    // After current year images settle, fetch all year fragments in parallel
+    if (typeof FRAGMENT_YEARS !== 'undefined' && FRAGMENT_YEARS.length > 0) {
+        loadCurrentImages.then(() => {
+            setTimeout(() => {
+                Promise.all(FRAGMENT_YEARS.map(year =>
+                    loadYear(year).catch(() => {})
+                )).then(() => {
+                    const yearQueue = getBackgroundImageQueue();
+                    loadImageQueue(yearQueue);
+                });
+            }, 3000);
+        });
+    }
 }
 
 // Save table as PNG (Shift+P)
@@ -2578,6 +3159,7 @@ function saveTableAsPng() {
 // Delta feature
 
 function buildLeaderboardData() {
+    if (_leaderboardDataCache) return _leaderboardDataCache;
     // Build a map: { weekId -> { username -> { teams: [...], isOfficial: bool } } }
     // Reads both official (sections[0]) and provisional (sections[1]) independently.
     const data = {};
@@ -2625,11 +3207,13 @@ function buildLeaderboardData() {
             }
         }
     });
+    _leaderboardDataCache = data;
     return data;
 }
 
 function buildDeltaData() {
     const isProvisional = document.getElementById("toggle-text")?.innerText === "Provisional Ballots";
+    if (_deltaDataCache !== null && _deltaDataCacheIsProvisional === isProvisional) return _deltaDataCache;
     const data = {};
     document.querySelectorAll(".week-tab").forEach(tab => {
         const weekId = tab.dataset.week;
@@ -2654,6 +3238,8 @@ function buildDeltaData() {
             }
         }
     });
+    _deltaDataCache = data;
+    _deltaDataCacheIsProvisional = isProvisional;
     return data;
 }
 
@@ -3207,14 +3793,16 @@ document.addEventListener("keydown", e => {
 
     if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
         e.preventDefault();
-        const sortedAll = getSortedTabs().reverse();
+        const sortedAll = getSortedTabs().slice().reverse();
         const idx = sortedAll.findIndex(t => t.dataset.week === activeTab.dataset.week);
         const target = e.key === "ArrowRight"
             ? sortedAll[idx + 1]
             : sortedAll[idx - 1];
         if (target) {
-            showWeek(target.dataset.week);
-            if (weekPickerPinned) rebuildWeekPicker();
+            loadYear(target.dataset.year).then(() => {
+                showWeek(target.dataset.week);
+                if (weekPickerPinned) rebuildWeekPicker();
+            }).catch(() => {});
         }
     }
 
@@ -3227,13 +3815,15 @@ document.addEventListener("keydown", e => {
             ? years[yearIdx + 1]
             : years[yearIdx - 1];
         if (!targetYear) return;
-        const yearTabs = tabs.filter(t => t.dataset.year === targetYear);
-        const sameWeek = yearTabs.find(t => parseInt(t.dataset.weeknum) === currentWeekNum);
-        const target = sameWeek || yearTabs.sort((a, b) => parseInt(b.dataset.weeknum) - parseInt(a.dataset.weeknum))[0];
-        if (target) {
-            showWeek(target.dataset.week);
-            if (weekPickerPinned) rebuildWeekPicker();
-        }
+        loadYear(targetYear).then(() => {
+            const yearTabs = getSortedTabs().filter(t => t.dataset.year === targetYear);
+            const sameWeek = yearTabs.find(t => parseInt(t.dataset.weeknum) === currentWeekNum);
+            const target = sameWeek || yearTabs.sort((a, b) => parseInt(b.dataset.weeknum) - parseInt(a.dataset.weeknum))[0];
+            if (target) {
+                showWeek(target.dataset.week);
+                if (weekPickerPinned) rebuildWeekPicker();
+            }
+        }).catch(() => {});
     }
 
     if (e.key === "?") {
@@ -3259,6 +3849,8 @@ rebuildYearPicker();
 rebuildWeekPicker();
 const allTabs = getSortedTabs();
 if (allTabs.length > 0) {
+    const inlineYear = allTabs[0]?.dataset.year;
+    if (inlineYear) _loadedYears.add(inlineYear);
     showWeek(allTabs[0].dataset.week);
     setTimeout(() => backgroundLoad(), 1000);
 }
@@ -3267,7 +3859,33 @@ if (allTabs.length > 0) {
 WEEK_TABS_MARKER = "<!-- WEEK-TABS -->"
 WEEK_DATA_MARKER = "<!-- WEEK-DATA -->"
 
-def build_full_html(week_tabs_html, week_data_html):
+def split_data_by_year(data_html):
+    """Split data_html into a dict of { year_str: year_data_html }."""
+    parts = re.split(r'(?=<div [^>]*id="week-\d+-\d+")', data_html)
+    by_year = {}
+    for part in parts:
+        m = re.match(r'<div [^>]*id="week-(\d+)-\d+"', part)
+        if m:
+            year = m.group(1)
+            by_year.setdefault(year, []).append(part)
+    return {y: "".join(blocks).strip() for y, blocks in by_year.items()}
+
+def get_current_year(tabs_html):
+    """Extract the most recent year from tab buttons."""
+    years = re.findall(r'data-year="(\d+)"', tabs_html)
+    return max(years) if years else None
+
+def write_year_fragments(data_by_year, current_year, base_dir):
+    """Write data-YEAR.html fragment files for all years except the current year."""
+    for year, year_html in data_by_year.items():
+        if year == current_year:
+            continue
+        frag_path = os.path.join(base_dir, f"data-{year}.html")
+        with open(frag_path, "w", encoding="utf-8") as f:
+            f.write(year_html)
+
+def build_full_html(week_tabs_html, week_data_html, fragment_years=None):
+    fragment_years_js = json.dumps(fragment_years or [])
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -3360,9 +3978,12 @@ def build_full_html(week_tabs_html, week_data_html):
   </div>
 </div>
 
+<div id="year-data-container">
 {WEEK_DATA_MARKER}
 {week_data_html}
+</div>
 <script>
+const FRAGMENT_YEARS = {fragment_years_js};
 {JS}
 </script>
 
@@ -3383,12 +4004,22 @@ def load_existing_weeks(html_path):
     )
     tabs_html = tabs_match.group(1).strip() if tabs_match else ""
 
-    # Extract existing week data blocks
+    # Extract existing week data blocks (handle both old format and new year-data-container format)
     data_match = re.search(
-        r'<!-- WEEK-DATA -->\n(.*?)(?=\n\n?<script>)',
+        r'<!-- WEEK-DATA -->\n(.*?)(?=\n</div>\n<script>|\n\n?<script>)',
         content, re.DOTALL
     )
     data_html = data_match.group(1).strip() if data_match else ""
+
+    # Also load any year fragment files to get the full dataset
+    base_dir = os.path.dirname(html_path) or "."
+    for frag_file in sorted(os.listdir(base_dir)):
+        if re.match(r'data-\d+\.html$', frag_file):
+            frag_path = os.path.join(base_dir, frag_file)
+            with open(frag_path, "r", encoding="utf-8") as frag_f:
+                frag_html = frag_f.read().strip()
+            if frag_html:
+                data_html = (data_html + "\n" + frag_html).strip()
 
     # Extract existing week IDs
     week_ids = re.findall(r'data-week="(week-\d+-\d+)"', tabs_html)
@@ -3412,7 +4043,15 @@ def save_html(week, year, new_week_block, html_path):
     # Append new week block
     data_html = (data_html + "\n" + new_week_block).strip()
 
-    full_html = build_full_html(tabs_html, data_html)
+    # Split by year: only embed the current year inline, write fragments for the rest
+    current_year = get_current_year(tabs_html)
+    data_by_year = split_data_by_year(data_html)
+    inline_data = data_by_year.get(current_year, "")
+    fragment_years = sorted([y for y in data_by_year if y != current_year])
+    base_dir = os.path.dirname(html_path) or "."
+    write_year_fragments(data_by_year, current_year, base_dir)
+
+    full_html = build_full_html(tabs_html, inline_data, fragment_years)
     with open(html_path, "w", encoding="utf-8") as f:
         f.write(full_html)
     print(f"✓ Saved to: {html_path}")
@@ -3451,9 +4090,23 @@ def delete_week(week, year):
     if week_id not in existing_ids:
         print(f"✗ Week {week} {year} not found in HTML.")
         return
-    tabs_html = remove_week_tab(tabs_html, week_id)
-    data_html = remove_week_block(data_html, week_id)
-    full_html = build_full_html(tabs_html.strip(), data_html.strip())
+    tabs_html = remove_week_tab(tabs_html, week_id).strip()
+    data_html = remove_week_block(data_html, week_id).strip()
+
+    current_year = get_current_year(tabs_html)
+    data_by_year = split_data_by_year(data_html)
+    inline_data = data_by_year.get(current_year, "")
+    fragment_years = sorted([y for y in data_by_year if y != current_year])
+    base_dir = os.path.dirname(HTML_PATH) or "."
+    write_year_fragments(data_by_year, current_year, base_dir)
+    # Remove fragment file for year if it has no more data
+    del_year_str = str(year)
+    if del_year_str not in data_by_year or not data_by_year[del_year_str].strip():
+        frag_path = os.path.join(base_dir, f"data-{del_year_str}.html")
+        if os.path.exists(frag_path):
+            os.remove(frag_path)
+
+    full_html = build_full_html(tabs_html, inline_data, fragment_years)
     with open(HTML_PATH, "w", encoding="utf-8") as f:
         f.write(full_html)
     print(f"✓ Deleted week {week} {year} from HTML.")
@@ -3494,6 +4147,12 @@ def rebuild_html():
 
     # Remove alt= attributes from team logos (redundant with data-team)
     data_html = re.sub(r'(<img\b[^>]*\bdata-team="[^"]*"[^>]*?) alt="[^"]*"', r'\1', data_html)
+
+    # Apply logo name corrections (fix wrong cbbpoll.net filenames to canonical local names)
+    for wrong, right in LOGO_NAME_MAP.items():
+        data_html = data_html.replace(f'data-src="{wrong}"', f'data-src="{right}"')
+        data_html = data_html.replace(f'data-team="{wrong}"', f'data-team="{right}"')
+        data_html = data_html.replace(f'alt="{wrong}"', f'alt="{right}"')
 
     # Remove inline styles from voter-cell divs
     data_html = re.sub(
@@ -3558,10 +4217,18 @@ def rebuild_html():
         new_parts.append(part)
     data_html = "".join(new_parts)
 
-    full_html = build_full_html(tabs_html, data_html)
+    # Split by year: embed only the current year, write fragments for the rest
+    current_year = get_current_year(tabs_html)
+    data_by_year = split_data_by_year(data_html)
+    inline_data = data_by_year.get(current_year, "")
+    fragment_years = sorted([y for y in data_by_year if y != current_year])
+    base_dir = os.path.dirname(HTML_PATH) or "."
+    write_year_fragments(data_by_year, current_year, base_dir)
+
+    full_html = build_full_html(tabs_html, inline_data, fragment_years)
     with open(HTML_PATH, "w", encoding="utf-8") as f:
         f.write(full_html)
-    print(f"✓ Rebuilt HTML with {len(week_ids)} weeks.")
+    print(f"✓ Rebuilt HTML with {len(week_ids)} weeks ({current_year} inline, {len(fragment_years)} year fragments).")
 
 def main():
     parser = argparse.ArgumentParser(description="Scrape CBB Poll ballots and generate HTML.")
@@ -3570,6 +4237,8 @@ def main():
     parser.add_argument("--rebuild", action="store_true", help="Rebuild HTML from existing data without scraping")
     parser.add_argument("--to-webp", action="store_true", help="Convert all existing PNG logos to WebP and exit")
     parser.add_argument("--delete", action="store_true", help="Delete a specific week from the HTML")
+    parser.add_argument("--cbbpoll", action="store_true", help="Scrape from cbbpoll.com (legacy site)")
+    parser.add_argument("--cbbpoll-build", action="store_true", help="Build HTML from cached cbbpoll.com data")
     args = parser.parse_args()
 
     if args.to_webp:
@@ -3584,6 +4253,26 @@ def main():
 
     if args.rebuild:
         rebuild_html()
+        return
+
+    if args.cbbpoll:
+        if not args.year:
+            parser.error("--year is required with --cbbpoll (e.g. --year 2022 or --year 0 for all)")
+        if args.year == 0:
+            for y in sorted(CBBPOLL_SEASONS.keys()):
+                cbbpoll_scrape_season(y)
+        else:
+            cbbpoll_scrape_season(args.year)
+        return
+
+    if args.cbbpoll_build:
+        if not args.year:
+            parser.error("--year is required with --cbbpoll-build")
+        if args.year == 0:
+            for y in sorted(CBBPOLL_SEASONS.keys()):
+                cbbpoll_build_season(y)
+        else:
+            cbbpoll_build_season(args.year)
         return
 
     if not args.week or not args.year:
