@@ -3793,7 +3793,7 @@ document.addEventListener("keydown", e => {
 
     if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
         e.preventDefault();
-        const sortedAll = getSortedTabs().reverse();
+        const sortedAll = getSortedTabs().slice().reverse();
         const idx = sortedAll.findIndex(t => t.dataset.week === activeTab.dataset.week);
         const target = e.key === "ArrowRight"
             ? sortedAll[idx + 1]
