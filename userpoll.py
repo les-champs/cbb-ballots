@@ -1717,7 +1717,7 @@ function pinRow(row, tbody) {
         }
     });
     syncPinnedToAggregate(username, !isPinned);
-    if (!isPinned) {
+    if (isPinned) {
         allRows.forEach(r => r.classList.remove("voter-cell-hover"));
     }
 }
