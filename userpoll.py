@@ -1019,12 +1019,13 @@ td.logo-cell .logo {
 }
 
 .veteran-tag {
+    display: inline;
     font-size: 8px;
     color: #999;
     font-weight: normal;
     margin-left: 4px;
     white-space: nowrap;
-    flex-shrink: 0;
+    vertical-align: baseline;
 }
 
 .pin-btn {
@@ -1523,13 +1524,13 @@ const HIDDEN_YEARS = new Set(["2024"]);
 
 function injectVeteranTags(root) {
     root.querySelectorAll(".voter-name").forEach(nameSpan => {
-        if (nameSpan.nextSibling?.classList?.contains("veteran-tag")) return;
+        if (nameSpan.querySelector(".veteran-tag")) return;
         const name = nameSpan.textContent.trim();
         if ((TENURE_COUNTS[name] ?? 0) > 100) {
             const tag = document.createElement("span");
             tag.className = "veteran-tag";
             tag.textContent = "veteran";
-            nameSpan.insertAdjacentElement("afterend", tag);
+            nameSpan.appendChild(tag);
         }
     });
 }
