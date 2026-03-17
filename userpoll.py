@@ -2589,6 +2589,7 @@ function rebuildWeekPicker() {
     const currentYear = document.getElementById("year-text").innerText;
     const activeTab = document.querySelector(".week-tab.active");
     const tabs = Array.from(document.querySelectorAll(`.week-tab[data-year="${currentYear}"]`))
+        .filter(t => parseInt(t.dataset.weeknum) !== 0)
         .sort((a, b) => parseInt(a.dataset.weeknum) - parseInt(b.dataset.weeknum));
     const weekPicker = document.getElementById("week-picker");
     weekPicker.innerHTML = "";
@@ -3815,10 +3816,27 @@ document.addEventListener("keydown", e => {
         return;
     }
 
+    if (e.metaKey && e.code === "Digit0") {
+        e.preventDefault();
+        const preSeasonTab = document.querySelector(`.week-tab[data-year="${currentYear}"][data-weeknum="0"]`);
+        if (preSeasonTab) {
+            loadYear(currentYear).then(() => {
+                showWeek(preSeasonTab.dataset.week);
+                if (weekPickerPinned) rebuildWeekPicker();
+            }).catch(() => {});
+        }
+        return;
+    }
+
     if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
         e.preventDefault();
-        const sortedAll = getSortedTabs().slice().reverse();
-        const idx = sortedAll.findIndex(t => t.dataset.week === activeTab.dataset.week);
+        const sortedAll = getSortedTabs().filter(t => parseInt(t.dataset.weeknum) !== 0).slice().reverse();
+        let idx = sortedAll.findIndex(t => t.dataset.week === activeTab.dataset.week);
+        if (idx === -1 && currentWeekNum === 0) {
+            // Currently on pre-season; treat as just before week 1 of this year
+            const firstOfYear = sortedAll.findIndex(t => t.dataset.year === currentYear);
+            idx = firstOfYear - 1;
+        }
         const target = e.key === "ArrowRight"
             ? sortedAll[idx + 1]
             : sortedAll[idx - 1];
@@ -3988,7 +4006,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
       <div class="keybind-section-title">Navigation</div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>→</kbd> / <kbd>←</kbd></span><span>Next / Previous Week</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>↑</kbd> / <kbd>↓</kbd></span><span>Next / Previous Year</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>D</kbd></span><span>Jump to Data Ballots</span></div>
+<div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>D</kbd></span><span>Jump to Data Ballots</span></div>
     </div>
     <div class="keybind-section">
       <div class="keybind-section-title">Views</div>
