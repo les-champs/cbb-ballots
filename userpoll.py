@@ -1463,6 +1463,7 @@ let _deltaDataCacheIsProvisional = null;
 
 const _loadedYears = new Set();
 const _loadingYears = {};
+const HIDDEN_YEARS = new Set(["2024"]);
 
 async function loadYear(year) {
     if (_loadedYears.has(year)) return;
@@ -1936,15 +1937,8 @@ function applyTableSort(sort, clickedTable) {
     }
 
     if (sort === "tenure") {
-        // Sort by total ballots submitted across all years (official + provisional), most first
-        const lbData = buildLeaderboardData();
-        const ballotCount = {};
-        Object.values(lbData).forEach(weekData => {
-            Object.entries(weekData).forEach(([u, entry]) => {
-                if (u === "Official Overall" || !entry.teams?.length) return;
-                ballotCount[u] = (ballotCount[u] || 0) + 1;
-            });
-        });
+        // Sort by total ballots submitted across all years (pre-computed at build time)
+        const ballotCount = (typeof TENURE_COUNTS !== 'undefined') ? TENURE_COUNTS : {};
         rows.sort((a, b) => {
             const ua = getVoterName(a), ub = getVoterName(b);
             return (ballotCount[ub] ?? 0) - (ballotCount[ua] ?? 0);
@@ -2474,7 +2468,7 @@ function rebuildYearPicker() {
         if (!byYear[y]) byYear[y] = [];
         byYear[y].push(t);
     });
-    const years = Object.keys(byYear).sort();
+    const years = Object.keys(byYear).filter(y => !HIDDEN_YEARS.has(y)).sort();
 
     const yearPicker = document.getElementById("year-picker");
     yearPicker.innerHTML = "";
@@ -3767,7 +3761,7 @@ document.addEventListener("keydown", e => {
     if (e.key === "ArrowUp" || e.key === "ArrowDown") {
         e.preventDefault();
         const tabs = getSortedTabs();
-        const years = [...new Set(tabs.map(t => t.dataset.year))].sort();
+        const years = [...new Set(tabs.map(t => t.dataset.year))].filter(y => !HIDDEN_YEARS.has(y)).sort();
         const yearIdx = years.indexOf(currentYear);
         const targetYear = e.key === "ArrowUp"
             ? years[yearIdx + 1]
@@ -3842,8 +3836,32 @@ def write_year_fragments(data_by_year, current_year, base_dir):
         with open(frag_path, "w", encoding="utf-8") as f:
             f.write(year_html)
 
-def build_full_html(week_tabs_html, week_data_html, fragment_years=None):
+def compute_tenure_counts(data_html):
+    """Count total ballots per voter across all week/year data (all loaded HTML).
+    Adds 36 to voters present in both 2022 and 2025 to account for missing 2023/2024 seasons."""
+    SKIP_NAMES = {"Official Overall", "5-Week Weighted"}
+    name_re = re.compile(r'<span class="voter-name"[^>]*>([^<]+)<')
+    counts = {}
+    for m in name_re.finditer(data_html):
+        username = m.group(1).strip()
+        if username in SKIP_NAMES:
+            continue
+        counts[username] = counts.get(username, 0) + 1
+
+    # Voters active in both 2022 and 2025 likely also voted in missing 2023/2024 seasons
+    by_year = split_data_by_year(data_html)
+    def voters_in_year(year_str):
+        html = by_year.get(year_str, "")
+        return {m.group(1).strip() for m in name_re.finditer(html) if m.group(1).strip() not in SKIP_NAMES}
+
+    for voter in voters_in_year("2022") & voters_in_year("2025"):
+        if voter in counts:
+            counts[voter] += 36
+    return counts
+
+def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_counts=None):
     fragment_years_js = json.dumps(fragment_years or [])
+    tenure_counts_js = json.dumps(tenure_counts or {})
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -3942,6 +3960,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None):
 </div>
 <script>
 const FRAGMENT_YEARS = {fragment_years_js};
+const TENURE_COUNTS = {tenure_counts_js};
 {JS}
 </script>
 
@@ -4008,8 +4027,9 @@ def save_html(week, year, new_week_block, html_path):
     fragment_years = sorted([y for y in data_by_year if y != current_year])
     base_dir = os.path.dirname(html_path) or "."
     write_year_fragments(data_by_year, current_year, base_dir)
+    tenure_counts = compute_tenure_counts(data_html)
 
-    full_html = build_full_html(tabs_html, inline_data, fragment_years)
+    full_html = build_full_html(tabs_html, inline_data, fragment_years, tenure_counts)
     with open(html_path, "w", encoding="utf-8") as f:
         f.write(full_html)
     print(f"✓ Saved to: {html_path}")
@@ -4063,8 +4083,9 @@ def delete_week(week, year):
         frag_path = os.path.join(base_dir, f"data-{del_year_str}.html")
         if os.path.exists(frag_path):
             os.remove(frag_path)
+    tenure_counts = compute_tenure_counts(data_html)
 
-    full_html = build_full_html(tabs_html, inline_data, fragment_years)
+    full_html = build_full_html(tabs_html, inline_data, fragment_years, tenure_counts)
     with open(HTML_PATH, "w", encoding="utf-8") as f:
         f.write(full_html)
     print(f"✓ Deleted week {week} {year} from HTML.")
@@ -4182,8 +4203,9 @@ def rebuild_html():
     fragment_years = sorted([y for y in data_by_year if y != current_year])
     base_dir = os.path.dirname(HTML_PATH) or "."
     write_year_fragments(data_by_year, current_year, base_dir)
+    tenure_counts = compute_tenure_counts(data_html)
 
-    full_html = build_full_html(tabs_html, inline_data, fragment_years)
+    full_html = build_full_html(tabs_html, inline_data, fragment_years, tenure_counts)
     with open(HTML_PATH, "w", encoding="utf-8") as f:
         f.write(full_html)
     print(f"✓ Rebuilt HTML with {len(week_ids)} weeks ({current_year} inline, {len(fragment_years)} year fragments).")
