@@ -4341,6 +4341,107 @@ def apply_recovery(year=2024):
     print("Run: python3 userpoll.py --rebuild  to regenerate index.html")
 
 
+def fix_season_contamination(year):
+    """
+    Remove voter rows from data-YEAR.html that contain ballot IDs from a different season.
+
+    When a season is scraped and some voters' ballot links are missing from the poll page,
+    the scraper's profile-page fallback may retrieve a ballot ID from a prior season
+    (same week number, earlier ObjectID timestamp). This function identifies and removes
+    those contaminated rows, then recomputes the affected aggregate rows.
+
+    Contamination detection: ballot IDs whose first 3 hex chars (ObjectID timestamp prefix)
+    fall outside the expected season window.
+
+    Season ObjectID prefix ranges (approximate):
+      2024 season (2023-24): 655–65f  (Nov 2023 – Mar 2024)
+      2025 season (2024-25): 672–67f  (Nov 2024 – Mar 2025)
+      2026 season (2025-26): 690–69e  (Nov 2025 – Mar 2026)
+    """
+    SEASON_PREFIXES = {
+        2024: set(f"{x:03x}" for x in range(0x654, 0x660)),
+        2025: set(f"{x:03x}" for x in range(0x672, 0x680)),
+        2026: set(f"{x:03x}" for x in range(0x690, 0x6a0)),
+    }
+    expected = SEASON_PREFIXES.get(year)
+    if not expected:
+        print(f"ERROR: No known season prefix range for year {year}.")
+        return
+
+    fragment_path = os.path.join(BASE_HTML_DIR, f"data-{year}.html")
+    if not os.path.exists(fragment_path):
+        print(f"ERROR: {fragment_path} not found.")
+        return
+
+    with open(fragment_path, encoding="utf-8") as f:
+        html = f.read()
+
+    # Find all voter rows with a ballot URL whose ObjectID prefix is outside the expected range
+    row_re     = re.compile(r'<tr class="voter-row">.*?</tr>', re.DOTALL)
+    ballot_re  = re.compile(r'data-ballot-url="https://www\.cbbpoll\.net/ballots/\d+/([a-f0-9]{24})"')
+    name_re    = re.compile(r'voter-name[^>]*>([^<]+)<')
+
+    contaminated_rows = []
+    for m in row_re.finditer(html):
+        row_html  = m.group(0)
+        ballot_m  = ballot_re.search(row_html)
+        if not ballot_m:
+            continue
+        bid = ballot_m.group(1)
+        if bid[:3].lower() not in expected:
+            name_m = name_re.search(row_html)
+            username = name_m.group(1).strip() if name_m else "?"
+            contaminated_rows.append((m.group(0), username, bid))
+
+    if not contaminated_rows:
+        print(f"No contaminated rows found in data-{year}.html.")
+        return
+
+    print(f"Found {len(contaminated_rows)} contaminated voter rows in data-{year}.html")
+    by_voter = {}
+    for _, username, bid in contaminated_rows:
+        by_voter.setdefault(username, []).append(bid[:6])
+    for u, prefixes in sorted(by_voter.items()):
+        print(f"  {u}: {len(prefixes)} rows (prefix examples: {prefixes[:3]})")
+
+    # Remove contaminated rows from HTML
+    for row_html, _, _ in contaminated_rows:
+        html = html.replace(row_html, "", 1)
+
+    print(f"\nRemoved {len(contaminated_rows)} contaminated rows.")
+
+    # Recompute aggregate rows for ALL weeks (contaminated rows may affect any week)
+    week_re = re.compile(rf'id="week-{year}-(\d+)-official"')
+    weeks_to_fix = sorted(set(int(m.group(1)) for m in week_re.finditer(html)))
+    print(f"Recomputing aggregates for {len(weeks_to_fix)} weeks...")
+
+    for week in weeks_to_fix:
+        off_id = f'id="week-{year}-{week}-official"'
+        pro_id = f'id="week-{year}-{week}-provisional"'
+        agg_id = f'id="week-{year}-{week}-aggregate"'
+
+        off_start = html.find(off_id)
+        if off_start == -1:
+            continue
+        off_end = html.find(pro_id, off_start)
+        if off_end == -1:
+            off_end = html.find(agg_id, off_start)
+
+        official_block = html[off_start:off_end]
+        all_official   = parse_voter_tuples_from_section_html(official_block)
+        new_agg_row    = build_aggregate_row(all_official)
+
+        agg_start   = html.find(agg_id, off_end)
+        agg_tbody_s = html.find("<tbody>", agg_start)
+        agg_tbody_e = html.find("</tbody>", agg_tbody_s) + len("</tbody>")
+        html = html[:agg_tbody_s] + f"<tbody>{new_agg_row}</tbody>" + html[agg_tbody_e:]
+
+    with open(fragment_path, "w", encoding="utf-8") as f:
+        f.write(html)
+    print(f"\nDone! Updated {fragment_path}")
+    print("Run: python3 userpoll.py --rebuild  to regenerate index.html")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Scrape CBB Poll ballots and generate HTML.")
     parser.add_argument("--week", type=int, help="Poll week number (e.g. 18)")
@@ -4349,6 +4450,7 @@ def main():
     parser.add_argument("--to-webp", action="store_true", help="Convert all existing PNG logos to WebP and exit")
     parser.add_argument("--delete", action="store_true", help="Delete a specific week from the HTML")
     parser.add_argument("--apply-recovery", action="store_true", help="Apply recovered ballot data from cbbpoll-YEAR-recovery.json")
+    parser.add_argument("--fix-contamination", action="store_true", help="Remove wrong-season ballot rows from data-YEAR.html")
     parser.add_argument("--cbbpoll", action="store_true", help="Scrape from cbbpoll.com (legacy site)")
     parser.add_argument("--cbbpoll-build", action="store_true", help="Build HTML from cached cbbpoll.com data")
     args = parser.parse_args()
@@ -4371,6 +4473,12 @@ def main():
         if not args.year:
             parser.error("--year is required with --apply-recovery (e.g. --year 2024)")
         apply_recovery(args.year)
+        return
+
+    if args.fix_contamination:
+        if not args.year:
+            parser.error("--year is required with --fix-contamination (e.g. --year 2025)")
+        fix_season_contamination(args.year)
         return
 
     if args.cbbpoll:
