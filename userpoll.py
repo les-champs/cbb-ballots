@@ -656,19 +656,35 @@ def cbbpoll_build_season(year):
     weeks = sorted(data["weeks"].keys(), key=lambda w: int(w))
     print(f"Building HTML for {year}: {len(weeks)} weeks")
 
+    # Build set of official voter usernames from weeks 2 and 3 to reclassify week 0
+    official_panel = set()
+    for ref_week in ("2", "3"):
+        for v in data["weeks"].get(ref_week, {}).get("official", []):
+            official_panel.add(v["username"])
+
     for week_key in weeks:
         week = int(week_key)
         week_data = data["weeks"][week_key]
 
-        official = _cbbpoll_voters_to_tuples(week_data.get("official", []))
-        provisional = _cbbpoll_voters_to_tuples(week_data.get("provisional", []))
+        if week == 0 and official_panel:
+            # Reclassify week 0 voters based on their status in weeks 2/3
+            all_week0 = week_data.get("official", []) + week_data.get("provisional", [])
+            reclassified_official = [v for v in all_week0 if v["username"] in official_panel]
+            reclassified_provisional = [v for v in all_week0 if v["username"] not in official_panel]
+            official = _cbbpoll_voters_to_tuples(reclassified_official)
+            provisional = _cbbpoll_voters_to_tuples(reclassified_provisional)
+            print(f"  Week 0: reclassified {len(reclassified_official)} official + {len(reclassified_provisional)} provisional (from weeks 2/3 panel)")
+        else:
+            official = _cbbpoll_voters_to_tuples(week_data.get("official", []))
+            provisional = _cbbpoll_voters_to_tuples(week_data.get("provisional", []))
 
         if not official and not provisional:
             print(f"  Week {week}: no voter data, skipping")
             continue
 
+        week_label = "Pre-Season" if week == 0 else None
         week_block = build_week_block(week, year, official, provisional)
-        save_html(week, year, week_block, HTML_PATH)
+        save_html(week, year, week_block, HTML_PATH, week_label=week_label)
         print(f"  ✓ Week {week}: {len(official)} official + {len(provisional)} provisional")
 
     print(f"\n✓ Built HTML for {year}.")
@@ -774,6 +790,37 @@ def build_week_block(week, year, official, provisional):
     <div class="table-scroll"><div class="table-container">{aggregate_table}</div></div>
   </div>
 </div><!-- /week-block:{week_id} -->"""
+
+def get_official_voters_from_html(year, weeks, html_path):
+    """Return a set of official voter usernames from already-saved week blocks.
+
+    Reads the official ballot section (first .ballot-section div) of each
+    requested week and extracts voter names from <span class="voter-name">.
+    """
+    _, data_html, _ = load_existing_weeks(html_path)
+    official_panel = set()
+    for week in weeks:
+        week_id = f"week-{year}-{week}"
+        # Find the week block
+        block_match = re.search(
+            rf'<div id="{re.escape(week_id)}".*?</div><!-- /week-block:{re.escape(week_id)} -->',
+            data_html, re.DOTALL
+        )
+        if not block_match:
+            continue
+        block = block_match.group(0)
+        # Extract everything between the official and provisional section divs
+        official_match = re.search(
+            rf'<div id="{re.escape(week_id)}-official"(.*?)<div id="{re.escape(week_id)}-provisional"',
+            block, re.DOTALL
+        )
+        if not official_match:
+            continue
+        official_html = official_match.group(1)
+        for name in re.findall(r'<span class="voter-name"[^>]*>([^<]+)</span>', official_html):
+            if name != "Official Overall":
+                official_panel.add(name)
+    return official_panel
 
 # ── HTML File Management ─────────────────────────────────────────────────────
 
@@ -969,6 +1016,15 @@ td.logo-cell .logo {
 
 .voter-cell:hover .voter-name {
     transform: scale(1.05);
+}
+
+.veteran-tag {
+    font-size: 8px;
+    color: #999;
+    font-weight: normal;
+    margin-left: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .pin-btn {
@@ -1465,6 +1521,19 @@ const _loadedYears = new Set();
 const _loadingYears = {};
 const HIDDEN_YEARS = new Set(["2024"]);
 
+function injectVeteranTags(root) {
+    root.querySelectorAll(".voter-name").forEach(nameSpan => {
+        if (nameSpan.nextSibling?.classList?.contains("veteran-tag")) return;
+        const name = nameSpan.textContent.trim();
+        if ((TENURE_COUNTS[name] ?? 0) > 100) {
+            const tag = document.createElement("span");
+            tag.className = "veteran-tag";
+            tag.textContent = "veteran";
+            nameSpan.insertAdjacentElement("afterend", tag);
+        }
+    });
+}
+
 async function loadYear(year) {
     if (_loadedYears.has(year)) return;
     if (_loadingYears[year]) return _loadingYears[year];
@@ -1480,6 +1549,7 @@ async function loadYear(year) {
             const html = await resp.text();
             const container = document.getElementById('year-data-container');
             container.insertAdjacentHTML('beforeend', html);
+            injectVeteranTags(container);
             _loadedYears.add(year);
             _sortedTabsCache = null;
             _leaderboardDataCache = null;
@@ -2135,7 +2205,7 @@ function renderVoterHistoryTable(mergedData, yearTabs, container) {
 
         const weekTd = document.createElement("td");
         weekTd.className = "week-label";
-        weekTd.textContent = "Week " + tab.dataset.weeknum;
+        weekTd.textContent = tab.dataset.weeklabel || ("Week " + tab.dataset.weeknum);
         weekTd.style.cssText = "white-space:nowrap; padding-right:16px; width:1px; min-width:0;";
         tr.appendChild(weekTd);
 
@@ -2891,7 +2961,8 @@ function showAvgRankModal(weekId) {
     const table = document.getElementById("avg-rank-table");
 
     const weekPad = String(weekNum).padStart(2, "0");
-    title.textContent = `${year} #${weekPad} Statistics`;
+    const weekLabel = activeTab?.dataset.weeklabel;
+    title.textContent = weekLabel ? `${year} ${weekLabel} Statistics` : `${year} #${weekPad} Statistics`;
 
     const buildRow = (team, rank) => {
         const avg = teamRankSum[team] / teamVoterCount[team];
@@ -3099,7 +3170,7 @@ function saveTableAsPng() {
     if (!table) return;
     html2canvas(table, { useCORS: true, scale: 2 }).then(canvas => {
         const link = document.createElement("a");
-        const week = activeTab.dataset.weeknum;
+        const week = activeTab.dataset.weeklabel || activeTab.dataset.weeknum;
         const year = activeTab.dataset.year;
         const label = document.getElementById("toggle-text").innerText.includes("Provisional") ? "provisional" : "official";
         link.download = `cbb-poll-${year}-week${week}-${label}.png`;
@@ -3803,6 +3874,7 @@ const allTabs = getSortedTabs();
 if (allTabs.length > 0) {
     const inlineYear = allTabs[0]?.dataset.year;
     if (inlineYear) _loadedYears.add(inlineYear);
+    injectVeteranTags(document);
     showWeek(allTabs[0].dataset.week);
     setTimeout(() => backgroundLoad(), 1000);
 }
@@ -4003,7 +4075,7 @@ def load_existing_weeks(html_path):
 
     return tabs_html, data_html, week_ids
 
-def save_html(week, year, new_week_block, html_path):
+def save_html(week, year, new_week_block, html_path, week_label=None):
     """Load existing HTML, append the new week, and save."""
     week_id = f"week-{year}-{week}"
     tabs_html, data_html, existing_ids = load_existing_weeks(html_path)
@@ -4014,7 +4086,9 @@ def save_html(week, year, new_week_block, html_path):
         data_html = remove_week_block(data_html, week_id)
 
     # Add new tab
-    new_tab = f'<button class="week-tab" data-week="{week_id}" data-weeknum="{week}" data-year="{year}">{year} #{week}</button>'
+    label_attr = f' data-weeklabel="{week_label}"' if week_label else ""
+    tab_text = f"{year} {week_label}" if week_label else f"{year} #{week}"
+    new_tab = f'<button class="week-tab" data-week="{week_id}" data-weeknum="{week}" data-year="{year}"{label_attr}>{tab_text}</button>'
     tabs_html = (tabs_html + "\n" + new_tab).strip()
 
     # Append new week block
@@ -4555,7 +4629,10 @@ def remove_overwritten_ballots(year, reference_year):
 
 def main():
     parser = argparse.ArgumentParser(description="Scrape CBB Poll ballots and generate HTML.")
-    parser.add_argument("--week", type=int, help="Poll week number (e.g. 18)")
+    parser.add_argument("--week", type=str, help="Poll week slug to fetch from cbbpoll.net (e.g. 18 or Pre-Season)")
+    parser.add_argument("--store-week", type=int, dest="store_week",
+                        help="Override the week number used for HTML storage/label (e.g. 0 for pre-season)")
+    parser.add_argument("--label", type=str, help="Custom display label for the week tab (e.g. 'Pre-Season')")
     parser.add_argument("--year", type=int, help="Poll year (e.g. 2026)")
     parser.add_argument("--rebuild", action="store_true", help="Rebuild HTML from existing data without scraping")
     parser.add_argument("--to-webp", action="store_true", help="Convert all existing PNG logos to WebP and exit")
@@ -4624,6 +4701,12 @@ def main():
         parser.error("--week and --year are required unless using --rebuild")
 
     week, year = args.week, args.year
+    if args.store_week is not None:
+        store_week = args.store_week
+    elif week.lstrip("-").isdigit():
+        store_week = int(week)
+    else:
+        parser.error(f"--store-week is required when --week is a non-numeric slug like '{week}'")
 
     # Try homepage first (most up-to-date for current week), then seasons archive for past weeks
     candidate_urls = [
@@ -4676,9 +4759,21 @@ def main():
     print("\nFetching provisional ballots...")
     provisional_with_ballots = process_voters(provisional_voters, "Provisional", week=week, year=year, ballot_map=ballot_map)
 
-    week_block = build_week_block(week, year, official_with_ballots, provisional_with_ballots)
-    save_html(week, year, week_block, HTML_PATH)
-    print(f"\nDone! Week {week} {year}: {len(official_with_ballots)} official + {len(provisional_with_ballots)} provisional voters.")
+    # For pre-season (week 0): reclassify voters based on their status in weeks 2/3
+    if store_week == 0:
+        official_panel = get_official_voters_from_html(year, [2, 3], HTML_PATH)
+        if official_panel:
+            all_voters = official_with_ballots + provisional_with_ballots
+            official_with_ballots = [v for v in all_voters if v[1] in official_panel]
+            provisional_with_ballots = [v for v in all_voters if v[1] not in official_panel]
+            print(f"\nReclassified week 0 using weeks 2/3 panel: {len(official_with_ballots)} official + {len(provisional_with_ballots)} provisional")
+        else:
+            print("\nNo weeks 2/3 data found — keeping pre-season voters as provisional")
+
+    week_block = build_week_block(store_week, year, official_with_ballots, provisional_with_ballots)
+    save_html(store_week, year, week_block, HTML_PATH, week_label=args.label)
+    week_display = args.label or f"Week {store_week}"
+    print(f"\nDone! {week_display} {year}: {len(official_with_ballots)} official + {len(provisional_with_ballots)} provisional voters.")
 
 if __name__ == "__main__":
     main()
