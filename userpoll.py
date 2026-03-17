@@ -4442,6 +4442,95 @@ def fix_season_contamination(year):
     print("Run: python3 userpoll.py --rebuild  to regenerate index.html")
 
 
+def remove_overwritten_ballots(year, reference_year):
+    """
+    Remove rows from data-YEAR.html whose ballot IDs also appear in data-REFERENCE_YEAR.html.
+
+    cbbpoll.net reuses ballot IDs across seasons: when a voter submits a ballot for the
+    same week in a new season, the old ballot ID record is overwritten with new content.
+    If recovery added rows using those now-overwritten ballot IDs, the rows in data-YEAR.html
+    will contain content from the newer season. This function detects and removes them.
+
+    Example: data-2024.html has ballot IDs that also appear in data-2025.html. Those IDs
+    were fetched during recovery but already had 2024-25 content → remove from 2024.
+    """
+    target_path = os.path.join(BASE_HTML_DIR, f"data-{year}.html")
+    ref_path    = os.path.join(BASE_HTML_DIR, f"data-{reference_year}.html")
+
+    for p in (target_path, ref_path):
+        if not os.path.exists(p):
+            print(f"ERROR: {p} not found.")
+            return
+
+    with open(target_path, encoding="utf-8") as f:
+        html = f.read()
+    with open(ref_path, encoding="utf-8") as f:
+        ref_html = f.read()
+
+    ref_ids = set(re.findall(r'data-ballot-url="[^"]*ballots/\d+/([a-f0-9]{24})"', ref_html))
+    print(f"Reference ballot IDs loaded from data-{reference_year}.html: {len(ref_ids)}")
+
+    row_re    = re.compile(r'<tr class="voter-row">.*?</tr>', re.DOTALL)
+    ballot_re = re.compile(r'data-ballot-url="[^"]*ballots/\d+/([a-f0-9]{24})"')
+    name_re   = re.compile(r'voter-name[^>]*>([^<]+)<')
+
+    to_remove = []
+    for m in row_re.finditer(html):
+        row_html = m.group(0)
+        bid_m    = ballot_re.search(row_html)
+        if not bid_m:
+            continue
+        if bid_m.group(1) in ref_ids:
+            name_m   = name_re.search(row_html)
+            username = name_m.group(1).strip() if name_m else "?"
+            to_remove.append((m.group(0), username, bid_m.group(1)))
+
+    if not to_remove:
+        print(f"No overwritten ballot rows found in data-{year}.html.")
+        return
+
+    print(f"Found {len(to_remove)} rows in data-{year}.html with ballot IDs also in data-{reference_year}.html")
+    by_voter = {}
+    for _, username, bid in to_remove:
+        by_voter.setdefault(username, []).append(bid[:8])
+    for u, bids in sorted(by_voter.items()):
+        print(f"  {u}: {len(bids)} rows")
+
+    for row_html, _, _ in to_remove:
+        html = html.replace(row_html, "", 1)
+    print(f"\nRemoved {len(to_remove)} rows.")
+
+    week_re = re.compile(rf'id="week-{year}-(\d+)-official"')
+    weeks_to_fix = sorted(set(int(m.group(1)) for m in week_re.finditer(html)))
+    print(f"Recomputing aggregates for {len(weeks_to_fix)} weeks...")
+
+    for week in weeks_to_fix:
+        off_id = f'id="week-{year}-{week}-official"'
+        pro_id = f'id="week-{year}-{week}-provisional"'
+        agg_id = f'id="week-{year}-{week}-aggregate"'
+
+        off_start = html.find(off_id)
+        if off_start == -1:
+            continue
+        off_end = html.find(pro_id, off_start)
+        if off_end == -1:
+            off_end = html.find(agg_id, off_start)
+
+        official_block = html[off_start:off_end]
+        all_official   = parse_voter_tuples_from_section_html(official_block)
+        new_agg_row    = build_aggregate_row(all_official)
+
+        agg_start   = html.find(agg_id, off_end)
+        agg_tbody_s = html.find("<tbody>", agg_start)
+        agg_tbody_e = html.find("</tbody>", agg_tbody_s) + len("</tbody>")
+        html = html[:agg_tbody_s] + f"<tbody>{new_agg_row}</tbody>" + html[agg_tbody_e:]
+
+    with open(target_path, "w", encoding="utf-8") as f:
+        f.write(html)
+    print(f"\nDone! Updated {target_path}")
+    print("Run: python3 userpoll.py --rebuild  to regenerate index.html")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Scrape CBB Poll ballots and generate HTML.")
     parser.add_argument("--week", type=int, help="Poll week number (e.g. 18)")
@@ -4451,6 +4540,8 @@ def main():
     parser.add_argument("--delete", action="store_true", help="Delete a specific week from the HTML")
     parser.add_argument("--apply-recovery", action="store_true", help="Apply recovered ballot data from cbbpoll-YEAR-recovery.json")
     parser.add_argument("--fix-contamination", action="store_true", help="Remove wrong-season ballot rows from data-YEAR.html")
+    parser.add_argument("--remove-overwritten", type=int, metavar="REF_YEAR",
+                        help="Remove rows from data-YEAR.html whose ballot IDs appear in data-REF_YEAR.html (detects reused/overwritten ballot IDs)")
     parser.add_argument("--cbbpoll", action="store_true", help="Scrape from cbbpoll.com (legacy site)")
     parser.add_argument("--cbbpoll-build", action="store_true", help="Build HTML from cached cbbpoll.com data")
     args = parser.parse_args()
@@ -4479,6 +4570,12 @@ def main():
         if not args.year:
             parser.error("--year is required with --fix-contamination (e.g. --year 2025)")
         fix_season_contamination(args.year)
+        return
+
+    if args.remove_overwritten:
+        if not args.year:
+            parser.error("--year is required with --remove-overwritten (e.g. --year 2024 --remove-overwritten 2025)")
+        remove_overwritten_ballots(args.year, args.remove_overwritten)
         return
 
     if args.cbbpoll:
