@@ -4188,6 +4188,159 @@ def rebuild_html():
         f.write(full_html)
     print(f"✓ Rebuilt HTML with {len(week_ids)} weeks ({current_year} inline, {len(fragment_years)} year fragments).")
 
+def parse_voter_tuples_from_section_html(section_html):
+    """
+    Parse voter tuples from an HTML official/provisional section for aggregate recomputation.
+    Returns list of (flair, username, ballot_url, teams) tuples.
+    Skips synthetic rows (Official Overall, 5-Week Weighted).
+    """
+    SKIP_NAMES = {"Official Overall", "5-Week Weighted"}
+    tuples = []
+    row_re      = re.compile(r'<tr class="voter-row">.*?</tr>', re.DOTALL)
+    name_re     = re.compile(r'voter-name[^>]*>([^<]+)<')
+    ballot_re   = re.compile(r'data-ballot-url="([^"]+)"')
+    flair_re    = re.compile(r'<img class="logo" data-src="([^"]+)"')
+    team_re     = re.compile(r'<td[^>]*><img[^>]*data-team="([^"]+)"')
+    for row_m in row_re.finditer(section_html):
+        row_html = row_m.group(0)
+        name_m = name_re.search(row_html)
+        if not name_m:
+            continue
+        username = name_m.group(1).strip()
+        if username in SKIP_NAMES:
+            continue
+        flair_m    = flair_re.search(row_html)
+        ballot_m   = ballot_re.search(row_html)
+        flair      = flair_m.group(1) if flair_m else "Unknown"
+        ballot_url = ballot_m.group(1) if ballot_m else None
+        teams      = team_re.findall(row_html)
+        tuples.append((flair, username, ballot_url, teams))
+    return tuples
+
+
+def apply_recovery(year=2024):
+    """
+    Apply recovered ballot data from cbbpoll-YEAR-recovery.json into data-YEAR.html.
+
+    For each week that has recovered voters, inserts their rows into the official section
+    and recomputes the aggregate row to include them.
+    """
+    recovery_path = os.path.join(BASE_HTML_DIR, f"cbbpoll-{year}-recovery.json")
+    if not os.path.exists(recovery_path):
+        print(f"ERROR: {recovery_path} not found. Run recover_{year}.py --recover first.")
+        return
+
+    with open(recovery_path) as f:
+        recovery_data = json.load(f)
+
+    # Build flair map from the next year's fragment (voters' flair is stable year-to-year)
+    flair_map = {}
+    for ref_year in [year + 1, year + 2, year - 1]:
+        ref_path = os.path.join(BASE_HTML_DIR, f"data-{ref_year}.html")
+        if not os.path.exists(ref_path):
+            continue
+        with open(ref_path) as f:
+            ref_html = f.read()
+        voter_re = re.compile(
+            r'class="voter-cell"[^>]*data-ballot-url="[^"]*">.*?'
+            r'<img class="logo" data-src="([^"]+)".*?voter-name[^>]*>([^<]+)<',
+            re.DOTALL
+        )
+        for m in voter_re.finditer(ref_html):
+            flair_map[m.group(2).strip()] = m.group(1)
+        if flair_map:
+            print(f"  Flair map built from data-{ref_year}.html ({len(flair_map)} voters)")
+            break
+
+    # Group recovery data by week, keeping only entries with ballot content
+    by_week = {}
+    for key, val in recovery_data.items():
+        if not val.get("teams"):
+            continue
+        week_str, username = key.split(":", 1)
+        week = int(week_str)
+        by_week.setdefault(week, {})[username] = val
+
+    if not by_week:
+        print("No recovered ballot content found in recovery JSON.")
+        return
+
+    # Determine target HTML file
+    fragment_path = os.path.join(BASE_HTML_DIR, f"data-{year}.html")
+    if not os.path.exists(fragment_path):
+        print(f"ERROR: {fragment_path} not found.")
+        return
+
+    with open(fragment_path, encoding="utf-8") as f:
+        html = f.read()
+
+    print(f"Applying recovery to {fragment_path}")
+    print(f"Weeks with recovered data: {sorted(by_week.keys())}\n")
+
+    for week in sorted(by_week.keys()):
+        voters = by_week[week]
+        print(f"Week {week}: adding {len(voters)} recovered voters")
+
+        # Build voter tuples sorted alphabetically (matching existing sort order)
+        recovered_tuples = sorted(
+            [
+                (flair_map.get(u, "Unknown"), u, v["ballot_url"], v["teams"])
+                for u, v in voters.items()
+            ],
+            key=lambda x: x[1].lower(),
+        )
+
+        new_rows = build_table_rows(recovered_tuples)
+
+        # --- Locate the official section and append rows before </tbody> ---
+        off_id    = f'id="week-{year}-{week}-official"'
+        pro_id    = f'id="week-{year}-{week}-provisional"'
+        agg_id    = f'id="week-{year}-{week}-aggregate"'
+
+        off_start = html.find(off_id)
+        if off_start == -1:
+            print(f"  WARNING: official section not found for week {week}, skipping")
+            continue
+
+        # Official block ends at provisional (or aggregate if no provisional)
+        off_end = html.find(pro_id, off_start)
+        if off_end == -1:
+            off_end = html.find(agg_id, off_start)
+
+        official_block = html[off_start:off_end]
+        tbody_end_rel  = official_block.rfind("</tbody>")
+        if tbody_end_rel == -1:
+            print(f"  WARNING: </tbody> not found in official section for week {week}, skipping")
+            continue
+
+        insert_pos = off_start + tbody_end_rel
+        html = html[:insert_pos] + new_rows + html[insert_pos:]
+        print(f"  ✓ Inserted {len(recovered_tuples)} rows into official section")
+
+        # --- Recompute aggregate row using all official voters (old + new) ---
+        # Re-locate official block after insertion
+        off_start2 = html.find(off_id)
+        off_end2   = html.find(pro_id, off_start2)
+        if off_end2 == -1:
+            off_end2 = html.find(agg_id, off_start2)
+        official_block2 = html[off_start2:off_end2]
+
+        all_official = parse_voter_tuples_from_section_html(official_block2)
+        new_agg_row  = build_aggregate_row(all_official)
+
+        # Replace the aggregate tbody
+        agg_start      = html.find(agg_id, off_end2)
+        agg_tbody_s    = html.find("<tbody>", agg_start)
+        agg_tbody_e    = html.find("</tbody>", agg_tbody_s) + len("</tbody>")
+        html = html[:agg_tbody_s] + f"<tbody>{new_agg_row}</tbody>" + html[agg_tbody_e:]
+        print(f"  ✓ Aggregate row recomputed ({len(all_official)} official voters total)")
+
+    with open(fragment_path, "w", encoding="utf-8") as f:
+        f.write(html)
+    print(f"\nDone! Updated {fragment_path}")
+    print("Run: python3 userpoll.py --rebuild  to regenerate index.html")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Scrape CBB Poll ballots and generate HTML.")
     parser.add_argument("--week", type=int, help="Poll week number (e.g. 18)")
@@ -4195,6 +4348,7 @@ def main():
     parser.add_argument("--rebuild", action="store_true", help="Rebuild HTML from existing data without scraping")
     parser.add_argument("--to-webp", action="store_true", help="Convert all existing PNG logos to WebP and exit")
     parser.add_argument("--delete", action="store_true", help="Delete a specific week from the HTML")
+    parser.add_argument("--apply-recovery", action="store_true", help="Apply recovered ballot data from cbbpoll-YEAR-recovery.json")
     parser.add_argument("--cbbpoll", action="store_true", help="Scrape from cbbpoll.com (legacy site)")
     parser.add_argument("--cbbpoll-build", action="store_true", help="Build HTML from cached cbbpoll.com data")
     args = parser.parse_args()
@@ -4211,6 +4365,12 @@ def main():
 
     if args.rebuild:
         rebuild_html()
+        return
+
+    if args.apply_recovery:
+        if not args.year:
+            parser.error("--year is required with --apply-recovery (e.g. --year 2024)")
+        apply_recovery(args.year)
         return
 
     if args.cbbpoll:
