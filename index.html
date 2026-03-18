@@ -226,11 +226,21 @@ body.hide-veteran-tags .veteran-tag {
 }
 
 .veteran-tag.veteran-elite {
-    color: rgba(213, 172, 53, 0.4);
+    color: rgba(235, 183, 33, 0.63);
 }
 
 .voter-name:has(.veteran-elite) {
-    -webkit-text-stroke: 0.4px rgba(213, 172, 53, 0.35);
+    -webkit-text-stroke-width: 0.3px;
+    -webkit-text-stroke-color: rgba(0, 0, 0, 0.35);
+}
+
+.voter-name:has(.veteran-tag:not(.veteran-elite)) {
+    -webkit-text-stroke-width: 0.3px;
+    -webkit-text-stroke-color: rgba(0, 0, 0, 0.35);
+}
+
+.veteran-tag:not(.veteran-elite) {
+    color: rgba(180, 180, 180, 0.63);
 }
 
 
