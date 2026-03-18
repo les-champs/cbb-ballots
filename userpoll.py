@@ -1028,6 +1028,15 @@ td.logo-cell .logo {
     vertical-align: baseline;
 }
 
+body.hide-veteran-tags .veteran-tag {
+    display: none;
+}
+
+.veteran-tag.veteran-elite {
+    color: #c8a84b;
+    opacity: 0.6;
+}
+
 .pin-btn {
     display: none;
     cursor: pointer;
@@ -1359,13 +1368,14 @@ kbd {
     width: 1px;
 }
 #voter-history-table td {
-    padding: 2px 5px;
+    padding: 4px 6px;
     text-align: center;
     vertical-align: middle;
 }
 #voter-history-table .logo {
     width: 22px;
     height: 22px;
+    vertical-align: middle;
 }
 #voter-history-table td.no-ballot {
     color: #bbb;
@@ -1526,9 +1536,10 @@ function injectVeteranTags(root) {
     root.querySelectorAll(".voter-name").forEach(nameSpan => {
         if (nameSpan.querySelector(".veteran-tag")) return;
         const name = nameSpan.textContent.trim();
-        if ((TENURE_COUNTS[name] ?? 0) > 100) {
+        const count = TENURE_COUNTS[name] ?? 0;
+        if (count > 100) {
             const tag = document.createElement("span");
-            tag.className = "veteran-tag";
+            tag.className = "veteran-tag" + (count >= 186 ? " veteran-elite" : "");
             tag.textContent = name.length > 17 ? "(v)" : "veteran";
             nameSpan.appendChild(tag);
         }
@@ -1909,7 +1920,7 @@ document.addEventListener("mousedown", e => {
 
 let currentSort = "alphabetic";
 
-const SORT_LABELS = { alphabetic: "Alphabetic", consensus: "Consensus", ranking: "Précision", tenure: "Tenure" };
+const SORT_LABELS = { alphabetic: "Alphabetic", zetabetique: "Zétabétique", consensus: "Consensus", ranking: "Précision", tenure: "Tenure" };
 
 function setGlobalSort(sort) {
     currentSort = sort;
@@ -1920,6 +1931,7 @@ function setGlobalSort(sort) {
     document.querySelectorAll(".sort-option").forEach(o => {
         o.classList.toggle("active", o.dataset.sort === sort);
     });
+    document.body.classList.toggle("hide-veteran-tags", sort !== "alphabetic" && sort !== "zetabetique");
 }
 
 function resetRankingSort() {
@@ -1964,6 +1976,12 @@ function applyTableSort(sort, clickedTable) {
 
     if (sort === "alphabetic") {
         rows.sort((a, b) => getVoterName(a).localeCompare(getVoterName(b)));
+        rows.forEach(r => tbody.appendChild(r));
+        return;
+    }
+
+    if (sort === "zetabetique") {
+        rows.sort((a, b) => getVoterName(b).localeCompare(getVoterName(a)));
         rows.forEach(r => tbody.appendChild(r));
         return;
     }
@@ -3738,6 +3756,12 @@ document.addEventListener("keydown", e => {
         return;
     }
 
+    if (e.key === "Z" || e.key === "z") {
+        e.preventDefault();
+        applyTableSort("zetabetique");
+        return;
+    }
+
     if (e.key === "D" || e.key === "d") {
         e.preventDefault();
         showAggregateSection();
@@ -3746,7 +3770,7 @@ document.addEventListener("keydown", e => {
 
     if (e.key === "E" || e.key === "e") {
         e.preventDefault();
-        expandAllDeltas();
+        toggleAllDeltas();
         return;
     }
 
@@ -4010,7 +4034,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
     </div>
     <div class="keybind-section">
       <div class="keybind-section-title">Views</div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>E</kbd></span><span>Expand Deltas</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>E</kbd></span><span>Expand / Collapse All Deltas</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>1</kbd> – <kbd>9</kbd></span><span>Adjust Delta Lookback Window</span></div>
     </div>
     <div class="keybind-section">
