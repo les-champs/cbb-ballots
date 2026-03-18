@@ -376,13 +376,7 @@ document.addEventListener("mousedown", e => {
     if (!opt) return;
     e.stopPropagation();
     const sort = opt.dataset.sort;
-    // Check if locked and prevent interaction with locked tabs
-    if (sortTabsLocked && (sort === "ranking" || sort === "tenure")) {
-        return;
-    }
     document.querySelectorAll(".consensus-dist").forEach(el => el.remove());
-    document.querySelectorAll(".rank-score-label").forEach(el => el.remove());
-    rankingSortActive = false;
     const picker = opt.closest(".sort-picker");
     // Show the toggle again
     if (picker._toggle) picker._toggle.style.display = "";
@@ -395,7 +389,7 @@ document.addEventListener("mousedown", e => {
 
 let currentSort = "alphabetic";
 
-const SORT_LABELS = { alphabetic: "Alphabetic", zetabetique: "Zétabétique", consensus: "Consensus", ranking: "Précision", tenure: "Tenure" };
+const SORT_LABELS = { alphabetic: "Alphabetic", zetabetique: "Zétabétique", consensus: "Consensus" };
 
 function setGlobalSort(sort) {
     currentSort = sort;
@@ -409,10 +403,6 @@ function setGlobalSort(sort) {
     document.body.classList.toggle("hide-veteran-tags", sort !== "alphabetic" && sort !== "zetabetique");
 }
 
-function resetRankingSort() {
-    setGlobalSort("alphabetic");
-    document.querySelectorAll(".voters-toggle").forEach(t => { if (t.style.display === "none") t.style.display = ""; });
-}
 
 function applyTableSort(sort) {
     setGlobalSort(sort);
@@ -461,12 +451,6 @@ function applyTableSort(sort) {
         return;
     }
 
-    if (sort === "ranking") {
-        // Reuse existing Shift+J ranking sort
-        sortByRanking();
-        return;
-    }
-
     if (sort === "consensus") {
         // Sort by deviation from official consensus (most conformist first)
         // Read consensus directly from the rendered aggregate row so it always
@@ -491,7 +475,22 @@ function applyTableSort(sort) {
             const u = getVoterName(r);
             voterTeams[u] = Array.from(r.querySelectorAll(".team-logo")).map(img => img.dataset.team);
         });
-        rows.sort((a, b) => scoreFn(voterTeams[getVoterName(a)]) - scoreFn(voterTeams[getVoterName(b)]));
+        const tiebreakFn = (ta, tb) => {
+            if (!ta?.length || !tb?.length) return 0;
+            for (let i = 0; i < 25; i++) {
+                const team = consensus[i];
+                const ra = ta.indexOf(team), rb = tb.indexOf(team);
+                const da = Math.abs(i - (ra === -1 ? 25 : ra));
+                const db = Math.abs(i - (rb === -1 ? 25 : rb));
+                if (da !== db) return da - db;
+            }
+            return 0;
+        };
+        rows.sort((a, b) => {
+            const ua = getVoterName(a), ub = getVoterName(b);
+            const sa = scoreFn(voterTeams[ua]), sb = scoreFn(voterTeams[ub]);
+            return sa !== sb ? sa - sb : tiebreakFn(voterTeams[ua], voterTeams[ub]);
+        });
         rows.forEach(r => {
             tbody.appendChild(r);
             const dist = scoreFn(voterTeams[getVoterName(r)]);
@@ -500,20 +499,6 @@ function applyTableSort(sort) {
         return;
     }
 
-    if (sort === "tenure") {
-        // Sort by total ballots submitted across all years (pre-computed at build time)
-        const ballotCount = (typeof TENURE_COUNTS !== 'undefined') ? TENURE_COUNTS : {};
-        rows.sort((a, b) => {
-            const ua = getVoterName(a), ub = getVoterName(b);
-            return (ballotCount[ub] ?? 0) - (ballotCount[ua] ?? 0);
-        });
-        rows.forEach(r => {
-            tbody.appendChild(r);
-            const count = ballotCount[getVoterName(r)] ?? 0;
-            if (count) addVoterLabel(r, count);
-        });
-        return;
-    }
 }
 
 function bindVoterCells(root) {
@@ -1160,26 +1145,8 @@ function showWeek(weekId) {
     bindRankHeaders();
     bindVoterCells();
     bindVotersToggle();
-    updateRankingOptionVisibility();
-    if (currentSort && currentSort !== "ranking") {
-        applyTableSort(currentSort);
-    }
+    applyTableSort(currentSort);
     updateAvgRankLines();
-    if (rankingSortActive) {
-        const activeTab2 = document.querySelector(".week-tab.active");
-        if (activeTab2) {
-            // Remove labels from all other blocks
-            document.querySelectorAll(".week-block").forEach(b => {
-                if (b.id !== weekId) {
-                    b.querySelectorAll(".rank-score-label").forEach(l => l.remove());
-                }
-            });
-            const yearTabs2 = getSortedTabs().filter(t => t.dataset.year === activeTab2.dataset.year).reverse();
-            const lbData2 = buildLeaderboardData();
-            const voterAvg2 = computeVoterAvg(yearTabs2, lbData2);
-            if (voterAvg2) applyRankingSortToBlock(document.getElementById(weekId), voterAvg2, true);
-        }
-    }
 }
 
 // Toggle Official / Provisional within current week
@@ -1199,19 +1166,10 @@ document.getElementById("toggle-text").addEventListener("click", () => {
         document.getElementById("toggle-text").innerText = "Official Ballots";
     }
     _deltaDataCache = null;
-    updateRankingOptionVisibility();
-    if (currentSort === "ranking") resetRankingSort();
     applyTableSort(currentSort);
     updateAvgRankLines();
 });
 
-function updateRankingOptionVisibility() {
-    const toggleText = document.getElementById("toggle-text")?.innerText;
-    const isOfficial = !toggleText || toggleText === "Official Ballots";
-    document.querySelectorAll(".sort-option[data-sort='ranking']").forEach(opt => {
-        opt.style.display = isOfficial ? "" : "none";
-    });
-}
 
 function injectWeightedRankingRow(activeTab, activeBlock) {
     // Build a "5-Week Weighted" ranking row in the aggregate table.
@@ -1268,10 +1226,10 @@ function injectWeightedRankingRow(activeTab, activeBlock) {
         } else {
             const diff = prev - currRank;
             if (diff > 0) {
-                deltaLabel.textContent = diff <= 2 ? String(diff) : "▲" + diff;
+                deltaLabel.textContent = diff >= 5 ? "▲" + diff : String(diff);
                 deltaLabel.classList.add("delta-up");
             } else if (diff < 0) {
-                deltaLabel.textContent = Math.abs(diff) <= 2 ? String(Math.abs(diff)) : "▼" + Math.abs(diff);
+                deltaLabel.textContent = Math.abs(diff) >= 5 ? "▼" + Math.abs(diff) : String(Math.abs(diff));
                 deltaLabel.classList.add("delta-down");
             } else {
                 deltaLabel.textContent = "—"; deltaLabel.classList.add("delta-same");
@@ -1358,6 +1316,14 @@ function showAvgRankModal(weekId) {
     }
     const hasPrevWeek = Object.keys(prevTeamRank).length > 0;
 
+    // 5-week weighted averages for current and previous weeks
+    const deltaData = buildDeltaData();
+    const yearTabs = allTabsSorted.filter(t => t.dataset.year === currYear);
+    const curr5W = compute5WeekWeighted(weekId, deltaData, yearTabs);
+    const prev5W = (prevTab && prevTab.dataset.year === currYear)
+        ? compute5WeekWeighted(prevTab.dataset.week, deltaData, yearTabs)
+        : null;
+
     const activeTab = document.querySelector(".week-tab.active");
     const weekNum = activeTab?.dataset.weeknum || "";
     const year = activeTab?.dataset.year || "";
@@ -1393,6 +1359,29 @@ function showAvgRankModal(weekId) {
                 }
             }
         }
+        let cell5WAvg = '<td>—</td>';
+        let cell5WDelta = '<td>—</td>';
+        if (curr5W) {
+            const rawSum = curr5W.teamAvgRankSum[team];
+            if (rawSum != null) {
+                const avgVal = rawSum / curr5W.totalVoters;
+                cell5WAvg = `<td>${avgVal.toFixed(2)}</td>`;
+                if (prev5W) {
+                    const prevSum = prev5W.teamAvgRankSum[team];
+                    if (prevSum != null) {
+                        const prevAvgVal = prevSum / prev5W.totalVoters;
+                        const diff = prevAvgVal - avgVal; // positive = improved (rank number decreased)
+                        if (Math.abs(diff) < 0.005) {
+                            cell5WDelta = '<td><span class="delta-same">—</span></td>';
+                        } else if (diff > 0) {
+                            cell5WDelta = `<td><span class="delta-up">${diff.toFixed(2)}</span></td>`;
+                        } else {
+                            cell5WDelta = `<td><span class="delta-down">${Math.abs(diff).toFixed(2)}</span></td>`;
+                        }
+                    }
+                }
+            }
+        }
         return `<tr>
             <td>${rank}</td>
             <td style="padding:2px 4px;"><img class="logo-sm" src="cbb-logos/${team}.webp"></td>
@@ -1404,6 +1393,8 @@ function showAvgRankModal(weekId) {
             <td>${count}/${totalVoters}</td>
             <td>${pts}</td>
             <td>${avg.toFixed(2)}</td>
+            ${cell5WAvg}
+            ${cell5WDelta}
         </tr>`;
     };
 
@@ -1418,6 +1409,8 @@ function showAvgRankModal(weekId) {
         <col style="width:56px">
         <col style="width:36px">
         <col style="width:64px">
+        <col style="width:64px">
+        <col style="width:52px">
     </colgroup><thead><tr>
         <th>#</th><th></th>
         <th class="team-col">Team</th>
@@ -1428,10 +1421,12 @@ function showAvgRankModal(weekId) {
         <th>Voters</th>
         <th>Pts</th>
         <th>Avg Rank</th>
+        <th title="5-week weighted average rank">5W Avg</th>
+        <th title="Change in 5-week weighted average rank from previous week">5W Δ</th>
     </tr></thead><tbody>`;
     top25.forEach((team, i) => { html += buildRow(team, i + 1); });
     if (receivingVotes.length > 0) {
-        html += `<tr class="rv-divider"><td colspan="10">Receiving Votes</td></tr>`;
+        html += `<tr class="rv-divider"><td colspan="12">Receiving Votes</td></tr>`;
         receivingVotes.forEach((team, i) => { html += buildRow(team, 26 + i); });
     }
     html += "</tbody>";
@@ -1453,8 +1448,6 @@ function showAggregateSection() {
     injectWeightedRankingRow(activeTab, activeBlock);
     bindVoterCells();
     bindTeamLogos();
-    updateRankingOptionVisibility();
-    if (currentSort === "ranking") resetRankingSort();
 }
 
 // Year picker toggle — hide year text, show all years inline
@@ -1700,6 +1693,7 @@ function buildDeltaData() {
 }
 
 let deltaWeeksBack = 1;
+let deltaSubMode = "consensus-diff"; // "consensus-diff" | "recency"
 
 function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
     const username = getVoterName(row);
@@ -1765,11 +1759,9 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
             const effectivePrev = prevIdx2 === -1 ? 25 : prevIdx2; // 0-indexed, so 25 = rank 26
             const diff = effectivePrev - idx;
             if (diff > 0) {
-                if (diff <= 2) { label.textContent = String(diff); label.classList.add("delta-up"); }
-                else { label.textContent = "▲" + diff; label.classList.add("delta-up"); }
+                label.textContent = diff >= 5 ? "▲" + diff : String(diff); label.classList.add("delta-up");
             } else if (diff < 0) {
-                if (Math.abs(diff) <= 2) { label.textContent = String(Math.abs(diff)); label.classList.add("delta-down"); }
-                else { label.textContent = "▼" + Math.abs(diff); label.classList.add("delta-down"); }
+                label.textContent = Math.abs(diff) >= 5 ? "▼" + Math.abs(diff) : String(Math.abs(diff)); label.classList.add("delta-down");
             }
         }
         if (label.textContent) {
@@ -1779,22 +1771,54 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
             wrapper.insertBefore(label, logo);
         }
 
-        // Weighted avg label below (linear weights: most recent=5, oldest=1, missing weeks skipped)
-        let weightedSum = 0, totalWeight = 0;
-        last5.forEach((ballot, wi) => {
-            if (!ballot) return;
-            const weight = 5 - wi;
-            const pos = ballot.indexOf(team);
-            const rank = pos === -1 ? 26 : pos + 1;
-            weightedSum += rank * weight;
-            totalWeight += weight;
-        });
-        if (totalWeight > 0) {
-            const avg = weightedSum / totalWeight;
-            const avgLabel = document.createElement("span");
-            avgLabel.className = "avg-label";
-            avgLabel.textContent = avg.toFixed(1);
-            wrapper.appendChild(avgLabel);
+        // Below-logo label — skipped for aggregate section rows
+        const isAggSection = row.closest('.ballot-section')?.id?.endsWith('-aggregate');
+        if (!isAggSection) {
+            if (deltaSubMode === "recency") {
+                // Weighted avg label (linear weights: most recent=5, oldest=1, missing weeks skipped)
+                let weightedSum = 0, totalWeight = 0;
+                last5.forEach((ballot, wi) => {
+                    if (!ballot) return;
+                    const weight = 5 - wi;
+                    const pos = ballot.indexOf(team);
+                    const rank = pos === -1 ? 26 : pos + 1;
+                    weightedSum += rank * weight;
+                    totalWeight += weight;
+                });
+                if (totalWeight > 0) {
+                    const avg = weightedSum / totalWeight;
+                    const avgLabel = document.createElement("span");
+                    avgLabel.className = "avg-label";
+                    avgLabel.textContent = avg.toFixed(1);
+                    wrapper.appendChild(avgLabel);
+                }
+            } else {
+                // Consensus diff: voter rank vs consensus rank for this week
+                const consensusTeams = deltaData[weekId]?.["Official Overall"] || [];
+                const voterRank = idx + 1;
+                const consensusIdx = consensusTeams.indexOf(team);
+                const avgLabel = document.createElement("span");
+                avgLabel.className = "avg-label";
+                if (consensusIdx !== -1) {
+                    const consensusRank = consensusIdx + 1;
+                    const diff = consensusRank - voterRank;
+                    if (diff > 0) {
+                        avgLabel.textContent = "+" + diff;
+                        avgLabel.classList.add("delta-up");
+                    } else if (diff < 0) {
+                        avgLabel.textContent = String(diff);
+                        avgLabel.classList.add("delta-down");
+                    } else {
+                        avgLabel.textContent = "0";
+                        avgLabel.classList.add("delta-same");
+                    }
+                    if (Math.abs(consensusRank - voterRank) > 4) avgLabel.classList.add("avg-bold");
+                } else {
+                    avgLabel.textContent = "—";
+                    avgLabel.classList.add("delta-same");
+                }
+                wrapper.appendChild(avgLabel);
+            }
         }
     });
 }
@@ -1912,10 +1936,131 @@ function showSeasonStatsModal() {
     modal.classList.add("open");
 }
 
+function showPrecisionModal() {
+    const activeTab = document.querySelector(".week-tab.active");
+    if (!activeTab) return;
+    const currentYear = activeTab.dataset.year;
+    const yearTabs = getSortedTabs().filter(t => t.dataset.year === currentYear).reverse();
+    if (yearTabs.length === 0) return;
+
+    const lbData = buildLeaderboardData();
+    const voterAvg = computeVoterAvg(yearTabs, lbData);
+    if (!voterAvg) return;
+
+    const sorted = Object.entries(voterAvg)
+        .filter(([, v]) => v.combined !== Infinity)
+        .sort((a, b) => a[1].combined - b[1].combined);
+    const disqualified = Object.entries(voterAvg)
+        .filter(([, v]) => v.combined === Infinity)
+        .sort((a, b) => a[0].localeCompare(b[0]));
+
+    const modal = document.getElementById("precision-modal");
+    const title = document.getElementById("precision-title");
+    const table = document.getElementById("precision-table");
+
+    title.textContent = `${currentYear} Précision Leaderboard`;
+
+    let html = `<colgroup>
+        <col style="width:28px">
+        <col>
+        <col style="width:60px">
+        <col style="width:60px">
+        <col style="width:52px">
+    </colgroup><thead><tr>
+        <th>#</th>
+        <th class="name-col">Voter</th>
+        <th title="Combined Précision score (lower is better)">Score</th>
+        <th title="Boldness adjustment (higher is better)">Bold ↑</th>
+        <th title="Missed weeks">Missed</th>
+    </tr></thead><tbody>`;
+
+    sorted.forEach(([username, scores], i) => {
+        const adj = scores.boldAdj || 0;
+        const missed = Math.round((scores.combined - scores.avg + (adj)) / 1) || 0;
+        // Derive missed from combined = avg - boldAdj + missed * 1
+        const missedWeeks = Math.round(scores.combined - scores.avg + adj);
+        html += `<tr>
+            <td>${i + 1}</td>
+            <td class="name-col">${username}</td>
+            <td>${scores.combined.toFixed(2)}</td>
+            <td style="color:#2a9d2a">${adj > 0.05 ? '+' + adj.toFixed(2) : '—'}</td>
+            <td>${missedWeeks > 0 ? missedWeeks : '—'}</td>
+        </tr>`;
+    });
+
+    if (disqualified.length > 0) {
+        html += `<tr><td colspan="5" style="padding:6px 8px; color:#aaa; font-size:11px; text-align:left; border-top:1px solid #ddd;">Disqualified (≥5 misses or ≥3 consecutive)</td></tr>`;
+        disqualified.forEach(([username]) => {
+            html += `<tr><td>—</td><td class="name-col" style="color:#bbb">${username}</td><td colspan="3" style="color:#bbb">DQ</td></tr>`;
+        });
+    }
+
+    html += `</tbody>`;
+    table.innerHTML = html;
+    modal.classList.add("open");
+}
+
+function showTenureModal() {
+    const activeTab = document.querySelector(".week-tab.active");
+    if (!activeTab) return;
+    const currentYear = activeTab.dataset.year;
+    const yearTabs = getSortedTabs().filter(t => t.dataset.year === currentYear).reverse();
+    if (yearTabs.length === 0) return;
+
+    const ballotCount = (typeof TENURE_COUNTS !== 'undefined') ? TENURE_COUNTS : {};
+    const lbData = buildLeaderboardData();
+
+    // Collect all voters who appeared in any week this year
+    const voterSet = new Set();
+    yearTabs.forEach(tab => {
+        const weekData = lbData[tab.dataset.week];
+        if (!weekData) return;
+        Object.keys(weekData).forEach(u => { if (u !== "Official Overall") voterSet.add(u); });
+    });
+
+    const voters = Array.from(voterSet).sort((a, b) => (ballotCount[b] ?? 0) - (ballotCount[a] ?? 0));
+
+    const modal = document.getElementById("tenure-modal");
+    const title = document.getElementById("tenure-title");
+    const table = document.getElementById("tenure-table");
+
+    title.textContent = `${currentYear} Tenure Leaderboard`;
+
+    let html = `<colgroup>
+        <col style="width:28px">
+        <col>
+        <col style="width:80px">
+    </colgroup><thead><tr>
+        <th>#</th>
+        <th class="name-col">Voter</th>
+        <th title="Total ballots submitted all-time">Ballots</th>
+    </tr></thead><tbody>`;
+
+    voters.forEach((username, i) => {
+        const count = ballotCount[username] ?? 0;
+        html += `<tr>
+            <td>${i + 1}</td>
+            <td class="name-col">${username}</td>
+            <td>${count || '—'}</td>
+        </tr>`;
+    });
+
+    html += `</tbody>`;
+    table.innerHTML = html;
+    modal.classList.add("open");
+}
+
+document.getElementById("precision-modal").addEventListener("click", e => {
+    if (e.target === document.getElementById("precision-modal"))
+        document.getElementById("precision-modal").classList.remove("open");
+});
+
+document.getElementById("tenure-modal").addEventListener("click", e => {
+    if (e.target === document.getElementById("tenure-modal"))
+        document.getElementById("tenure-modal").classList.remove("open");
+});
+
 // Keyboard shortcuts
-let rankingSortActive = false;
-let sortTabsLocked = true;
-let lastKeyWasU = false;
 
 function computeVoterAvg(yearTabs, lbData) {
     // Per-week consensus ranking (Official Overall computed from that week's official ballots)
@@ -2052,91 +2197,6 @@ function computeVoterAvg(yearTabs, lbData) {
     return voterAvg;
 }
 
-function applyRankingSortToBlock(block, voterAvg, showLabels = false) {
-    if (!block) return;
-    const tbody = block.querySelectorAll(".ballot-section")[0]?.querySelector("tbody");
-    if (!tbody || !tbody.querySelector(".voter-row")) return;
-
-    const sortFn = (a, b) => {
-        const ua = getVoterName(a);
-        const ub = getVoterName(b);
-        const sa = voterAvg[ua]?.combined ?? Infinity;
-        const sb = voterAvg[ub]?.combined ?? Infinity;
-        if (sa === Infinity && sb === Infinity) return ua.localeCompare(ub);
-        return sa - sb;
-    };
-    const rows = Array.from(tbody.querySelectorAll(".voter-row"));
-    rows.forEach((r, i) => {
-        if (!r.dataset.origIdx) r.dataset.origIdx = i;
-        const nameSpan = r.querySelector(".voter-name");
-        if (nameSpan && showLabels) {
-            nameSpan.querySelector(".rank-score-label")?.remove();
-            const username = getVoterName(r);
-            const scores = voterAvg[username];
-            const label = document.createElement("span");
-            label.className = "rank-score-label";
-            if (!scores || scores.combined === Infinity) {
-                label.textContent = "—";
-            } else {
-                const adj = scores.boldAdj || 0;
-                label.textContent = scores.combined.toFixed(1);
-                if (adj > 0.05) {
-                    const adjSpan = document.createElement("span");
-                    adjSpan.style.marginLeft = "2px";
-                    adjSpan.style.color = "#2a9d2a";
-                    adjSpan.textContent = `↑${adj.toFixed(1)}`;
-                    label.appendChild(adjSpan);
-                }
-            }
-            nameSpan.parentElement.appendChild(label);
-        }
-        r.classList.add("row-rank-sorted");
-    });
-    rows.sort(sortFn);
-    rows.forEach(r => tbody.appendChild(r));
-}
-
-function restoreOriginalSortToBlock(block) {
-    if (!block) return;
-    const tbody = block.querySelectorAll(".ballot-section")[0]?.querySelector("tbody");
-    if (!tbody) return;
-    const rows = Array.from(tbody.querySelectorAll(".voter-row"));
-    rows.forEach(r => {
-        r.classList.remove("row-rank-sorted");
-        r.querySelector(".rank-score-label")?.remove();
-    });
-    rows.sort((a, b) => parseInt(a.dataset.origIdx || 0) - parseInt(b.dataset.origIdx || 0));
-    rows.forEach(r => tbody.appendChild(r));
-}
-
-function sortByRanking() {
-    document.querySelectorAll(".consensus-dist").forEach(el => el.remove());
-    const activeTab = document.querySelector(".week-tab.active");
-    if (!activeTab) return;
-    const activeBlock = document.getElementById(activeTab.dataset.week);
-    if (!activeBlock) return;
-
-    if (rankingSortActive) {
-        // Restore all week blocks
-        document.querySelectorAll(".week-block").forEach(block => restoreOriginalSortToBlock(block));
-        rankingSortActive = false;
-        return;
-    }
-
-    const currentYear = activeTab.dataset.year;
-    const yearTabs = getSortedTabs().filter(t => t.dataset.year === currentYear).reverse();
-    const lbData = buildLeaderboardData();
-    const voterAvg = computeVoterAvg(yearTabs, lbData);
-    if (!voterAvg) return;
-
-    // Apply sort+labels to all loaded week blocks, labels only show on visible week
-    yearTabs.forEach(tab => {
-        const block = document.getElementById(tab.dataset.week);
-        applyRankingSortToBlock(block, voterAvg, block === activeBlock);
-    });
-    rankingSortActive = true;
-}
-
 document.getElementById("keybind-legend-modal").addEventListener("click", e => {
     if (e.target === document.getElementById("keybind-legend-modal"))
         document.getElementById("keybind-legend-modal").classList.remove("open");
@@ -2158,24 +2218,10 @@ document.addEventListener("keydown", e => {
         document.getElementById("keybind-legend-modal").classList.remove("open");
         document.getElementById("avg-rank-modal").classList.remove("open");
         document.getElementById("season-stats-modal").classList.remove("open");
+        document.getElementById("precision-modal").classList.remove("open");
+        document.getElementById("tenure-modal").classList.remove("open");
     }
-    // Check for unlock combo: Shift+U then !
-    if (e.shiftKey && (e.key === "!" || e.key === "Shift")) {
-        if (e.key === "!" && lastKeyWasU) {
-            e.preventDefault();
-            sortTabsLocked = false;
-            lastKeyWasU = false;
-            // Update UI to remove locked class from tabs
-            document.querySelectorAll(".sort-option[data-sort='ranking'], .sort-option[data-sort='tenure']").forEach(opt => {
-                opt.classList.remove("locked");
-            });
-            return;
-        }
-    }
-    if (!e.shiftKey) {
-        lastKeyWasU = false;
-        return;
-    }
+    if (!e.shiftKey) return;
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab) return;
 
@@ -2206,6 +2252,19 @@ document.addEventListener("keydown", e => {
         return;
     }
 
+    if (e.key === "J" || e.key === "j") {
+        e.preventDefault();
+        deltaSubMode = deltaSubMode === "recency" ? "consensus-diff" : "recency";
+        const deltaData2 = buildDeltaData();
+        const sortedTabs2 = getSortedTabs();
+        document.querySelectorAll(".voter-row.row-delta").forEach(r => {
+            r.querySelectorAll(".avg-label").forEach(el => el.remove());
+            const wid = r.closest(".week-block")?.id;
+            if (wid) applyDeltaToRow(r, wid, deltaData2, sortedTabs2);
+        });
+        return;
+    }
+
     if (e.key === "C" || e.key === "c") {
         e.preventDefault();
         applyTableSort("consensus");
@@ -2214,17 +2273,13 @@ document.addEventListener("keydown", e => {
 
     if (e.key === "R" || e.key === "r") {
         e.preventDefault();
-        if (!sortTabsLocked) {
-            applyTableSort("ranking");
-        }
+        showPrecisionModal();
         return;
     }
 
     if (e.key === "T" || e.key === "t") {
         e.preventDefault();
-        if (!sortTabsLocked) {
-            applyTableSort("tenure");
-        }
+        showTenureModal();
         return;
     }
 
@@ -2237,9 +2292,6 @@ document.addEventListener("keydown", e => {
 
     if (e.key === "U" || e.key === "u") {
         e.preventDefault();
-        lastKeyWasU = true;
-        // Reset flag after 1 second if no ! is pressed
-        setTimeout(() => { lastKeyWasU = false; }, 1000);
         showSeasonStatsModal();
         return;
     }
@@ -2324,19 +2376,7 @@ document.addEventListener("keydown", e => {
     }
 });
 
-// Update locked state UI
-function updateLockedUI() {
-    document.querySelectorAll(".sort-option[data-sort='ranking'], .sort-option[data-sort='tenure']").forEach(opt => {
-        if (sortTabsLocked) {
-            opt.classList.add("locked");
-        } else {
-            opt.classList.remove("locked");
-        }
-    });
-}
-
 // Init
-updateLockedUI();
 rebuildYearPicker();
 rebuildWeekPicker();
 const allTabs = getSortedTabs();

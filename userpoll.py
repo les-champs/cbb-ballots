@@ -756,8 +756,6 @@ THEAD_HTML = (
     f"<span class='sort-picker'>"
     f"<span class='sort-option active' data-sort='alphabetic'>Alphabetic</span>"
     f"<span class='sort-option' data-sort='consensus'>Consensus</span>"
-    f"<span class='sort-option' data-sort='ranking'>Précision <span class='sort-lock'>🔒</span></span>"
-    f"<span class='sort-option' data-sort='tenure'>Tenure <span class='sort-lock'>🔒</span></span>"
     f"</span></th>"
     f"{RANK_HEADERS}</tr></thead>"
 )
@@ -947,17 +945,18 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
     <div class="keybind-section">
       <div class="keybind-section-title">Views</div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>E</kbd></span><span>Expand / Collapse All Deltas</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>J</kbd></span><span>Toggle Delta Sub-label (Consensus Diff / Recency)</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>1</kbd> – <kbd>9</kbd></span><span>Adjust Delta Lookback Window</span></div>
     </div>
     <div class="keybind-section">
       <div class="keybind-section-title">Sorting</div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>A</kbd></span><span>Sort Alphabetically</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>C</kbd></span><span>Sort by Consensus</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>R</kbd></span><span>Sort by Précision</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>T</kbd></span><span>Sort by Tenure</span></div>
     </div>
     <div class="keybind-section">
       <div class="keybind-section-title">Other</div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>R</kbd></span><span>Précision leaderboard</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>T</kbd></span><span>Tenure leaderboard</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>Y</kbd></span><span>Week avg rank table</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>U</kbd></span><span>Season statistics</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>P</kbd></span><span>Save table as PNG</span></div>
@@ -978,6 +977,20 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
   <div id="season-stats-box">
     <h2 id="season-stats-title"></h2>
     <table id="season-stats-table"></table>
+  </div>
+</div>
+
+<div id="precision-modal">
+  <div id="precision-box">
+    <h2 id="precision-title"></h2>
+    <table id="precision-table"></table>
+  </div>
+</div>
+
+<div id="tenure-modal">
+  <div id="tenure-box">
+    <h2 id="tenure-title"></h2>
+    <table id="tenure-table"></table>
   </div>
 </div>
 

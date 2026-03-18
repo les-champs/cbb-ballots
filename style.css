@@ -130,14 +130,14 @@ th, td {
     white-space: nowrap;
 }
 
-th:first-child, td:first-child {
+.table-container th:first-child, .table-container td:first-child {
     width: 180px;
     min-width: 180px;
     max-width: 180px;
     white-space: nowrap;
 }
 
-td:first-child {
+.table-container td:first-child {
     overflow: hidden;
 }
 
@@ -322,6 +322,10 @@ body.hide-veteran-tags .veteran-tag {
     line-height: 1;
     margin-top: 1px;
     color: #555;
+}
+
+.avg-label.avg-bold {
+    font-weight: bold;
     white-space: nowrap;
 }
 
@@ -378,24 +382,6 @@ body.hide-veteran-tags .veteran-tag {
     color: inherit;
     background: transparent;
     border: none;
-}
-
-.sort-lock {
-    display: inline-block;
-    vertical-align: middle;
-    font-size: 0.75em;
-    line-height: 1;
-    margin-left: 2px;
-    filter: grayscale(1) brightness(0);
-}
-
-.sort-option.locked {
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-
-.sort-option.locked:hover {
-    opacity: 0.5;
 }
 
 .team-logo {
@@ -572,8 +558,8 @@ kbd {
     background: #fff;
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.25);
-    max-width: 500px;
-    width: 95vw;
+    width: max-content;
+    max-width: 95vw;
     max-height: 88vh;
     overflow: auto;
     padding: 20px 24px 16px;
@@ -587,6 +573,7 @@ kbd {
     border-collapse: collapse;
     width: 100%;
     font-size: 13px;
+    table-layout: auto;
 }
 #avg-rank-table th {
     font-size: 11px;
@@ -611,7 +598,8 @@ kbd {
 #avg-rank-table .logo-sm { height: 20px; width: 20px; object-fit: contain; vertical-align: middle; }
 #avg-rank-table tr.rv-divider td { padding: 6px 0 2px; color: #aaa; font-size: 11px; text-align: left; border-bottom: none; }
 #avg-rank-table th:nth-child(5), #avg-rank-table td:nth-child(5),
-#avg-rank-table th:nth-child(9), #avg-rank-table td:nth-child(9) { border-right: none; }
+#avg-rank-table th:nth-child(9), #avg-rank-table td:nth-child(9),
+#avg-rank-table th:nth-child(11), #avg-rank-table td:nth-child(11) { border-right: none; }
 
 #season-stats-modal {
     display: none;
@@ -629,8 +617,8 @@ kbd {
     background: #fff;
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.25);
-    max-width: 580px;
-    width: 95vw;
+    width: max-content;
+    max-width: 95vw;
     max-height: 88vh;
     overflow: auto;
     padding: 20px 24px 16px;
@@ -644,6 +632,7 @@ kbd {
     border-collapse: collapse;
     width: 100%;
     font-size: 13px;
+    table-layout: auto;
 }
 #season-stats-table th {
     font-size: 11px;
@@ -666,6 +655,59 @@ kbd {
 #season-stats-table td:first-child { color: #aaa; font-size: 11px; }
 #season-stats-table .logo-sm { height: 20px; width: 20px; object-fit: contain; vertical-align: middle; }
 #season-stats-table th:nth-child(5), #season-stats-table td:nth-child(5) { border-right: none; }
+
+#precision-modal, #tenure-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+#precision-modal.open, #tenure-modal.open {
+    display: flex;
+}
+#precision-box, #tenure-box {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    max-width: 440px;
+    width: 95vw;
+    max-height: 88vh;
+    overflow: auto;
+    padding: 20px 24px 16px;
+}
+#precision-box h2, #tenure-box h2 {
+    margin: 0 0 12px;
+    font-size: 1.05rem;
+    color: #333;
+}
+#precision-table, #tenure-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+    table-layout: auto;
+}
+#precision-table th, #tenure-table th {
+    font-size: 11px;
+    color: #888;
+    font-weight: normal;
+    padding: 4px 8px;
+    text-align: center;
+    border-bottom: 1px solid #ddd;
+    white-space: nowrap;
+}
+#precision-table th.name-col, #tenure-table th.name-col { text-align: left; }
+#precision-table td, #tenure-table td {
+    padding: 3px 6px;
+    text-align: center;
+    border-bottom: 1px solid #f4f4f4;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+#precision-table td.name-col, #tenure-table td.name-col { text-align: left; }
+#precision-table td:first-child, #tenure-table td:first-child { color: #aaa; font-size: 11px; }
 
 body.year-loading::after {
     content: "Loading…";
