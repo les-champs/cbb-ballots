@@ -1541,7 +1541,7 @@ function injectVeteranTags(root) {
         const count = TENURE_COUNTS[name] ?? 0;
         if (count > 100) {
             const tag = document.createElement("span");
-            tag.className = "veteran-tag" + (count >= 186 ? " veteran-elite" : "");
+            tag.className = "veteran-tag" + (count >= 200 ? " veteran-elite" : "");
             tag.textContent = name.length > 17 ? "(v)" : "veteran";
             nameSpan.appendChild(tag);
         }
