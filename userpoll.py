@@ -1529,7 +1529,7 @@ function injectVeteranTags(root) {
         if ((TENURE_COUNTS[name] ?? 0) > 100) {
             const tag = document.createElement("span");
             tag.className = "veteran-tag";
-            tag.textContent = "veteran";
+            tag.textContent = name.length > 17 ? "(v)" : "veteran";
             nameSpan.appendChild(tag);
         }
     });
