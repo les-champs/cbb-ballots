@@ -276,6 +276,8 @@ CBBPOLL_NAME_OVERRIDES = {
     "UNC Wilmington": "UNCWilmington",
     "UT Martin": "UTMartin",
     "North Carolina": "NorthCarolina",
+    "North Carolina at Chapel Hill": "NorthCarolina",
+    "Wisconsin-Madison": "Wisconsin",
     "South Carolina": "SouthCarolina",
     "North Dakota": "NorthDakota",
     "South Dakota": "SouthDakota",
@@ -1370,13 +1372,13 @@ kbd {
     width: 1px;
 }
 #voter-history-table td {
-    padding: 4px 6px;
+    padding: 3px 5px;
     text-align: center;
     vertical-align: middle;
 }
 #voter-history-table .logo {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     vertical-align: middle;
 }
 #voter-history-table td.no-ballot {
