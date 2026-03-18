@@ -1385,11 +1385,9 @@ function showAvgRankModal(weekId) {
             } else {
                 const diff = prevRank - rank;
                 if (diff > 0) {
-                    const txt = diff <= 2 ? String(diff) : "▲" + diff;
-                    deltaCell = `<td><span class="delta-up">${txt}</span></td>`;
+                    deltaCell = `<td><span class="delta-up">${diff}</span></td>`;
                 } else if (diff < 0) {
-                    const txt = Math.abs(diff) <= 2 ? String(Math.abs(diff)) : "▼" + Math.abs(diff);
-                    deltaCell = `<td><span class="delta-down">${txt}</span></td>`;
+                    deltaCell = `<td><span class="delta-down">${Math.abs(diff)}</span></td>`;
                 } else {
                     deltaCell = '<td><span class="delta-same">—</span></td>';
                 }
