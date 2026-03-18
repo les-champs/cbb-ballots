@@ -239,6 +239,7 @@ CBBPOLL_BASE = "https://cbbpoll.com"
 
 # Seasons available on cbbpoll.com: year param → valid weeks
 CBBPOLL_SEASONS = {
+    2016: list(range(2, 20)),          # 2015-16 (no preseason)
     2017: [0] + list(range(3, 20)),   # 2016-17
     2018: [0] + list(range(2, 21)),   # 2017-18
     2019: [0] + list(range(2, 22)),   # 2018-19
@@ -403,8 +404,9 @@ CBBPOLL_NAME_OVERRIDES = {
     "Tarleton State": "TarletonState",
     "Savannah State University": "SavannahState",
     "Savannah State": "SavannahState",
-    "William & Mary": "WilliamMary",
-    "William and Mary": "WilliamMary",
+    "GW": "GeorgeWashington",
+    "William & Mary": "WilliamandMary",
+    "William and Mary": "WilliamandMary",
     "USF": "USF",
     "SC State": "SCState",
     "UMES": "UMES",
