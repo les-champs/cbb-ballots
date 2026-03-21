@@ -221,7 +221,8 @@ td.logo-cell .logo {
     vertical-align: baseline;
 }
 
-body.hide-veteran-tags .veteran-tag {
+body.hide-veteran-tags .veteran-tag,
+.voter-row.voter-cell-hover .veteran-tag {
     display: none;
 }
 
@@ -603,6 +604,7 @@ kbd {
     text-align: center;
     border-bottom: 1px solid #ddd;
     white-space: nowrap;
+    vertical-align: bottom;
 }
 #avg-rank-table th.team-col { text-align: left; }
 #avg-rank-table td {
@@ -742,6 +744,25 @@ body.year-loading::after {
     font-size: 14px;
     z-index: 9999;
     pointer-events: none;
+}
+
+.spread-toggle {
+    padding: 4px 14px;
+    margin: 0 3px;
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    background: #f5f5f5;
+    cursor: pointer;
+    font-size: 13px;
+    color: #333;
+}
+.spread-toggle.active {
+    background: #2277cc;
+    color: #fff;
+    border-color: #2277cc;
+}
+.spread-toggle:hover:not(.active) {
+    background: #e8e8e8;
 }
 
 @media (max-device-width: 768px) {
@@ -1008,6 +1029,7 @@ body.year-loading::after {
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>R</kbd></span><span>Précision leaderboard</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>T</kbd></span><span>Tenure leaderboard</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>Y</kbd></span><span>Week avg rank table</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>G</kbd></span><span>Week rank spread chart</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>U</kbd></span><span>Season statistics</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>P</kbd></span><span>Save table as PNG</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>?</kbd></span><span>Show legend</span></div>
@@ -3029,7 +3051,7 @@ body.year-loading::after {
 </div>
 <script>
 const FRAGMENT_YEARS = ["2016", "2017", "2018", "2019", "2020", "2021", "2022", "2024", "2025"];
-const TENURE_COUNTS = {"Axgwd1": 142, "bakonydraco": 163, "bkervick": 36, "Blazeth": 201, "Boilers11": 113, "corndogshuffle": 71, "darrylweenus": 169, "DCProf": 52, "DealerNo4908": 14, "DeepBlue_8": 32, "DEP61": 117, "Di9ForLife": 37, "Dolphinz811": 16, "drcollegehoops": 206, "drowse": 91, "Equivalent-Yard3824": 30, "ferrett3": 204, "frumpybuffalo": 102, "Gabe_i_guess": 16, "Greyson04": 132, "Hackasizlak": 150, "Hambone721": 204, "INeedMoreCreativity": 151, "IrishBall": 146, "Jaguar4728": 94, "JamesBouknightStan": 37, "jloose128": 192, "Jomosensual": 77, "JuliePepperwood": 137, "KingInDaNorf34": 16, "Mills_Miles": 119, "Monkey832": 93, "Nacos2001": 38, "NickDrummer": 20, "oddcharisma": 36, "pete4999": 133, "Piglee_037": 18, "pongislame": 93, "Pro-1st-Amendment": 19, "PSUMediaPA": 35, "Pure-Shirt-5831": 17, "RiseAndFire69": 152, "RutabagaReady3370": 34, "SaguaroCactus19": 38, "Senior_Chang": 189, "Sharpe318": 92, "ShogunAshoka": 127, "Soterios": 34, "SpeedLegend": 147, "stocktonisgoat": 204, "theiwc0303": 17, "Travbowman": 40, "Tygorz": 35, "UncleSam_HS": 87, "unkemptrage": 77, "Weathergeekal": 114, "Yellow_Evan": 19, "zags-not-zogs": 23, "Zloggt": 91, "zzer0tonin": 19, "1Subject": 11, "Chasea24": 13, "dterp13": 73, "dubscurry30": 16, "Impossible-Still-349": 3, "ItsCommonGamer": 4, "JazzyJonah13": 10, "JJuva13": 13, "Les-Champs": 9, "Leukeme": 7, "lukedux": 5, "maybeSkywalker": 10, "Mission_Pay_3373": 3, "Mother_Boss_4140": 2, "scumbag46": 13, "SwissArmyScythe": 17, "12panther": 152, "ALStark69": 156, "danielshap2": 30, "Gavigator": 52, "Character_Moment9959": 3, "Huge_Public_1437": 11, "IndigoExpress13": 1, "Marvellent": 2, "squibKickFanatic": 2, "brvheart": 157, "Jaze1": 25, "39_Ringo": 3, "DarensHyper": 1, "Shpion007": 1, "bbbredy": 3, "brendan0305": 72, "Clarinetist22": 64, "Da_Bears17": 4, "generally-mediocre": 8, "LagJetGameThe": 21, "LordRotharoth": 9, "maddydotcom": 20, "MainPeanut25": 32, "Mundane-Platform7735": 10, "OliviaPG1": 23, "pacman-2022": 28, "SeanPFly": 8, "Stepkeyt": 67, "SufferingfOrLife": 10, "willweaverrva": 28, "WWG_Fire": 7, "zvexler": 6, "DaK1ngA1den": 1, "jackmc04": 25, "MrAtlantic": 6, "ObiLaurie311": 11, "One_Expert_1111": 9, "rainymarimba": 2, "thequietpenguin": 8, "younggun92": 3, "80katrillion": 188, "amad97": 26, "Anduril1776": 12, "dukenukeeee": 25, "Jaymoney00": 72, "jdb5173": 6, "Mr-Cantaloupe": 2, "Pale-Pay8772": 23, "RevolutionarySort6": 92, "Toastiify": 144, "CentenarioAvalanche": 2, "Wazzup44": 151, "WillingRestaurant483": 12, "ohayden02": 2, "zombielovertrio": 2, "Call_Mee_Santa": 25, "Automatic_Clerk_1106": 1, "Icy-Chart-6453": 10, "johnjones55": 131, "AsFTW": 1, "OkRole82": 1, "TommyWiseau22": 2, "Nanananora": 1, "thonmaker4mvp": 4, "TimelyTint": 4, "NeoDucky": 1, "HealthyPapaya8206": 2, "Sauronthegreat0610": 1, "Background-Coast8430": 1, "Feisty-Piano-7086": 3, "3236-on-MC": 1, "pikafreakinchu": 1, "cardracer270": 1, "chief_sitass": 11, "flightsim9fan": 1, "imanidiot2012": 2, "Old_Policy89": 1, "therealtand": 93, "Versigot": 1, "VisibleConcern": 1, "Zagineer": 1, "broadwaystarVGC": 3, "ab163": 4, "arbysguy": 46, "badjazzmaverick": 5, "Barnhard": 92, "BeardyMcJew": 16, "Bleacherblues": 29, "boeheim": 3, "CantFindMyWallet": 20, "chadmb2003": 53, "cincyXU": 16, "ClaudeLemieux": 41, "Concision": 14, "crappysandwich": 17, "Ctkevb": 2, "DCorNothing": 3, "Digz4Gallia": 17, "ExtremelySexyMan": 13, "geoffreyh76": 43, "grahoben": 14, "Gregorian1": 45, "gregorykoch11": 31, "HannibalK": 4, "henryshort": 3, "honar": 32, "hotspencer": 19, "igloo_assassin": 154, "jayhawx19": 49, "jjparker084": 46, "jkclone": 81, "JonJaysBooty": 26, "jpj77": 82, "Justinhub2003": 70, "KalifAlhassan": 11, "kimjongunnumerouno": 9, "Korn28": 12, "marktheshark34": 7, "Meowing_Cows": 14, "mitchdwx": 62, "mountm": 103, "Mr_Otters": 124, "MrCoolHand": 10, "nostempore": 21, "OhioBornSoonerBred": 133, "Onegreatrace": 10, "peachios": 112, "Pmoney51": 115, "Protoman12": 13, "Quaddlebaum": 8, "redblue_22": 26, "rednip_mada": 9, "ReegsShannon": 24, "RMGH": 54, "rockchalk": 18, "Roper92391": 67, "ruwisc": 76, "scarycamel": 51, "seaotter2": 54, "skinz4life": 24, "SlightlyBiased": 55, "snlutnas": 4, "splenda806": 8, "strongscience62": 29, "tACorruption": 130, "terker": 24, "TheBen15": 15, "thecrispybacon": 152, "TheGimper": 21, "TheRealFrankLongo": 29, "thevorminatheria": 36, "ThuggsyBogues": 21, "Tiibou": 11, "tumblingtower": 5, "uvafan": 19, "VarnerBeast14": 31, "wichita_gator": 75, "WickedUMD": 4, "xBRxNecromancer": 8, "benjay67": 1, "boiling_friars": 3, "bwburke94": 2, "cavahoos": 10, "CKpsu5220": 1, "crossedsabres8": 2, "dcsportsfan1234": 6, "deltadore": 1, "eatapenny": 21, "ElysiumUS": 6, "esc1010": 1, "ESPbeN": 133, "fancygama": 1, "flynndarealest": 1, "fogell2013": 4, "Forever_Mirin_Brah": 5, "golframfan": 1, "hammerjkt": 36, "Home_sweet_dome": 1, "HoopsU": 4, "IrritatedQuail": 78, "JamesBCrazy": 45, "JDesq2015": 2, "jodatoufin": 2, "Jojo1691": 5, "jrlund2": 5, "jsmith4415": 2, "kmart2129": 1, "lieutenantcumbucket": 1, "marack99": 3, "MobyDickOfDopeness": 1, "MrBMac": 6, "NateOwns": 5, "pantherhawk17": 34, "PM_ME_YOUR_STERNUM": 103, "Refahcs": 2, "remfan477": 24, "s_carn6": 3, "sibewolf": 6, "SLR52": 7, "SSJRoshi": 1, "Tarheels96": 1, "tekmonkey": 4, "thesidestepkids": 2, "tjmullen94": 2, "treasCoastFish": 1, "Twosixtytwo": 22, "wajomc": 30, "WinstonWolf77": 27, "Yankeefan333": 6, "zalemam": 5, "LareTheBear": 15, "shaidar9haran": 47, "206-Ginge": 87, "3cardblindbot": 3, "A_Zone_Of_Danger_": 1, "alexthegreat217": 1, "alijimando": 7, "atthebuzzer21": 4, "BigSetzy": 6, "BugsSuck": 1, "captain_reddit_": 1, "CavalierPB": 6, "dconn501": 1, "FireBreathingPanda": 1, "GreatEnigma": 3, "greeninator": 1, "interesting1235799": 3, "OQAudi": 3, "PolyMatt98": 40, "sharknado3": 4, "Simba_Swish": 5, "ukfan8293": 8, "XCCadet": 1, "xtroreddit": 1, "ahmed_iAm": 2, "BettingJays": 1, "Cwebfan23": 18, "Duhawk": 49, "grimes19": 1, "natethe247": 98, "OldManEllus": 91, "rbhindepmo": 53, "SubmitToTheFunk": 12, "therichone509": 1, "Ukmeteorunner": 1, "ethantm": 3, "falconlover79": 132, "grubberbeb": 50, "JamaalFuckinCharles": 3, "lewalani": 13, "Shaudius": 7, "StewieTheBlueDevil": 20, "WMMRT": 5, "Chuckmac88": 10, "dtread7": 6, "muskiechip": 5, "SKyJ007": 11, "sloppybuttmustard": 3, "XAV_mn": 1, "cav4life": 2, "cft4nh": 1, "GimmeTacos2": 3, "hagenation": 11, "kanshawk15": 1, "MBakhsh": 61, "Quattlebomber": 4, "Shinanigins1": 3, "BU_Milksteak": 1, "HoosierFanBoy": 4, "MartinBrodyMcFly": 10, "quintuscicero": 1, "RoidingOldMan": 1, "SecretComposer": 4, "thatkid1441": 2, "asap_cocky": 2, "b0flex": 10, "BearDownTacoShop": 1, "bwalter2595": 1, "HumbleMoses": 14, "jedibill": 1, "Rathartic": 2, "The_Tobaughn": 4, "YellowSkarmory": 83, "804ian": 1, "bluejaysfan21": 7, "bryceryals42": 63, "koehler05": 1, "ouguy2017": 66, "Wtayjay": 10, "AHxRazr": 1, "Arrow2dakneeftw": 1, "cscout": 1, "ed_merckx": 5, "elefish92": 14, "JR97111": 8, "maschwa": 1, "newportnik": 77, "shrimcentral": 1, "svvansea": 47, "BleedBlackGold": 7, "Cryptacity": 2, "cshaps": 1, "pepperoniroll": 2, "Robey2": 1, "shrimpfriedrice66": 3, "TheChr0nic2001": 1, "TheOtherLeftCoast": 1, "cnterps": 6, "goregousdreamer": 1, "JetRush": 3, "PieDisliker": 4, "tehtsar": 1, "ToneLoak95": 2, "dalematt88": 1, "Jlevy34": 10, "Lukeisabeast": 1, "soonerfreak": 1, "SquintySquidX": 1, "apricotcoast": 12, "Arsid": 3, "DaneCooper": 1, "jeezum_crow": 1, "jrrullo06": 28, "Shalmanesser": 2, "allezrafa": 1, "BumpyBob0007": 173, "chechockey": 3, "Dano21": 1, "DeNovoReview": 5, "Schnectadyslim": 2, "TrueBlue41": 1, "Villanova15": 3, "drunkenAmoeba": 1, "elschultheis": 1, "simmar13": 65, "ztrobin5": 17, "blckjack": 1, "R99": 1, "SexualEarwax": 19, "SpartyOn75": 1, "1hive": 17, "8thave": 43, "_TD3": 16, "Akiraptor": 38, "amopeyzoolion": 13, "asaprocket": 27, "bluedsrule": 17, "Bradcav1": 33, "cinciforthewin": 87, "dluby": 18, "Fifth_Down": 52, "Food_Fight_Please": 12, "InHoc12": 3, "jckund": 81, "JerryTheManager": 6, "kdcoltred": 7, "kmckeon2": 17, "KUmitch": 9, "KUSmurf": 2, "Lex_Ludorum": 114, "loomerr": 5, "MoneyManeVick": 65, "njhokie5": 32, "PillPushr": 14, "Random__User": 35, "recklessfive": 17, "Shiftz": 4, "southsidesenator": 15, "swarlyisback": 14, "ukfan515": 116, "yankees32123": 1, "-kale-": 1, "3isfordale": 80, "Abombinator": 1, "anethor": 1, "bencoleLAD": 1, "BleedBlue__": 2, "BRNXB0MBERS": 76, "cardsfan98": 3, "Careerbeef": 3, "conair513": 1, "CountryTimeLemonlade": 1, "cwrogers0530": 1, "drknight": 1, "dwyyyyyyanewade": 1, "emmer15": 1, "hfj8120": 78, "ihawkMLG": 65, "jack3moto": 1, "JS3Baylor": 1, "JustinJacksonsRunner": 1, "jwjwjwjwjw": 1, "kdiuro13": 5, "KingofJewz": 1, "Losh923": 1, "manofruber": 1, "marcushorton": 1, "mewfert": 1, "MichaelsMotorcycle": 1, "MikeTheMagnific": 11, "mountaineer2016": 6, "MrGoodieMob": 1, "naughtthatdrunk": 1, "noseris": 2, "OhioUPilot12": 5, "OptimalAudio": 1, "reddevilhusky": 1, "rsaale": 1, "slipinr": 1, "smaroo": 1, "sportsfan0620": 3, "thelongderek": 69, "thrashboy": 1, "tsluder19": 1, "uconnball17": 1, "Whoseawhat": 2, "willsg": 1, "WMcKSquared": 1, "yungloudancolin": 5, "Boontz13": 13, "gogglesup859": 57, "MrTheSpork": 12, "NanananaFAPMAN": 13, "retnuh101": 32, "SpookyCaster": 2, "themidnightmamba": 110, "topher9595": 11, "BabyPandaBear2": 1, "Banks44": 3, "bearcatsnation": 3, "Brett420": 2, "brettslo12": 2, "cappow26": 26, "chem031": 15, "mpejkrm": 2, "sasmith2015": 53, "_drjack_": 4, "DinoJockeyTebow": 2, "MRolly24": 33, "ncaafan2": 41, "pasis": 2, "peterm0198": 2, "removepoutine": 4, "SJ_Diesel": 2, "SodaPawp": 7, "SuperScott97": 1, "1RedHouND1": 9, "AlternateShapes": 1, "Hank_Scorpio74": 7, "hazyel": 35, "Phphphonograph": 4, "trouble982": 3, "vikinick": 9, "Wzvd": 1, "MixonWitDaWrongCrowd": 1, "Jaydubzsc2": 4, "thecoffeecake1": 43, "titty_boi_420": 11, "BobbyL1ght": 2, "DerpCoop": 1, "metjetnet": 31, "Ronzoni_": 1, "WahooNerd": 1, "qngff": 13, "r3cebarnett": 1, "TheRammer": 21, "wbw03": 12, "AStrangerWCandy": 2, "markboidman": 1, "beermit": 1, "billsnewera": 19, "Intelligente": 2, "Lexical_Analysis": 5, "shutentsatsu": 8, "UnholyNarwhal": 1, "Ghee___Buttersnaps": 2, "Joey_Rogers": 2, "SportAnalyst": 1, "420memelordharambe69": 2, "abovemars": 9, "bobthepotato11": 1, "CJ29DJ": 26, "CrimsonHawk21": 1, "Himmerius": 7, "Jonathan_AP": 1, "mmccarthy14": 2, "Mr_Gagman": 2, "_zachhall": 6, "Gobearcats99": 4, "marcus_trout": 3, "politicalmetrics": 4, "sully_felton": 20, "the_doormatt23": 6, "CrusherTusher": 3, "wisconsinrules8": 2, "buttermc14": 5, "jtd2013": 1, "kanyebear": 2, "MadokaAndBulletClub": 3, "NevermindJamba": 3, "o_Stereotype_o": 2, "ty5486": 3, "AngeredSnowmen": 1, "Blakedude21": 19, "brayley": 39, "cjmich11": 1, "CopperWalrus": 45, "CordialCalamity": 1, "cycguy": 1, "deetmonster": 1, "dodo1672": 25, "febrezzeman": 1, "hailoran": 1, "italiansguybl": 9, "ItsMrBlackout": 1, "jacobguo95": 1, "Jakesnake42": 1, "JaykeJacobs": 1, "Mknot_uh_rbt": 2, "mrb11n": 1, "MrIceCreamCow": 1, "PM_YOUR_BOOBIES_": 1, "RedMamba13": 1, "squeakysprings": 1, "tmlarsen96": 1, "_Jetto_": 57, "boregon": 19, "Imperialism32": 28, "pricelescracker": 5, "tiqmiq": 11, "0Bry": 1, "aboyd14": 1, "arbadak": 1, "ArmaniWindbreaker": 2, "austinwer": 1, "BassettHound": 1, "BenDubie7": 3, "bicknob": 1, "Big_Morf": 1, "bjennings210": 16, "bluemanredstate": 2, "BlueTeamRuless": 1, "boiler2000": 1, "boltfromtheblue98": 2, "bombers92": 1, "Boredomis_real": 2, "BracewellBeast": 1, "BrewDowden": 1, "brosk34": 2, "Cameter44": 1, "cartkp": 42, "CdotLykins4": 1, "ChannelSERFER": 1, "cheeks_mcgoo": 46, "clipstep": 1, "collegescaresme": 17, "DabbyGilmore": 1, "dallas1289": 1, "dchalk": 1, "dereleek07": 2, "devinup": 39, "DJSquiggle": 2, "Dont_Jimmy_Me": 2, "DontPanak": 1, "dstone108": 1, "elusabcmpters": 1, "FadedCrown95": 76, "freeMCW": 1, "gelmaster189": 1, "GimmeDixon": 3, "gm4n22": 1, "go_uw": 97, "gotta_be_kidding": 1, "GreenGuy27": 1, "havingfun89": 1, "hillsonn": 1, "HuskerDeuce402": 1, "ilo4645": 1, "jakedasnake1": 1, "JankFromStateFarm": 1, "jdiene01": 18, "Joeskithejoe": 1, "Jpcjr17": 4, "JunkyardMccants": 1, "kfdbjjgdxb": 2, "KJones77": 15, "kpowtp": 1, "kychleap": 3, "LackOfAnotherName": 3, "Laxrools2": 1, "lipperypickels": 4, "LostCanadianGoose": 4, "lukasmotley3": 1, "Manelk": 1, "Maxreds19": 58, "meek_cubs": 1, "MIZ_CFC": 1, "nleloia42": 13, "nojeanshere": 14, "NQwerty1234": 2, "Patb1489": 1, "pengle8807": 2, "PessimistMinnyFan": 1, "Puregamergames": 1, "Ralphie_V": 5, "RegulatorRWF": 1, "Rhancock19": 1, "rutterb0": 1, "sacred421": 1, "shartney": 10, "ShockerSeahawkRoyal": 1, "ShutemdownD": 1, "slideintoyoDL": 1, "Slimg7": 20, "Snasty728": 11, "soccernamlak": 38, "sportsfan-25": 2, "Sprizzo11": 2, "sskor": 1, "stxrunner": 13, "t_V0": 1, "the-great-masticator": 1, "Theevun": 1, "tylong93": 1, "UK1721": 1, "Ultimatephenom": 3, "unique_name_02": 1, "vcuramsrva": 1, "Vignogna1": 1, "wolverheel": 1, "your_username_here_": 2, "bpletch05": 4, "BrandonRK": 2, "Clipdodgecharge": 6, "DrHokie13": 12, "felix39": 2, "golferhoops": 16, "jfb_20": 4, "KC_Kat": 2, "Kingkoch32": 6, "PoopyJoe420": 1, "samylam": 1, "AsheliaDalmasca": 17, "LucasErb": 4, "masterofawesomeness2": 2, "NorthStRussia": 2, "Sproded": 1, "Vrtrahan": 5, "CentreDem": 35, "crazychica5": 5, "gp_13": 3, "Jacoangel123": 28, "MikeyDoug98": 7, "nabraun03": 1, "rickym24": 34, "wcb34": 10, "zjl539": 56, "cavfan22": 2, "jwk1988": 7, "PiazzaDelivery": 4, "pogopony": 17, "Adaomi00": 1, "BigThomsd": 64, "CLCUBING": 2, "dc912": 1, "furrytoe819": 6, "HickeysBay": 13, "I_CAN_SMELL_U": 7, "jerlambert": 21, "Just-Vince": 1, "MsxArty": 3, "Reisende3": 3, "RetMaestro": 91, "seahawkspwn": 1, "smashhog": 14, "TheFoxAtNight": 1, "uncleSamuelg": 3, "bmehrmann": 1, "bobsaget824": 5, "Eska": 89, "GreatGeeko": 1, "iBlaire": 10, "knicolex": 3, "nnnnnvvvvv": 1, "NonstandardFactor": 1, "Sir_Richard_Rose": 1, "colby983": 1, "rscp1123": 9, "TheBaconDrinker": 8, "audiodiscovideo": 1, "eklosier": 4, "jmciesla": 10, "coreynj2461": 1, "crazygringo12": 3, "albusdumblederp": 8, "GHooLion": 9, "ismyusernameallowed": 1, "MatthewSulls": 20, "Rainmaker203": 6, "SamArc6": 2, "Theicecreamman3": 2, "zmp1924": 1, "EvanGelos99": 2, "geo2197": 2, "racernate30": 4, "sawyrs11": 1, "ttturk": 32, "EndangeredKoala": 4, "Kyounggun": 11, "RealGreen4": 4, "Sip_py": 2, "DrewSaylor": 2, "JakobJanoski": 1, "jmartn23": 6, "elmos-wurld": 3, "Merpninja": 23, "clemay14": 20, "Ifeelstronglyabout": 6, "NateDawg498": 3, "Bazralian": 59, "dominicex": 21, "jmandel9": 1, "BarackaYoMama": 3, "MetaKoopa99": 56, "The_Jesus_Beast": 1, "10011002": 39, "AlexAiley": 1, "Alprazolam_1": 3, "BoilerCrum": 1, "co_dehart": 38, "doctershaw": 75, "Elitefourbrad": 27, "Killerbob424": 5, "kjking70": 22, "mattc1714": 1, "Mr-Mutant": 30, "nontoaster": 7, "okamonk": 1, "SleveMcDichael4": 77, "themdh": 53, "Webs_7": 8, "ZB4CY": 1, "221bb": 1, "Austin_LSU_Fan22": 1, "Babirusas": 2, "benfreeman114": 1, "BJD1379": 12, "bobsbballblog": 1, "Btamres": 2, "Captain_T": 3, "Cubator": 22, "dajoeysims": 1, "Dtlgolf1": 1, "Eluvio_Vale": 3, "Flair-Up": 1, "Flattishsassy": 1, "ForeverPhilosophical": 1, "fucktard_": 3, "giodude2626": 1, "Gvanders": 2, "GWB_Sparta": 1, "imajadedpanda": 4, "JayhawkBball": 5, "JonathonWarriner": 1, "jski19233645": 10, "KalonKral": 19, "markstouffer": 1, "Matti_ice_21": 1, "maxipad4": 3, "maxis99swat": 4, "mccoyconundrum": 1, "MEmerson14": 16, "michahs": 3, "mija78504": 1, "MonteGoesWeGo": 3, "Offtheheazy": 2, "patohara1": 1, "paxxyagent": 1, "rccola4422": 4, "RobertELeeLoL": 1, "scoobydoobymutley": 1, "SethShubert": 1, "soccerpro5674": 1, "softkitty84": 1, "SpadeRyker": 20, "stepback34": 1, "Sup3rStup": 2, "The_Real_Jar": 1, "The_Wikipedia_Vandal": 15, "tmoneylegend": 1, "TotallynotfromDallas": 3, "Train350": 1, "unc_at_duke": 1, "yungkennie": 1, "zachhampu32": 1, "zachpaul15": 1, "zwickmanchia": 1, "Pesgato": 10, "CFC_MacK22": 4, "franky2580": 2, "hickeysbat": 3, "needaboat4": 23, "The_Trombone_Winner": 3, "Vhyris19": 2, "BluOmega": 84, "btd2310": 2, "FC_Cincy12": 4, "AetherAnaconda": 1, "BT121904": 2, "cubiqxe": 17, "giddy_up_up": 49, "leprachaun77": 12, "moopl": 9, "OsgSandmanZC": 18, "pkw0101": 6, "RockyNite": 1, "TPM_23": 33, "alexc4761": 1, "brodysully": 7, "chappersflappers": 2, "eise87": 4, "fallenangels_angels": 24, "iDevourer": 56, "slippers03": 1, "sluggerrr24": 31, "7_marko": 8, "kittysbybob": 1, "ssb_hopeless": 7, "stevenpham01": 1, "TallLatvianLad": 92, "The_DoubleHelix": 5, "Boombox4153": 1, "Esteban95": 38, "OwenProGolfer": 34, "phoenixphan87": 69, "PuckFurdue": 10, "VerySeriousBanana": 1, "22Graeme": 7, "anonymous_puffin": 2, "koestekn": 1, "MilkyWayNights": 5, "MoistWillingness": 1, "moneyhandzzz": 1, "rbga": 4, "Trucker1911": 47, "Victory_Screeeeeech": 11, "54321Newcomb": 65, "BlackSquirrelMed": 2, "darkwulf32": 2, "Disciple_of_Oedon": 1, "JayP0003": 1, "jbor_9": 4, "len_bias7": 2, "MiddleWord": 2, "shnikeys22": 12, "WalkingCalculator": 2, "CanadianShadow": 53, "DifferentCattle": 9, "JCPoly": 2, "jgaarnell": 4, "keatlib29": 24, "Nick_GoVols": 1, "QMaroonQ": 9, "StudiousBroccoli": 2, "ThePUNisher96": 1, "xJPF11x": 2, "Jagacin": 1, "JCS-13": 2, "OGTraveler": 1, "oncearunner": 48, "Rcy4122": 1, "byzantiums": 16, "chadercheese": 16, "phawkins30": 6, "plainvintage": 5, "trust_the_process__": 1, "UrgyUrgenson": 4, "BrokenBat4": 57, "DrMantis_Tobbagan": 33, "Greenbayfan93": 35, "primepierce34": 2, "samstrong35": 2, "Strikesuit": 24, "ZachBearcats": 2, "archi_hoo": 19, "HeelsFan27": 1, "MatteoBaresi": 1, "pmwhitehead": 1, "TheRealHenryG": 78, "theZcuber": 52, "tlahwm": 1, "Blazer2223": 69, "Hungry_Huskies": 24, "ionlypwn": 3, "PMro1210": 1, "Rew615": 3, "TerribleTryhard": 2, "tkrie": 3, "BurkePhotography": 1, "EagleswonSuperBowl52": 1, "Kaledasm13": 10, "matt714matt": 3, "ShamWow517": 1, "Townkrier": 42, "WrongDonkeyKongBong": 4, "2integral": 1, "97soryva": 1, "greenoranges": 4, "GuyOnTheMike": 1, "laflame301": 3, "nkingsley8": 3, "straightperson11": 6, "Username_taken99": 6, "intronexondna": 3, "JesusDaBeast": 1, "kbuva19": 1, "owencrook": 1, "Snarlycarl": 3, "Tortsl93l": 4, "XtraDucks4": 1, "alexpieguy": 55, "brobroma": 14, "BurritoHombre": 5, "daswassup13": 28, "GradedA": 11, "igniteshield": 43, "martingale18": 45, "MattyIceM": 23, "PNWSwag": 13, "rileydavis3": 38, "SorrowPlots": 1, "taukapp": 35, "zacheiny": 6, "zpjohnson3": 6, "11trobo": 5, "AdrianMojnarowski": 1, "alloythepunny": 4, "AllTarHeelDan": 18, "azgx29": 6, "bark98": 1, "BE______________": 1, "benf1999": 1, "BenJ06257": 1, "BottasGOAT": 1, "BrocavindCoD": 1, "Brotato_Man": 1, "CG2028": 1, "ChadKroger": 2, "Chance_The_Clapper": 1, "CHSLAX15": 13, "ConstantMadness": 1, "coogs35": 1, "cvcv12": 1, "DeificWhiteBoy": 1, "Devbucks": 7, "DoubleChalupaBox": 1, "dukeeaglesfan": 1, "EUFanhardstuckinNA": 2, "FlyingPheonix": 1, "geauxblue43": 1, "gmills87": 3, "gregorz17": 1, "Guhraffe": 2, "hainesj2": 1, "Hampton64": 1, "HorseRacingGuy": 10, "human_being44": 4, "iadozer": 1, "icameinyourmom": 1, "IDukie10": 1, "ItsAesthus": 56, "jbadlato": 1, "jchurch8073": 1, "jhall901": 1, "JonnyStatic": 1, "Keeg9351": 1, "Letsgomountaineers5": 5, "LowcountryTarHeels": 3, "macole29": 1, "MightyChunks": 1, "mlfsport88": 1, "nburt13": 1, "OneAdhesiveness": 1, "overeastover": 1, "OxycontinRain": 1, "Phillyfan3": 56, "Pieisgood186": 1, "PotassiumPills": 3, "Prlmitive": 1, "QuantumDonger": 1, "Quidster4040": 4, "RareRotten": 1, "Rattus375": 6, "Rector1219": 8, "RheagarTargaryen": 1, "Smitty1029": 1, "Sweeny75": 2, "T_R--7": 6, "terroristically": 1, "TigerSpartan04": 1, "tjones1000": 2, "YMCMBlamp": 2, "gwhuskyfan": 11, "giantraisin": 6, "Qioxa": 3, "tgriffith1992": 1, "Ununhexium1999": 4, "AYUtheEpic": 2, "confusedwalrus4": 31, "FinnBiscuit181": 4, "ld012": 2, "PgFalcons": 2, "Smurffor3": 27, "unitedRuminations": 1, "Yoshi123YT": 48, "zr8915": 8, "AcceptableExample2": 2, "boobalah10": 1, "Grady_Yeet": 4, "jarnold6997": 3, "jkulpa27": 2, "odetostillsleeping": 24, "ryanpickle": 53, "VillanovaMildcats": 10, "BanditC4Why": 1, "depaulbluedemon": 1, "guyman3": 1, "jgro97": 15, "kuhawk5": 1, "matthewz17": 13, "notarealwoodcarver": 1, "Plat3kSZN": 1, "SpailsJr": 3, "WorldyTrip54": 1, "DasDerp": 18, "EricTalksSports": 2, "hardadar": 4, "nolemanwsu": 1, "TheOblitratr": 9, "Tinynapkins": 1, "wr888": 1, "cbojdak": 10, "nerfmybum": 2, "OrangePlasma": 31, "phpMyPython": 1, "Matchbeak": 2, "sam_roop": 3, "tmuma": 2, "adamjthomas11": 1, "Ap_Sona_Bot": 1, "aztecdude": 7, "Fireyisthebest101": 5, "jroe0704": 1, "ni3t": 9, "okayalrightthen": 1, "zawmc33": 1, "askpat13": 1, "ev_moran": 4, "horse-cock-lock": 9, "King_Dong12": 4, "smolboi69420-57": 4, "UrAverageHuman": 10, "DDog20": 1, "ninjatom21": 1, "sneky_snek_": 1, "KPV922": 2, "Lem2798": 3, "Pengu-in-the-hood": 5, "Argiii": 4, "Cyberchao_X": 6, "patodro": 3, "sixseven89": 4, "dyldandr338": 2, "eandy14": 5, "nicodf3": 2, "swagzaphone": 2, "177676ers": 1, "DConrad0": 1, "MilesMisfit": 4, "mjostudios": 4, "reddit7457": 2, "texas2089": 1, "Eldubano": 5, "quan1754": 2, "shark522": 2, "ThunderKent69": 1, "eug11": 2, "liamliam1234liam": 9, "31caleb": 1, "moyboi2112": 1, "Steed_Davidson": 1, "nattydread6": 1, "verdenvidia": 60, "BigBoutros": 37, "GoldPantsTerrelle": 15, "hamalex2000": 16, "Item-Upstairs": 10, "jackcutch1": 5, "JH_181301": 92, "Jippylong12": 18, "Kiing_Kyle": 14, "KimJongBen": 36, "T8mascari": 4, "tbirdie_21": 12, "tclark8995": 3, "A_Delicious_Soda": 2, "alexkwin9": 1, "bsuracer": 2, "BuckybadgerW": 1, "Da-Pheeds": 1, "Drake0Malfoy": 1, "dwrakes": 1, "foggycactus7": 21, "iamalord": 6, "Isolatedbamafan": 1, "jackschaedi": 1, "JFA1996": 1, "jga620": 1, "Jpmiller7243": 4, "jules99b": 6, "koke012": 1, "landonrenard": 1, "LiterateWildcat": 1, "mistermachiano": 37, "MrSteely": 1, "Pugz4Life16": 1, "Quann345838": 4, "Rude-Employer9453": 1, "shrimppuertoricojr": 37, "snarfchomp": 2, "SnooCupcakes2460": 86, "The_Fighting_Wildcat": 9, "Unknown_Enigma10": 1, "WilliamStableCube": 4, "mpleafan": 5, "roaddogg": 2, "WhiteChocolate12": 29, "Beneficial-Board3508": 1, "dgi02": 1, "Eric18utah": 1, "evanky01": 5, "Fucktrump74839": 7, "hipsterhipst": 18, "JasterMereel11": 1, "kpp1252": 3, "LocksmithPrudent3357": 1, "LynkinPark": 19, "Mgtnquasar": 17, "Moorehunter89": 1, "MyAnswerIsMaybe": 58, "One_Run": 33, "StrangeCandle5534": 6, "ARentPayingSpider": 3, "Calm_Geologist_2330": 1, "ChantiHawk": 1, "Legitimate_Carry47": 3, "mynamejeeeeeff": 8, "nfeidt3": 14, "QWERTYUIOPquinn": 3, "raulmccartney": 1, "sinister4545": 1, "websterracing": 1, "WhiteGiraffe2020": 8, "DominiqueTrillkins": 1, "globalhighlander": 2, "I_hate_fritz_bot": 18, "jacobvarner": 8, "klondike838": 2, "ns1396": 2, "Select_Protection818": 2, "AwesomeCat14": 22, "Burn_2001": 2, "cyberchaox": 10, "Flatt12": 2, "sam00121": 12, "Ultiplayers": 1, "Aidang317": 9, "ApprehensiveShop5": 1, "Boise_Wright": 29, "Reg-Dunlop": 3, "Somali-Pirate-Lvl100": 1, "Staind075": 1, "sweekley34": 8, "wtf-is_juice": 1, "cooperg25": 1, "ethanbcook22": 5, "Gallaxee": 1, "JJPower2": 6, "Old_Win5361": 6, "RVP_DFS": 6, "taliarus": 1, "AshamedMusician5482": 17, "GoLionsJD107": 2, "lilpoststamp": 1, "MiniShaug": 2, "RandomGuy643": 3, "ErectEeyore": 1, "iSpazem": 1, "Jaemason19": 8, "Minnesnowtaaa": 1, "PapaNacho7": 3, "SharpHD7": 3, "SportsMadness": 9, "0pticle": 6, "Apes2520": 1, "CheapTrickIsOkay": 15, "ds1224": 10, "No_Bet4646": 5, "KDog13k": 2, "d_on_": 2, "Ryannevadafan1": 17, "KTurnUp": 4, "starace39": 2, "FieldKey5359": 4, "froman21": 1, "ZucchiniKnown1160": 1, "apk0605": 1, "arjunpatelmail": 1, "DusdyDurdle19": 4, "evilmangoes": 2, "Gods_Ego": 3, "vindictivejazz": 1, "The_Duck27": 1, "Ayo_Me_Cockburns": 12, "BeanMachine5555": 20, "BigPlayJ1220": 7, "BoolaBoolaBoi": 34, "Brained07": 32, "chet_w": 5, "emunchkinman": 47, "feeling-orange": 5, "Felix_Tholomyes": 5, "gettinreadyATW": 5, "GingerGod69": 2, "HenraldFunk": 16, "hilltopper06": 18, "ImAndytimbo": 2, "itsbrytonyo": 5, "JordanHerald5": 7, "King_Bumi_Of_Omashu": 5, "Lobro986": 15, "lukedmpeak": 43, "m_swansonn": 1, "mangcity": 20, "maxwell6233": 75, "natedog1097": 20, "occasional_user": 14, "OsmosisFillmore_": 15, "RobHD4": 14, "RocketsGuy": 3, "sleepymike01101101": 13, "SportsDude012": 5, "TheTiranian": 14, "tropic_gnome_hunter": 11, "0aguywithglasses0": 1, "asketch_": 1, "avgjoe10": 1, "bigbird727": 1, "Breakfast_Virtual": 1, "CardinalGlickWOW": 41, "Cdsnz23": 1, "Coollidinthefridge": 1, "CoomeyLoomey": 3, "Gammapotatoe": 1, "HamiltonSamuel": 3, "iLikeApples116": 1, "IllAd4178": 1, "juul_daydream": 1, "kujo77777": 2, "M3L0NM4N": 1, "MasterOogway-2003": 1, "Natural_Eye_2309": 1, "PoloNewt": 1, "Purdue4lyfe": 4, "shaleum": 1, "tdsn-sports": 1, "Trappist1": 18, "Wangchief": 1, "windypalmtree": 1, "yaboicasey32": 2, "zachw900": 4, "arkm114": 1, "brainj5471": 75, "E_Shaped_Pie": 7, "Hubertisthegoat": 5, "iam_alittlestitious": 17, "Sal514": 13, "ehunta11": 1, "geauxsaints777": 3, "HopscotchChampion69": 4, "Rhcbearsfan": 1, "SavageSquirl": 1, "the_windsurfer": 18, "BoJack_Horseman1338": 1, "Excellent-Wishbone68": 2, "GrootLovesFunions": 6, "boiler1101": 2, "Champion-raven": 5, "finalfourcuse": 70, "idkmannnnnnnnnm": 1, "NickFromNewGirl": 1, "SilentZzShane": 1, "slider12-6": 15, "AL3XD": 1, "Berks2381": 1, "BigBaller331": 12, "RagingLasagna": 70, "Available-Reserve329": 1, "Dellerly": 2, "brady11": 21, "Darnoc27": 1, "JKramer421": 3, "GreenAndYellow12": 4, "SnooPeppers1563": 1, "TommyTwoTaps": 66, "Weary_Spot9880": 1, "Hoosier2016": 1, "mill1634": 64, "Newman1938": 4, "RootBeerBloat": 4, "cdbjj22": 6, "ericfisher4": 3, "marquardt_": 13, "TheFluffyClouds": 2, "BrodieCollins": 2, "tattedmonster999": 2, "Critical-Savings-830": 1, "trickleupgangsta": 6, "TSC_12": 6, "According-Pay-3371": 3, "Broncofan101": 1, "GreedyRhombus": 1, "Lobro9": 61, "Mangotheory97": 2, "quadruplehaitch": 2, "z_banks24": 2, "averyvick": 13, "Ghost_TTV_1": 2, "SteelHeelNittanyLion": 2, "ink625": 1, "MetsJetsKnicksFan": 1, "Spider_The_Cat": 1, "TheThunder165": 2, "North_Use5348": 2, "zacvoynow": 1, "LoadedTots18": 1, "goodwriterer": 1, "Ac91722": 20, "amesker": 19, "BlueGreenMikey": 16, "camfam44": 16, "dstick2323": 20, "garretttt4": 16, "Hot-Description4492": 16, "ItsTheTenthDoctor": 19, "phatLhoops": 20, "SnooBooks8063": 17, "undecided_mask": 17, "70277027": 14, "AWrecord": 13, "BirdsBeCool": 7, "ggbinc": 19, "Luigiatl": 4, "Miserable-Chart-9479": 7, "scsd4222": 2, "Swovine": 7, "Worldly_Worldliness5": 1, "lilguccipurpledrank": 17, "MAFIAxMaverick": 12, "NothingBurgerNoCals": 14, "bugmanishere": 2, "DI9_ForLife": 13, "Impressive-Tank9803": 1, "LatrellSprewell1997": 13, "tuckedpin": 8, "United434": 2, "gohogs1995": 14, "bh6891": 5, "TheNigerianHyperion": 2, "VelicoVinny": 4, "Aidanj927": 12, "Maison-Marthgiela": 13, "Maladroit44": 15, "AlexLM95": 3, "boise_bronco": 3, "Browndog319": 5, "ItsWatch360": 2, "Maleficent_Drag1983": 2, "RockChalkMPLS": 2, "Theboomerhasarisen": 1, "twc9904": 1, "FitIndependence6187": 12, "Ok_Professional_5998": 7, "Ted_Lavie": 14, "DrSandmanZ": 5, "ebState": 2, "fortysecondave": 1, "ftskeebo": 7, "mrfishycrackers": 2, "ResidentRunner1": 12, "Welfare_Pudding": 6, "Boom_Confetti": 12, "Bulby_Ant": 1, "chioud": 1, "gamehusky": 1, "LetsGetSilly21": 8, "Nomac20": 3, "notnonoseven": 2, "Party_Hattz": 2, "Remote-Duck-2611": 1, "AnAnonymousS0urce": 8, "DogeFancy": 1, "FlyinPurplePartyPony": 1, "Low_Silver_9270": 1, "Moosecat201": 4, "prpltrTLS": 2, "tomcar13": 1, "ayushg3": 1, "DaBullsnBears1985": 1, "DoubleBird6633": 1, "haydenknobloch": 1, "MacaRonniAndCheese": 1, "RushShirtKid": 1, "Worldly-Repair-7698": 2, "AlphaDoubleNegative_": 9, "fancycheesus": 8, "KDogCaden55": 11, "OneandonlyTiran": 12, "BeginningCourt3060": 1, "g4rt0": 4, "Important-Ostrich-26": 1, "MachoGringo": 1, "Purdue49OSU20": 4, "WILSON_CK": 2, "_C1ty": 19, "andyduke23": 8, "CarnivoreEndurance": 7, "strategicsound": 4, "thrownaway12211": 8, "fellohuman77": 4, "Ryry24lol": 2, "Urbassassin": 1, "yoshyguy": 3, "LEDVoicebox": 1, "Banana_Bread_Beer": 2, "CheeseWinz": 3, "Left-Palpitation2291": 2, "PaleontologistNo876": 3, "pharmacy_guy": 3, "stabbyyyy_sfw": 2, "Yagachak": 2, "David-Allan-Coe": 1, "LaconianSalvage": 3, "yellowstones_fav": 2, "dude_stfu": 1, "AshWulf_": 1, "tlozfox": 2, "drneilpretenamen": 1, "Bchillman1": 1, "Cre-Fiddy": 1, "ToeSuckingFiend": 1, "bboiler": 1, "Key_Beginning4231": 1, "SpiceNoodles": 1, "collegekorb360": 1, "lolaya": 1, "Col_Pol": 18, "JazzYotesRSL": 17, "Life-Veterinarian699": 16, "TheKarateFan": 20, "yung_communism": 20, "yzerman8": 19, "Icy_Machinery736": 1, "Mission_Big_2145": 1, "OrangeSean": 7, "Thickrichchicken": 18, "Baz4700": 16, "NewRCTID22": 14, "Flat-Astronomer287": 16, "Gamer0o0o": 1, "KwameBaguette": 4, "SantiBigBaller": 1, "bentj101": 13, "Josh_5890": 6, "Yoshi111599": 15, "Gangsta_Shark037": 4, "pupupp42069": 7, "57namkrod": 1, "phnnydntm": 1, "NJP-CogitoEonPardon": 1, "Thebballchemist16": 10, "TSL5_CBB": 9, "donut066": 7, "KampferV": 3, "manbeqrpig": 3, "okoios": 1, "Bengjumping": 6, "BensenJensen": 6, "MisterPotato11": 3, "koltonm23": 8, "ballerwill23": 2, "Pratt-and-Whitney": 3, "RCKaos7": 1, "cdc030402": 4, "THE_HUMAN_TREE": 4, "Able_Enthusiasm7739": 1, "ione107": 4, "riddledwithdoubt": 5, "the_sword_of_brunch": 5, "noahbird25": 1, "zerafan19": 2, "kesodop": 4, "Ori311": 4, "Affectionate-Cup9340": 3, "nike-addias-99": 2, "TheScarletSeahawk": 3, "casconed": 1, "TheSandMan713": 1, "melikefiddle": 1, "ababababab_okay": 1, "ApprehensivePace2661": 1, "balconesescarpment": 1, "BSUFan07": 1, "Busy_Fig2574": 1, "coilmeup": 1, "edgyusernameguy": 1, "HydeHawk": 1, "Ill_Ad_4429": 1, "KatzDeli": 1, "littlvinny": 1, "Low_Bad_9936": 1, "Mon5teRico": 1, "Routine-Remove8750": 1, "Sportzfanatic_001": 1, "Trujiogriz": 1, "WetDreaminOfParadise": 1, "Wings4514": 1};
+const TENURE_COUNTS = {"Axgwd1": 142, "bakonydraco": 163, "bkervick": 36, "Blazeth": 201, "Boilers11": 113, "corndogshuffle": 107, "darrylweenus": 169, "DCProf": 88, "DealerNo4908": 14, "DeepBlue_8": 32, "DEP61": 117, "Di9ForLife": 37, "Dolphinz811": 16, "drcollegehoops": 206, "drowse": 91, "Equivalent-Yard3824": 30, "ferrett3": 204, "frumpybuffalo": 102, "Gabe_i_guess": 16, "Greyson04": 132, "Hackasizlak": 150, "Hambone721": 204, "INeedMoreCreativity": 151, "IrishBall": 146, "Jaguar4728": 94, "JamesBouknightStan": 37, "jloose128": 192, "Jomosensual": 77, "JuliePepperwood": 137, "KingInDaNorf34": 16, "Mills_Miles": 119, "Monkey832": 93, "Nacos2001": 74, "NickDrummer": 20, "oddcharisma": 72, "pete4999": 133, "Piglee_037": 18, "pongislame": 93, "Pro-1st-Amendment": 19, "PSUMediaPA": 35, "Pure-Shirt-5831": 17, "RiseAndFire69": 152, "RutabagaReady3370": 34, "SaguaroCactus19": 38, "Senior_Chang": 189, "Sharpe318": 92, "ShogunAshoka": 127, "Soterios": 34, "SpeedLegend": 147, "stocktonisgoat": 204, "theiwc0303": 17, "Travbowman": 76, "Tygorz": 35, "UncleSam_HS": 87, "unkemptrage": 77, "Weathergeekal": 114, "Yellow_Evan": 19, "zags-not-zogs": 23, "Zloggt": 91, "zzer0tonin": 19, "1Subject": 11, "Chasea24": 13, "dterp13": 73, "dubscurry30": 16, "Impossible-Still-349": 3, "ItsCommonGamer": 4, "JazzyJonah13": 10, "JJuva13": 13, "Les-Champs": 9, "Leukeme": 7, "lukedux": 5, "maybeSkywalker": 10, "Mission_Pay_3373": 3, "Mother_Boss_4140": 2, "scumbag46": 13, "SwissArmyScythe": 17, "12panther": 152, "ALStark69": 156, "danielshap2": 66, "Gavigator": 52, "Character_Moment9959": 3, "Huge_Public_1437": 11, "IndigoExpress13": 1, "Marvellent": 2, "squibKickFanatic": 2, "brvheart": 157, "Jaze1": 25, "39_Ringo": 3, "DarensHyper": 1, "Shpion007": 1, "bbbredy": 39, "brendan0305": 72, "Clarinetist22": 64, "Da_Bears17": 4, "generally-mediocre": 8, "LagJetGameThe": 21, "LordRotharoth": 9, "maddydotcom": 56, "MainPeanut25": 32, "Mundane-Platform7735": 10, "OliviaPG1": 23, "pacman-2022": 28, "SeanPFly": 8, "Stepkeyt": 67, "SufferingfOrLife": 10, "willweaverrva": 28, "WWG_Fire": 7, "zvexler": 6, "DaK1ngA1den": 1, "jackmc04": 25, "MrAtlantic": 6, "ObiLaurie311": 11, "One_Expert_1111": 9, "rainymarimba": 2, "thequietpenguin": 8, "younggun92": 3, "80katrillion": 188, "amad97": 26, "Anduril1776": 12, "dukenukeeee": 25, "Jaymoney00": 72, "jdb5173": 6, "Mr-Cantaloupe": 2, "Pale-Pay8772": 23, "RevolutionarySort6": 92, "Toastiify": 144, "CentenarioAvalanche": 2, "Wazzup44": 151, "WillingRestaurant483": 12, "ohayden02": 2, "zombielovertrio": 2, "Call_Mee_Santa": 25, "Automatic_Clerk_1106": 1, "Icy-Chart-6453": 10, "johnjones55": 131, "AsFTW": 1, "OkRole82": 1, "TommyWiseau22": 2, "Nanananora": 1, "thonmaker4mvp": 4, "TimelyTint": 4, "NeoDucky": 1, "HealthyPapaya8206": 2, "Sauronthegreat0610": 1, "Background-Coast8430": 1, "Feisty-Piano-7086": 3, "3236-on-MC": 1, "pikafreakinchu": 1, "cardracer270": 1, "chief_sitass": 11, "flightsim9fan": 1, "imanidiot2012": 2, "Old_Policy89": 1, "therealtand": 93, "Versigot": 1, "VisibleConcern": 1, "Zagineer": 1, "broadwaystarVGC": 3, "ab163": 4, "arbysguy": 46, "badjazzmaverick": 5, "Barnhard": 92, "BeardyMcJew": 16, "Bleacherblues": 29, "boeheim": 3, "CantFindMyWallet": 20, "chadmb2003": 53, "cincyXU": 16, "ClaudeLemieux": 41, "Concision": 14, "crappysandwich": 17, "Ctkevb": 2, "DCorNothing": 3, "Digz4Gallia": 17, "ExtremelySexyMan": 13, "geoffreyh76": 43, "grahoben": 14, "Gregorian1": 45, "gregorykoch11": 31, "HannibalK": 4, "henryshort": 3, "honar": 32, "hotspencer": 19, "igloo_assassin": 154, "jayhawx19": 49, "jjparker084": 46, "jkclone": 81, "JonJaysBooty": 26, "jpj77": 82, "Justinhub2003": 70, "KalifAlhassan": 11, "kimjongunnumerouno": 9, "Korn28": 12, "marktheshark34": 7, "Meowing_Cows": 14, "mitchdwx": 62, "mountm": 103, "Mr_Otters": 124, "MrCoolHand": 10, "nostempore": 21, "OhioBornSoonerBred": 133, "Onegreatrace": 10, "peachios": 112, "Pmoney51": 115, "Protoman12": 13, "Quaddlebaum": 8, "redblue_22": 26, "rednip_mada": 9, "ReegsShannon": 24, "RMGH": 54, "rockchalk": 18, "Roper92391": 67, "ruwisc": 76, "scarycamel": 51, "seaotter2": 54, "skinz4life": 24, "SlightlyBiased": 55, "snlutnas": 4, "splenda806": 8, "strongscience62": 29, "tACorruption": 130, "terker": 24, "TheBen15": 15, "thecrispybacon": 152, "TheGimper": 21, "TheRealFrankLongo": 29, "thevorminatheria": 36, "ThuggsyBogues": 21, "Tiibou": 11, "tumblingtower": 5, "uvafan": 19, "VarnerBeast14": 31, "wichita_gator": 75, "WickedUMD": 4, "xBRxNecromancer": 8, "benjay67": 1, "boiling_friars": 3, "bwburke94": 2, "cavahoos": 10, "CKpsu5220": 1, "crossedsabres8": 2, "dcsportsfan1234": 6, "deltadore": 1, "eatapenny": 21, "ElysiumUS": 6, "esc1010": 1, "ESPbeN": 133, "fancygama": 1, "flynndarealest": 1, "fogell2013": 4, "Forever_Mirin_Brah": 5, "golframfan": 1, "hammerjkt": 36, "Home_sweet_dome": 1, "HoopsU": 4, "IrritatedQuail": 78, "JamesBCrazy": 45, "JDesq2015": 2, "jodatoufin": 2, "Jojo1691": 5, "jrlund2": 5, "jsmith4415": 2, "kmart2129": 1, "lieutenantcumbucket": 1, "marack99": 3, "MobyDickOfDopeness": 1, "MrBMac": 6, "NateOwns": 5, "pantherhawk17": 34, "PM_ME_YOUR_STERNUM": 103, "Refahcs": 2, "remfan477": 24, "s_carn6": 3, "sibewolf": 6, "SLR52": 7, "SSJRoshi": 1, "Tarheels96": 1, "tekmonkey": 4, "thesidestepkids": 2, "tjmullen94": 2, "treasCoastFish": 1, "Twosixtytwo": 22, "wajomc": 30, "WinstonWolf77": 27, "Yankeefan333": 6, "zalemam": 5, "LareTheBear": 15, "shaidar9haran": 47, "206-Ginge": 87, "3cardblindbot": 3, "A_Zone_Of_Danger_": 1, "alexthegreat217": 1, "alijimando": 7, "atthebuzzer21": 4, "BigSetzy": 6, "BugsSuck": 1, "captain_reddit_": 1, "CavalierPB": 6, "dconn501": 1, "FireBreathingPanda": 1, "GreatEnigma": 3, "greeninator": 1, "interesting1235799": 3, "OQAudi": 3, "PolyMatt98": 40, "sharknado3": 4, "Simba_Swish": 5, "ukfan8293": 8, "XCCadet": 1, "xtroreddit": 1, "ahmed_iAm": 2, "BettingJays": 1, "Cwebfan23": 18, "Duhawk": 49, "grimes19": 1, "natethe247": 98, "OldManEllus": 91, "rbhindepmo": 53, "SubmitToTheFunk": 12, "therichone509": 1, "Ukmeteorunner": 1, "ethantm": 3, "falconlover79": 132, "grubberbeb": 50, "JamaalFuckinCharles": 3, "lewalani": 13, "Shaudius": 7, "StewieTheBlueDevil": 20, "WMMRT": 5, "Chuckmac88": 10, "dtread7": 6, "muskiechip": 5, "SKyJ007": 11, "sloppybuttmustard": 3, "XAV_mn": 1, "cav4life": 2, "cft4nh": 1, "GimmeTacos2": 3, "hagenation": 11, "kanshawk15": 1, "MBakhsh": 61, "Quattlebomber": 4, "Shinanigins1": 3, "BU_Milksteak": 1, "HoosierFanBoy": 4, "MartinBrodyMcFly": 10, "quintuscicero": 1, "RoidingOldMan": 1, "SecretComposer": 4, "thatkid1441": 2, "asap_cocky": 2, "b0flex": 10, "BearDownTacoShop": 1, "bwalter2595": 1, "HumbleMoses": 14, "jedibill": 1, "Rathartic": 2, "The_Tobaughn": 4, "YellowSkarmory": 83, "804ian": 1, "bluejaysfan21": 7, "bryceryals42": 63, "koehler05": 1, "ouguy2017": 66, "Wtayjay": 10, "AHxRazr": 1, "Arrow2dakneeftw": 1, "cscout": 1, "ed_merckx": 5, "elefish92": 14, "JR97111": 8, "maschwa": 1, "newportnik": 77, "shrimcentral": 1, "svvansea": 47, "BleedBlackGold": 7, "Cryptacity": 2, "cshaps": 1, "pepperoniroll": 2, "Robey2": 1, "shrimpfriedrice66": 3, "TheChr0nic2001": 1, "TheOtherLeftCoast": 1, "cnterps": 6, "goregousdreamer": 1, "JetRush": 3, "PieDisliker": 4, "tehtsar": 1, "ToneLoak95": 2, "dalematt88": 1, "Jlevy34": 10, "Lukeisabeast": 1, "soonerfreak": 1, "SquintySquidX": 1, "apricotcoast": 12, "Arsid": 3, "DaneCooper": 1, "jeezum_crow": 1, "jrrullo06": 28, "Shalmanesser": 2, "allezrafa": 1, "BumpyBob0007": 173, "chechockey": 3, "Dano21": 1, "DeNovoReview": 5, "Schnectadyslim": 2, "TrueBlue41": 1, "Villanova15": 3, "drunkenAmoeba": 1, "elschultheis": 1, "simmar13": 65, "ztrobin5": 17, "blckjack": 1, "R99": 1, "SexualEarwax": 19, "SpartyOn75": 1, "1hive": 17, "8thave": 43, "_TD3": 16, "Akiraptor": 38, "amopeyzoolion": 13, "asaprocket": 27, "bluedsrule": 17, "Bradcav1": 33, "cinciforthewin": 87, "dluby": 18, "Fifth_Down": 52, "Food_Fight_Please": 12, "InHoc12": 3, "jckund": 81, "JerryTheManager": 6, "kdcoltred": 7, "kmckeon2": 17, "KUmitch": 9, "KUSmurf": 2, "Lex_Ludorum": 114, "loomerr": 5, "MoneyManeVick": 65, "njhokie5": 32, "PillPushr": 14, "Random__User": 35, "recklessfive": 17, "Shiftz": 4, "southsidesenator": 15, "swarlyisback": 14, "ukfan515": 116, "yankees32123": 1, "-kale-": 1, "3isfordale": 80, "Abombinator": 1, "anethor": 1, "bencoleLAD": 1, "BleedBlue__": 2, "BRNXB0MBERS": 76, "cardsfan98": 3, "Careerbeef": 3, "conair513": 1, "CountryTimeLemonlade": 1, "cwrogers0530": 1, "drknight": 1, "dwyyyyyyanewade": 1, "emmer15": 1, "hfj8120": 78, "ihawkMLG": 65, "jack3moto": 1, "JS3Baylor": 1, "JustinJacksonsRunner": 1, "jwjwjwjwjw": 1, "kdiuro13": 5, "KingofJewz": 1, "Losh923": 1, "manofruber": 1, "marcushorton": 1, "mewfert": 1, "MichaelsMotorcycle": 1, "MikeTheMagnific": 11, "mountaineer2016": 6, "MrGoodieMob": 1, "naughtthatdrunk": 1, "noseris": 2, "OhioUPilot12": 5, "OptimalAudio": 1, "reddevilhusky": 1, "rsaale": 1, "slipinr": 1, "smaroo": 1, "sportsfan0620": 3, "thelongderek": 69, "thrashboy": 1, "tsluder19": 1, "uconnball17": 1, "Whoseawhat": 2, "willsg": 1, "WMcKSquared": 1, "yungloudancolin": 5, "Boontz13": 13, "gogglesup859": 57, "MrTheSpork": 12, "NanananaFAPMAN": 13, "retnuh101": 32, "SpookyCaster": 2, "themidnightmamba": 110, "topher9595": 11, "BabyPandaBear2": 1, "Banks44": 3, "bearcatsnation": 3, "Brett420": 2, "brettslo12": 2, "cappow26": 26, "chem031": 15, "mpejkrm": 2, "sasmith2015": 53, "_drjack_": 4, "DinoJockeyTebow": 2, "MRolly24": 33, "ncaafan2": 41, "pasis": 2, "peterm0198": 2, "removepoutine": 4, "SJ_Diesel": 2, "SodaPawp": 7, "SuperScott97": 1, "1RedHouND1": 9, "AlternateShapes": 1, "Hank_Scorpio74": 7, "hazyel": 35, "Phphphonograph": 4, "trouble982": 3, "vikinick": 9, "Wzvd": 1, "MixonWitDaWrongCrowd": 1, "Jaydubzsc2": 4, "thecoffeecake1": 43, "titty_boi_420": 11, "BobbyL1ght": 2, "DerpCoop": 1, "metjetnet": 31, "Ronzoni_": 1, "WahooNerd": 1, "qngff": 13, "r3cebarnett": 1, "TheRammer": 21, "wbw03": 12, "AStrangerWCandy": 2, "markboidman": 1, "beermit": 1, "billsnewera": 19, "Intelligente": 2, "Lexical_Analysis": 5, "shutentsatsu": 8, "UnholyNarwhal": 1, "Ghee___Buttersnaps": 2, "Joey_Rogers": 2, "SportAnalyst": 1, "420memelordharambe69": 2, "abovemars": 9, "bobthepotato11": 1, "CJ29DJ": 26, "CrimsonHawk21": 1, "Himmerius": 7, "Jonathan_AP": 1, "mmccarthy14": 2, "Mr_Gagman": 2, "_zachhall": 6, "Gobearcats99": 4, "marcus_trout": 3, "politicalmetrics": 4, "sully_felton": 20, "the_doormatt23": 6, "CrusherTusher": 3, "wisconsinrules8": 2, "buttermc14": 5, "jtd2013": 1, "kanyebear": 2, "MadokaAndBulletClub": 3, "NevermindJamba": 3, "o_Stereotype_o": 2, "ty5486": 3, "AngeredSnowmen": 1, "Blakedude21": 19, "brayley": 39, "cjmich11": 1, "CopperWalrus": 45, "CordialCalamity": 1, "cycguy": 1, "deetmonster": 1, "dodo1672": 25, "febrezzeman": 1, "hailoran": 1, "italiansguybl": 9, "ItsMrBlackout": 1, "jacobguo95": 1, "Jakesnake42": 1, "JaykeJacobs": 1, "Mknot_uh_rbt": 2, "mrb11n": 1, "MrIceCreamCow": 1, "PM_YOUR_BOOBIES_": 1, "RedMamba13": 1, "squeakysprings": 1, "tmlarsen96": 1, "_Jetto_": 57, "boregon": 19, "Imperialism32": 28, "pricelescracker": 5, "tiqmiq": 11, "0Bry": 1, "aboyd14": 1, "arbadak": 1, "ArmaniWindbreaker": 2, "austinwer": 1, "BassettHound": 1, "BenDubie7": 3, "bicknob": 1, "Big_Morf": 1, "bjennings210": 16, "bluemanredstate": 2, "BlueTeamRuless": 1, "boiler2000": 1, "boltfromtheblue98": 2, "bombers92": 1, "Boredomis_real": 2, "BracewellBeast": 1, "BrewDowden": 1, "brosk34": 2, "Cameter44": 1, "cartkp": 42, "CdotLykins4": 1, "ChannelSERFER": 1, "cheeks_mcgoo": 46, "clipstep": 1, "collegescaresme": 17, "DabbyGilmore": 1, "dallas1289": 1, "dchalk": 1, "dereleek07": 2, "devinup": 39, "DJSquiggle": 2, "Dont_Jimmy_Me": 2, "DontPanak": 1, "dstone108": 1, "elusabcmpters": 1, "FadedCrown95": 76, "freeMCW": 1, "gelmaster189": 1, "GimmeDixon": 3, "gm4n22": 1, "go_uw": 97, "gotta_be_kidding": 1, "GreenGuy27": 1, "havingfun89": 1, "hillsonn": 1, "HuskerDeuce402": 1, "ilo4645": 1, "jakedasnake1": 1, "JankFromStateFarm": 1, "jdiene01": 18, "Joeskithejoe": 1, "Jpcjr17": 4, "JunkyardMccants": 1, "kfdbjjgdxb": 2, "KJones77": 15, "kpowtp": 1, "kychleap": 3, "LackOfAnotherName": 3, "Laxrools2": 1, "lipperypickels": 4, "LostCanadianGoose": 4, "lukasmotley3": 1, "Manelk": 1, "Maxreds19": 58, "meek_cubs": 1, "MIZ_CFC": 1, "nleloia42": 13, "nojeanshere": 14, "NQwerty1234": 2, "Patb1489": 1, "pengle8807": 2, "PessimistMinnyFan": 1, "Puregamergames": 1, "Ralphie_V": 5, "RegulatorRWF": 1, "Rhancock19": 1, "rutterb0": 1, "sacred421": 1, "shartney": 10, "ShockerSeahawkRoyal": 1, "ShutemdownD": 1, "slideintoyoDL": 1, "Slimg7": 20, "Snasty728": 11, "soccernamlak": 38, "sportsfan-25": 2, "Sprizzo11": 2, "sskor": 1, "stxrunner": 13, "t_V0": 1, "the-great-masticator": 1, "Theevun": 1, "tylong93": 1, "UK1721": 1, "Ultimatephenom": 3, "unique_name_02": 1, "vcuramsrva": 1, "Vignogna1": 1, "wolverheel": 1, "your_username_here_": 2, "bpletch05": 4, "BrandonRK": 2, "Clipdodgecharge": 6, "DrHokie13": 12, "felix39": 2, "golferhoops": 16, "jfb_20": 4, "KC_Kat": 2, "Kingkoch32": 6, "PoopyJoe420": 1, "samylam": 1, "AsheliaDalmasca": 17, "LucasErb": 4, "masterofawesomeness2": 2, "NorthStRussia": 2, "Sproded": 1, "Vrtrahan": 5, "CentreDem": 35, "crazychica5": 5, "gp_13": 3, "Jacoangel123": 28, "MikeyDoug98": 7, "nabraun03": 1, "rickym24": 34, "wcb34": 10, "zjl539": 56, "cavfan22": 2, "jwk1988": 7, "PiazzaDelivery": 4, "pogopony": 17, "Adaomi00": 1, "BigThomsd": 64, "CLCUBING": 2, "dc912": 1, "furrytoe819": 6, "HickeysBay": 13, "I_CAN_SMELL_U": 7, "jerlambert": 21, "Just-Vince": 1, "MsxArty": 3, "Reisende3": 3, "RetMaestro": 91, "seahawkspwn": 1, "smashhog": 14, "TheFoxAtNight": 1, "uncleSamuelg": 3, "bmehrmann": 1, "bobsaget824": 5, "Eska": 89, "GreatGeeko": 1, "iBlaire": 10, "knicolex": 3, "nnnnnvvvvv": 1, "NonstandardFactor": 1, "Sir_Richard_Rose": 1, "colby983": 1, "rscp1123": 9, "TheBaconDrinker": 8, "audiodiscovideo": 1, "eklosier": 4, "jmciesla": 10, "coreynj2461": 1, "crazygringo12": 3, "albusdumblederp": 8, "GHooLion": 9, "ismyusernameallowed": 1, "MatthewSulls": 20, "Rainmaker203": 6, "SamArc6": 2, "Theicecreamman3": 2, "zmp1924": 1, "EvanGelos99": 2, "geo2197": 2, "racernate30": 4, "sawyrs11": 1, "ttturk": 32, "EndangeredKoala": 4, "Kyounggun": 11, "RealGreen4": 4, "Sip_py": 2, "DrewSaylor": 2, "JakobJanoski": 1, "jmartn23": 6, "elmos-wurld": 3, "Merpninja": 23, "clemay14": 20, "Ifeelstronglyabout": 6, "NateDawg498": 3, "Bazralian": 59, "dominicex": 21, "jmandel9": 1, "BarackaYoMama": 3, "MetaKoopa99": 56, "The_Jesus_Beast": 1, "10011002": 39, "AlexAiley": 1, "Alprazolam_1": 3, "BoilerCrum": 1, "co_dehart": 38, "doctershaw": 75, "Elitefourbrad": 27, "Killerbob424": 5, "kjking70": 22, "mattc1714": 1, "Mr-Mutant": 30, "nontoaster": 7, "okamonk": 1, "SleveMcDichael4": 77, "themdh": 53, "Webs_7": 8, "ZB4CY": 1, "221bb": 1, "Austin_LSU_Fan22": 1, "Babirusas": 2, "benfreeman114": 1, "BJD1379": 12, "bobsbballblog": 1, "Btamres": 2, "Captain_T": 3, "Cubator": 22, "dajoeysims": 1, "Dtlgolf1": 1, "Eluvio_Vale": 3, "Flair-Up": 1, "Flattishsassy": 1, "ForeverPhilosophical": 1, "fucktard_": 3, "giodude2626": 1, "Gvanders": 2, "GWB_Sparta": 1, "imajadedpanda": 4, "JayhawkBball": 5, "JonathonWarriner": 1, "jski19233645": 10, "KalonKral": 19, "markstouffer": 1, "Matti_ice_21": 1, "maxipad4": 3, "maxis99swat": 4, "mccoyconundrum": 1, "MEmerson14": 16, "michahs": 3, "mija78504": 1, "MonteGoesWeGo": 3, "Offtheheazy": 2, "patohara1": 1, "paxxyagent": 1, "rccola4422": 4, "RobertELeeLoL": 1, "scoobydoobymutley": 1, "SethShubert": 1, "soccerpro5674": 1, "softkitty84": 1, "SpadeRyker": 20, "stepback34": 1, "Sup3rStup": 2, "The_Real_Jar": 1, "The_Wikipedia_Vandal": 15, "tmoneylegend": 1, "TotallynotfromDallas": 3, "Train350": 1, "unc_at_duke": 1, "yungkennie": 1, "zachhampu32": 1, "zachpaul15": 1, "zwickmanchia": 1, "Pesgato": 10, "CFC_MacK22": 4, "franky2580": 2, "hickeysbat": 3, "needaboat4": 23, "The_Trombone_Winner": 3, "Vhyris19": 2, "BluOmega": 84, "btd2310": 2, "FC_Cincy12": 4, "AetherAnaconda": 1, "BT121904": 2, "cubiqxe": 17, "giddy_up_up": 49, "leprachaun77": 12, "moopl": 9, "OsgSandmanZC": 18, "pkw0101": 6, "RockyNite": 1, "TPM_23": 33, "alexc4761": 1, "brodysully": 7, "chappersflappers": 2, "eise87": 4, "fallenangels_angels": 24, "iDevourer": 56, "slippers03": 1, "sluggerrr24": 31, "7_marko": 8, "kittysbybob": 1, "ssb_hopeless": 7, "stevenpham01": 1, "TallLatvianLad": 92, "The_DoubleHelix": 5, "Boombox4153": 1, "Esteban95": 38, "OwenProGolfer": 34, "phoenixphan87": 69, "PuckFurdue": 10, "VerySeriousBanana": 1, "22Graeme": 7, "anonymous_puffin": 2, "koestekn": 1, "MilkyWayNights": 5, "MoistWillingness": 1, "moneyhandzzz": 1, "rbga": 4, "Trucker1911": 47, "Victory_Screeeeeech": 11, "54321Newcomb": 65, "BlackSquirrelMed": 2, "darkwulf32": 2, "Disciple_of_Oedon": 1, "JayP0003": 1, "jbor_9": 4, "len_bias7": 2, "MiddleWord": 2, "shnikeys22": 12, "WalkingCalculator": 2, "CanadianShadow": 53, "DifferentCattle": 9, "JCPoly": 2, "jgaarnell": 4, "keatlib29": 24, "Nick_GoVols": 1, "QMaroonQ": 9, "StudiousBroccoli": 2, "ThePUNisher96": 1, "xJPF11x": 2, "Jagacin": 1, "JCS-13": 2, "OGTraveler": 1, "oncearunner": 48, "Rcy4122": 1, "byzantiums": 16, "chadercheese": 16, "phawkins30": 6, "plainvintage": 5, "trust_the_process__": 1, "UrgyUrgenson": 4, "BrokenBat4": 57, "DrMantis_Tobbagan": 33, "Greenbayfan93": 35, "primepierce34": 2, "samstrong35": 2, "Strikesuit": 24, "ZachBearcats": 2, "archi_hoo": 19, "HeelsFan27": 1, "MatteoBaresi": 1, "pmwhitehead": 1, "TheRealHenryG": 78, "theZcuber": 52, "tlahwm": 1, "Blazer2223": 69, "Hungry_Huskies": 24, "ionlypwn": 3, "PMro1210": 1, "Rew615": 3, "TerribleTryhard": 2, "tkrie": 3, "BurkePhotography": 1, "EagleswonSuperBowl52": 1, "Kaledasm13": 10, "matt714matt": 3, "ShamWow517": 1, "Townkrier": 42, "WrongDonkeyKongBong": 4, "2integral": 1, "97soryva": 1, "greenoranges": 4, "GuyOnTheMike": 1, "laflame301": 3, "nkingsley8": 3, "straightperson11": 6, "Username_taken99": 6, "intronexondna": 3, "JesusDaBeast": 1, "kbuva19": 1, "owencrook": 1, "Snarlycarl": 3, "Tortsl93l": 4, "XtraDucks4": 1, "alexpieguy": 55, "brobroma": 14, "BurritoHombre": 5, "daswassup13": 28, "GradedA": 11, "igniteshield": 43, "martingale18": 45, "MattyIceM": 23, "PNWSwag": 13, "rileydavis3": 38, "SorrowPlots": 1, "taukapp": 35, "zacheiny": 6, "zpjohnson3": 6, "11trobo": 5, "AdrianMojnarowski": 1, "alloythepunny": 4, "AllTarHeelDan": 18, "azgx29": 6, "bark98": 1, "BE______________": 1, "benf1999": 1, "BenJ06257": 1, "BottasGOAT": 1, "BrocavindCoD": 1, "Brotato_Man": 1, "CG2028": 1, "ChadKroger": 2, "Chance_The_Clapper": 1, "CHSLAX15": 13, "ConstantMadness": 1, "coogs35": 1, "cvcv12": 1, "DeificWhiteBoy": 1, "Devbucks": 7, "DoubleChalupaBox": 1, "dukeeaglesfan": 1, "EUFanhardstuckinNA": 2, "FlyingPheonix": 1, "geauxblue43": 1, "gmills87": 3, "gregorz17": 1, "Guhraffe": 2, "hainesj2": 1, "Hampton64": 1, "HorseRacingGuy": 10, "human_being44": 4, "iadozer": 1, "icameinyourmom": 1, "IDukie10": 1, "ItsAesthus": 56, "jbadlato": 1, "jchurch8073": 1, "jhall901": 1, "JonnyStatic": 1, "Keeg9351": 1, "Letsgomountaineers5": 5, "LowcountryTarHeels": 3, "macole29": 1, "MightyChunks": 1, "mlfsport88": 1, "nburt13": 1, "OneAdhesiveness": 1, "overeastover": 1, "OxycontinRain": 1, "Phillyfan3": 56, "Pieisgood186": 1, "PotassiumPills": 3, "Prlmitive": 1, "QuantumDonger": 1, "Quidster4040": 4, "RareRotten": 1, "Rattus375": 6, "Rector1219": 8, "RheagarTargaryen": 1, "Smitty1029": 1, "Sweeny75": 2, "T_R--7": 6, "terroristically": 1, "TigerSpartan04": 1, "tjones1000": 2, "YMCMBlamp": 2, "gwhuskyfan": 11, "giantraisin": 6, "Qioxa": 3, "tgriffith1992": 1, "Ununhexium1999": 4, "AYUtheEpic": 2, "confusedwalrus4": 31, "FinnBiscuit181": 4, "ld012": 2, "PgFalcons": 2, "Smurffor3": 27, "unitedRuminations": 1, "Yoshi123YT": 48, "zr8915": 8, "AcceptableExample2": 2, "boobalah10": 1, "Grady_Yeet": 4, "jarnold6997": 3, "jkulpa27": 2, "odetostillsleeping": 24, "ryanpickle": 53, "VillanovaMildcats": 10, "BanditC4Why": 1, "depaulbluedemon": 1, "guyman3": 1, "jgro97": 15, "kuhawk5": 1, "matthewz17": 13, "notarealwoodcarver": 1, "Plat3kSZN": 1, "SpailsJr": 3, "WorldyTrip54": 1, "DasDerp": 18, "EricTalksSports": 2, "hardadar": 4, "nolemanwsu": 1, "TheOblitratr": 9, "Tinynapkins": 1, "wr888": 1, "cbojdak": 10, "nerfmybum": 2, "OrangePlasma": 31, "phpMyPython": 1, "Matchbeak": 2, "sam_roop": 3, "tmuma": 2, "adamjthomas11": 1, "Ap_Sona_Bot": 1, "aztecdude": 7, "Fireyisthebest101": 5, "jroe0704": 1, "ni3t": 9, "okayalrightthen": 1, "zawmc33": 1, "askpat13": 1, "ev_moran": 4, "horse-cock-lock": 9, "King_Dong12": 4, "smolboi69420-57": 4, "UrAverageHuman": 10, "DDog20": 1, "ninjatom21": 1, "sneky_snek_": 1, "KPV922": 2, "Lem2798": 3, "Pengu-in-the-hood": 5, "Argiii": 4, "Cyberchao_X": 6, "patodro": 3, "sixseven89": 4, "dyldandr338": 2, "eandy14": 5, "nicodf3": 2, "swagzaphone": 2, "177676ers": 1, "DConrad0": 1, "MilesMisfit": 4, "mjostudios": 4, "reddit7457": 2, "texas2089": 1, "Eldubano": 5, "quan1754": 2, "shark522": 2, "ThunderKent69": 1, "eug11": 2, "liamliam1234liam": 9, "31caleb": 1, "moyboi2112": 1, "Steed_Davidson": 1, "nattydread6": 1, "verdenvidia": 60, "BigBoutros": 37, "GoldPantsTerrelle": 15, "hamalex2000": 16, "Item-Upstairs": 10, "jackcutch1": 5, "JH_181301": 92, "Jippylong12": 18, "Kiing_Kyle": 14, "KimJongBen": 36, "T8mascari": 4, "tbirdie_21": 12, "tclark8995": 3, "A_Delicious_Soda": 2, "alexkwin9": 1, "bsuracer": 2, "BuckybadgerW": 1, "Da-Pheeds": 1, "Drake0Malfoy": 1, "dwrakes": 1, "foggycactus7": 21, "iamalord": 6, "Isolatedbamafan": 1, "jackschaedi": 1, "JFA1996": 1, "jga620": 1, "Jpmiller7243": 4, "jules99b": 6, "koke012": 1, "landonrenard": 1, "LiterateWildcat": 1, "mistermachiano": 37, "MrSteely": 1, "Pugz4Life16": 1, "Quann345838": 4, "Rude-Employer9453": 1, "shrimppuertoricojr": 37, "snarfchomp": 2, "SnooCupcakes2460": 86, "The_Fighting_Wildcat": 9, "Unknown_Enigma10": 1, "WilliamStableCube": 4, "mpleafan": 5, "roaddogg": 2, "WhiteChocolate12": 29, "Beneficial-Board3508": 1, "dgi02": 1, "Eric18utah": 1, "evanky01": 5, "Fucktrump74839": 7, "hipsterhipst": 18, "JasterMereel11": 1, "kpp1252": 3, "LocksmithPrudent3357": 1, "LynkinPark": 19, "Mgtnquasar": 17, "Moorehunter89": 1, "MyAnswerIsMaybe": 58, "One_Run": 33, "StrangeCandle5534": 6, "ARentPayingSpider": 3, "Calm_Geologist_2330": 1, "ChantiHawk": 1, "Legitimate_Carry47": 3, "mynamejeeeeeff": 8, "nfeidt3": 14, "QWERTYUIOPquinn": 3, "raulmccartney": 1, "sinister4545": 1, "websterracing": 1, "WhiteGiraffe2020": 8, "DominiqueTrillkins": 1, "globalhighlander": 2, "I_hate_fritz_bot": 18, "jacobvarner": 8, "klondike838": 2, "ns1396": 2, "Select_Protection818": 2, "AwesomeCat14": 22, "Burn_2001": 2, "cyberchaox": 10, "Flatt12": 2, "sam00121": 12, "Ultiplayers": 1, "Aidang317": 9, "ApprehensiveShop5": 1, "Boise_Wright": 29, "Reg-Dunlop": 3, "Somali-Pirate-Lvl100": 1, "Staind075": 1, "sweekley34": 8, "wtf-is_juice": 1, "cooperg25": 1, "ethanbcook22": 5, "Gallaxee": 1, "JJPower2": 6, "Old_Win5361": 6, "RVP_DFS": 6, "taliarus": 1, "AshamedMusician5482": 17, "GoLionsJD107": 2, "lilpoststamp": 1, "MiniShaug": 2, "RandomGuy643": 3, "ErectEeyore": 1, "iSpazem": 1, "Jaemason19": 8, "Minnesnowtaaa": 1, "PapaNacho7": 3, "SharpHD7": 3, "SportsMadness": 9, "0pticle": 6, "Apes2520": 1, "CheapTrickIsOkay": 15, "ds1224": 10, "No_Bet4646": 5, "KDog13k": 2, "d_on_": 2, "Ryannevadafan1": 17, "KTurnUp": 4, "starace39": 2, "FieldKey5359": 4, "froman21": 1, "ZucchiniKnown1160": 1, "apk0605": 1, "arjunpatelmail": 1, "DusdyDurdle19": 4, "evilmangoes": 2, "Gods_Ego": 3, "vindictivejazz": 1, "The_Duck27": 1, "Ayo_Me_Cockburns": 12, "BeanMachine5555": 20, "BigPlayJ1220": 7, "BoolaBoolaBoi": 34, "Brained07": 32, "chet_w": 5, "emunchkinman": 47, "feeling-orange": 5, "Felix_Tholomyes": 5, "gettinreadyATW": 5, "GingerGod69": 2, "HenraldFunk": 16, "hilltopper06": 18, "ImAndytimbo": 2, "itsbrytonyo": 5, "JordanHerald5": 7, "King_Bumi_Of_Omashu": 5, "Lobro986": 15, "lukedmpeak": 43, "m_swansonn": 1, "mangcity": 20, "maxwell6233": 75, "natedog1097": 20, "occasional_user": 14, "OsmosisFillmore_": 15, "RobHD4": 14, "RocketsGuy": 3, "sleepymike01101101": 13, "SportsDude012": 5, "TheTiranian": 14, "tropic_gnome_hunter": 11, "0aguywithglasses0": 1, "asketch_": 1, "avgjoe10": 1, "bigbird727": 1, "Breakfast_Virtual": 1, "CardinalGlickWOW": 41, "Cdsnz23": 1, "Coollidinthefridge": 1, "CoomeyLoomey": 3, "Gammapotatoe": 1, "HamiltonSamuel": 3, "iLikeApples116": 1, "IllAd4178": 1, "juul_daydream": 1, "kujo77777": 2, "M3L0NM4N": 1, "MasterOogway-2003": 1, "Natural_Eye_2309": 1, "PoloNewt": 1, "Purdue4lyfe": 4, "shaleum": 1, "tdsn-sports": 1, "Trappist1": 18, "Wangchief": 1, "windypalmtree": 1, "yaboicasey32": 2, "zachw900": 4, "arkm114": 1, "brainj5471": 75, "E_Shaped_Pie": 7, "Hubertisthegoat": 5, "iam_alittlestitious": 17, "Sal514": 13, "ehunta11": 1, "geauxsaints777": 3, "HopscotchChampion69": 4, "Rhcbearsfan": 1, "SavageSquirl": 1, "the_windsurfer": 18, "BoJack_Horseman1338": 1, "Excellent-Wishbone68": 2, "GrootLovesFunions": 6, "boiler1101": 2, "Champion-raven": 5, "finalfourcuse": 70, "idkmannnnnnnnnm": 1, "NickFromNewGirl": 1, "SilentZzShane": 1, "slider12-6": 15, "AL3XD": 1, "Berks2381": 1, "BigBaller331": 12, "RagingLasagna": 70, "Available-Reserve329": 1, "Dellerly": 2, "brady11": 21, "Darnoc27": 1, "JKramer421": 3, "GreenAndYellow12": 4, "SnooPeppers1563": 1, "TommyTwoTaps": 66, "Weary_Spot9880": 1, "Hoosier2016": 1, "mill1634": 64, "Newman1938": 4, "RootBeerBloat": 4, "cdbjj22": 6, "ericfisher4": 3, "marquardt_": 13, "TheFluffyClouds": 2, "BrodieCollins": 2, "tattedmonster999": 2, "Critical-Savings-830": 1, "trickleupgangsta": 6, "TSC_12": 6, "According-Pay-3371": 3, "Broncofan101": 1, "GreedyRhombus": 1, "Lobro9": 61, "Mangotheory97": 2, "quadruplehaitch": 2, "z_banks24": 2, "averyvick": 13, "Ghost_TTV_1": 2, "SteelHeelNittanyLion": 2, "ink625": 1, "MetsJetsKnicksFan": 1, "Spider_The_Cat": 1, "TheThunder165": 2, "North_Use5348": 2, "zacvoynow": 1, "LoadedTots18": 1, "goodwriterer": 1, "Ac91722": 20, "amesker": 19, "BlueGreenMikey": 16, "camfam44": 16, "dstick2323": 20, "garretttt4": 16, "Hot-Description4492": 16, "ItsTheTenthDoctor": 19, "phatLhoops": 20, "SnooBooks8063": 17, "undecided_mask": 17, "70277027": 14, "AWrecord": 13, "BirdsBeCool": 7, "ggbinc": 19, "Luigiatl": 4, "Miserable-Chart-9479": 7, "scsd4222": 2, "Swovine": 7, "Worldly_Worldliness5": 1, "lilguccipurpledrank": 17, "MAFIAxMaverick": 12, "NothingBurgerNoCals": 14, "bugmanishere": 2, "DI9_ForLife": 13, "Impressive-Tank9803": 1, "LatrellSprewell1997": 13, "tuckedpin": 8, "United434": 2, "gohogs1995": 14, "bh6891": 5, "TheNigerianHyperion": 2, "VelicoVinny": 4, "Aidanj927": 12, "Maison-Marthgiela": 13, "Maladroit44": 15, "AlexLM95": 3, "boise_bronco": 3, "Browndog319": 5, "ItsWatch360": 2, "Maleficent_Drag1983": 2, "RockChalkMPLS": 2, "Theboomerhasarisen": 1, "twc9904": 1, "FitIndependence6187": 12, "Ok_Professional_5998": 7, "Ted_Lavie": 14, "DrSandmanZ": 5, "ebState": 2, "fortysecondave": 1, "ftskeebo": 7, "mrfishycrackers": 2, "ResidentRunner1": 12, "Welfare_Pudding": 6, "Boom_Confetti": 12, "Bulby_Ant": 1, "chioud": 1, "gamehusky": 1, "LetsGetSilly21": 8, "Nomac20": 3, "notnonoseven": 2, "Party_Hattz": 2, "Remote-Duck-2611": 1, "AnAnonymousS0urce": 8, "DogeFancy": 1, "FlyinPurplePartyPony": 1, "Low_Silver_9270": 1, "Moosecat201": 4, "prpltrTLS": 2, "tomcar13": 1, "ayushg3": 1, "DaBullsnBears1985": 1, "DoubleBird6633": 1, "haydenknobloch": 1, "MacaRonniAndCheese": 1, "RushShirtKid": 1, "Worldly-Repair-7698": 2, "AlphaDoubleNegative_": 9, "fancycheesus": 8, "KDogCaden55": 11, "OneandonlyTiran": 12, "BeginningCourt3060": 1, "g4rt0": 4, "Important-Ostrich-26": 1, "MachoGringo": 1, "Purdue49OSU20": 4, "WILSON_CK": 2, "_C1ty": 19, "andyduke23": 8, "CarnivoreEndurance": 7, "strategicsound": 4, "thrownaway12211": 8, "fellohuman77": 4, "Ryry24lol": 2, "Urbassassin": 1, "yoshyguy": 3, "LEDVoicebox": 1, "Banana_Bread_Beer": 2, "CheeseWinz": 3, "Left-Palpitation2291": 2, "PaleontologistNo876": 3, "pharmacy_guy": 3, "stabbyyyy_sfw": 2, "Yagachak": 2, "David-Allan-Coe": 1, "LaconianSalvage": 3, "yellowstones_fav": 2, "dude_stfu": 1, "AshWulf_": 1, "tlozfox": 2, "drneilpretenamen": 1, "Bchillman1": 1, "Cre-Fiddy": 1, "ToeSuckingFiend": 1, "bboiler": 1, "Key_Beginning4231": 1, "SpiceNoodles": 1, "collegekorb360": 1, "lolaya": 1, "Col_Pol": 18, "JazzYotesRSL": 17, "Life-Veterinarian699": 16, "TheKarateFan": 20, "yung_communism": 20, "yzerman8": 19, "Icy_Machinery736": 1, "Mission_Big_2145": 1, "OrangeSean": 7, "Thickrichchicken": 18, "Baz4700": 16, "NewRCTID22": 14, "Flat-Astronomer287": 16, "Gamer0o0o": 1, "KwameBaguette": 4, "SantiBigBaller": 1, "bentj101": 13, "Josh_5890": 6, "Yoshi111599": 15, "Gangsta_Shark037": 4, "pupupp42069": 7, "57namkrod": 1, "phnnydntm": 1, "NJP-CogitoEonPardon": 1, "Thebballchemist16": 10, "TSL5_CBB": 9, "donut066": 7, "KampferV": 3, "manbeqrpig": 3, "okoios": 1, "Bengjumping": 6, "BensenJensen": 6, "MisterPotato11": 3, "koltonm23": 8, "ballerwill23": 2, "Pratt-and-Whitney": 3, "RCKaos7": 1, "cdc030402": 4, "THE_HUMAN_TREE": 4, "Able_Enthusiasm7739": 1, "ione107": 4, "riddledwithdoubt": 5, "the_sword_of_brunch": 5, "noahbird25": 1, "zerafan19": 2, "kesodop": 4, "Ori311": 4, "Affectionate-Cup9340": 3, "nike-addias-99": 2, "TheScarletSeahawk": 3, "casconed": 1, "TheSandMan713": 1, "melikefiddle": 1, "ababababab_okay": 1, "ApprehensivePace2661": 1, "balconesescarpment": 1, "BSUFan07": 1, "Busy_Fig2574": 1, "coilmeup": 1, "edgyusernameguy": 1, "HydeHawk": 1, "Ill_Ad_4429": 1, "KatzDeli": 1, "littlvinny": 1, "Low_Bad_9936": 1, "Mon5teRico": 1, "Routine-Remove8750": 1, "Sportzfanatic_001": 1, "Trujiogriz": 1, "WetDreaminOfParadise": 1, "Wings4514": 1};
 let _sortedTabsCache = null;
 let _leaderboardDataCache = null;
 let _deltaDataCache = null;
@@ -3038,6 +3060,14 @@ let _deltaDataCacheIsProvisional = null;
 const _loadedYears = new Set();
 const _loadingYears = {};
 const HIDDEN_YEARS = new Set(["2024"]);
+
+function formatTeamName(team) {
+    // Always insert space before "State"
+    let name = team.replace(/State/g, " State");
+    // Insert space before uppercase letter when preceded by lowercase (camelCase boundary)
+    name = name.replace(/([a-z])([A-Z])/g, "$1 $2");
+    return name.replace(/  +/g, " ").trim();
+}
 
 function injectVeteranTags(root) {
     root.querySelectorAll(".voter-name").forEach(nameSpan => {
@@ -3855,7 +3885,7 @@ function showTeamRankChart(team, username) {
     const title = document.getElementById("voter-history-title");
     const table = document.getElementById("voter-history-table");
 
-    title.innerHTML = `<img class="logo" src="cbb-logos/${team}.webp" style="height:22px;vertical-align:middle;margin-right:6px;">${team} — ${username || "Unknown"}`;
+    title.innerHTML = `<img class="logo" src="cbb-logos/${team}.webp" style="height:22px;vertical-align:middle;margin-right:6px;">${formatTeamName(team)} — ${username || "Unknown"}`;
     table.innerHTML = "";
     table.style.cssText = "display:block; white-space:normal; width:100%;";
 
@@ -3984,11 +4014,342 @@ function showTeamRankChart(team, username) {
         msg.setAttribute("x", mL + cW / 2); msg.setAttribute("y", mT + cH / 2);
         msg.setAttribute("text-anchor", "middle"); msg.setAttribute("font-size", "14");
         msg.setAttribute("fill", "#999");
-        msg.textContent = `${team} not ranked by ${username || "this voter"} this season`;
+        msg.textContent = `${formatTeamName(team)} not ranked by ${username || "this voter"} this season`;
         svg.appendChild(msg);
     }
 
     table.appendChild(svg);
+    modal.dataset.chartType = "teamrank";
+    modal.classList.add("open");
+}
+
+function showWeekHighLowChart(weekId, mode = "highlow") {
+    const block = document.getElementById(weekId);
+    if (!block) return;
+    const sections = block.querySelectorAll(".ballot-section");
+    const officialSection = sections[0];
+    if (!officialSection) return;
+
+    const voterRows = Array.from(officialSection.querySelectorAll(".voter-row"))
+        .filter(r => getVoterName(r) !== "Official Overall");
+    const totalVoters = voterRows.length;
+    if (totalVoters === 0) return;
+
+    const teamRankSum = {};
+    const teamVoterCount = {};
+    const teamPoints = {};
+    const teamRanks = {};
+    const teamRankVoters = {};
+    const allVoterNames = [];
+    voterRows.forEach(row => {
+        const voterName = getVoterName(row);
+        allVoterNames.push(voterName);
+        const teams = Array.from(row.querySelectorAll(".team-logo")).map(img => img.dataset.team);
+        teams.slice(0, 25).forEach((team, i) => {
+            const rank = i + 1;
+            teamRankSum[team] = (teamRankSum[team] || 0) + rank;
+            teamVoterCount[team] = (teamVoterCount[team] || 0) + 1;
+            teamPoints[team] = (teamPoints[team] || 0) + (26 - rank);
+            if (!teamRanks[team]) teamRanks[team] = [];
+            teamRanks[team].push(rank);
+            if (!teamRankVoters[team]) teamRankVoters[team] = {};
+            if (!teamRankVoters[team][rank]) teamRankVoters[team][rank] = [];
+            teamRankVoters[team][rank].push(voterName);
+        });
+    });
+    // Populate NR voters (rank 26) for each team
+    Object.keys(teamRankVoters).forEach(team => {
+        const rankedSet = new Set(Object.values(teamRankVoters[team]).flat());
+        const nrVoters = allVoterNames.filter(v => !rankedSet.has(v));
+        if (nrVoters.length > 0) teamRankVoters[team][26] = nrVoters;
+    });
+
+    const percentileRank = (sortedArr, p) => {
+        if (sortedArr.length === 1) return sortedArr[0];
+        const idx = p * (sortedArr.length - 1);
+        const lo = Math.floor(idx);
+        const hi = Math.ceil(idx);
+        return sortedArr[lo] + (idx - lo) * (sortedArr[hi] - sortedArr[lo]);
+    };
+
+    const top25 = Object.entries(teamPoints).sort((a, b) => b[1] - a[1]).map(([t]) => t).slice(0, 25);
+    const chartData = top25.map(team => {
+        const avg = teamRankSum[team] / teamVoterCount[team];
+        const count = teamVoterCount[team];
+        const allRanks = [...teamRanks[team], ...Array(totalVoters - count).fill(26)].sort((a, b) => a - b);
+        const hi = percentileRank(allRanks, 0.10);
+        const lo = percentileRank(allRanks, 0.90);
+        const rankVoters = teamRankVoters[team] || {};
+        return { team, avg, hi, lo, allRanks, rankVoters };
+    });
+
+    // Tier detection: find natural breaks in average ranks.
+    // Gray is always the last color; inner colors are assigned in order based on break count.
+    const innerColors = [
+        { fill: "#cc3333", stroke: "#aa1111" },  // red
+        { fill: "#e88c1a", stroke: "#c06a00" },  // orange
+        { fill: "#2ea043", stroke: "#1a7f37" },  // green
+        { fill: "#4488cc", stroke: "#2266aa" },  // blue
+        { fill: "#8b5cf6", stroke: "#6d38e0" },  // purple
+        { fill: "#e85c9a", stroke: "#c0307a" },  // pink
+        { fill: "#0d9488", stroke: "#0a7070" },  // teal
+        { fill: "#d4a017", stroke: "#a87800" },  // gold
+        { fill: "#e05252", stroke: "#b83030" },  // coral
+    ];
+    const grayColor = { fill: "#999", stroke: "#777" };
+    const avgs = chartData.map(d => d.avg);
+    const gaps = [];
+    for (let i = 1; i < avgs.length; i++) gaps.push({ idx: i, gap: avgs[i] - avgs[i - 1] });
+    const medianGap = gaps.length > 0
+        ? [...gaps].sort((a, b) => a.gap - b.gap)[Math.floor(gaps.length / 2)].gap
+        : 1;
+    const threshold = Math.max(medianGap * 1.5, 0.8);
+    // Find all qualifying breaks (at most innerColors.length, so gray is always reachable)
+    let breakIdxs = gaps.filter(g => g.gap >= threshold).map(g => g.idx)
+        .sort((a, b) => a - b).slice(0, innerColors.length);
+    // Gray must not be the only tier: if all teams fall in one group, no breaks needed
+    // Build the palette for this week: innerColors[0..numTiers-2] + gray
+    const numTiers = breakIdxs.length + 1;
+    const tierColors = innerColors.slice(0, numTiers - 1).concat([grayColor]);
+    // Assign tier index to each team
+    chartData.forEach((d, i) => {
+        let tier = 0;
+        for (const bi of breakIdxs) { if (i >= bi) tier++; }
+        d.tier = Math.min(tier, tierColors.length - 1);
+        d.color = tierColors[d.tier];
+    });
+
+    const modal = document.getElementById("voter-history-modal");
+    const title = document.getElementById("voter-history-title");
+    const table = document.getElementById("voter-history-table");
+
+    const activeTab = document.querySelector(".week-tab.active");
+    const weekNum = activeTab?.dataset.weeknum || "";
+    const year = activeTab?.dataset.year || "";
+    const weekLabel = activeTab?.dataset.weeklabel;
+    title.textContent = weekLabel
+        ? `${year} ${weekLabel} — Rank Spread`
+        : `${year} Week ${String(weekNum).padStart(2, "0")} — Rank Spread`;
+
+    table.innerHTML = "";
+    table.style.cssText = "display:block; white-space:normal; width:100%;";
+
+    // Toggle buttons
+    const toggleDiv = document.createElement("div");
+    toggleDiv.style.cssText = "text-align:center;margin-bottom:10px;";
+    const escapedId = weekId.replace(/'/g, "\\'");
+    toggleDiv.innerHTML = `
+        <button class="spread-toggle${mode === 'highlow' ? ' active' : ''}"
+                onclick="showWeekHighLowChart('${escapedId}', 'highlow')">High-Low</button>
+        <button class="spread-toggle${mode === 'dots' ? ' active' : ''}"
+                onclick="showWeekHighLowChart('${escapedId}', 'dots')">Dot Plot</button>`;
+    table.appendChild(toggleDiv);
+
+    const svgNS = "http://www.w3.org/2000/svg";
+    const W = 900, H = 460;
+    const mL = 44, mR = 16, mT = 28, mB = 52;
+    const cW = W - mL - mR, cH = H - mT - mB;
+
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.style.cssText = "width:min(860px,90vw);display:block;margin:0 auto;";
+
+    const n = chartData.length;
+    const slotW = cW / n;
+    const xPos = i => mL + (i + 0.5) * slotW;
+    const yPos = r => mT + ((r - 1) / 25) * cH;  // rank 1 at top, 26 (NR) at bottom
+
+    const axisColor = "#999", gridColor = "#e8e8e8";
+
+    // Rank gridlines + y-axis labels
+    [1, 5, 10, 15, 20, 25, 26].forEach(r => {
+        const y = yPos(r);
+        const line = document.createElementNS(svgNS, "line");
+        line.setAttribute("x1", mL); line.setAttribute("x2", mL + cW);
+        line.setAttribute("y1", y); line.setAttribute("y2", y);
+        line.setAttribute("stroke", r === 26 ? "#d8d8d8" : gridColor);
+        line.setAttribute("stroke-width", "1");
+        if (r === 26) line.setAttribute("stroke-dasharray", "3,3");
+        svg.appendChild(line);
+        const txt = document.createElementNS(svgNS, "text");
+        txt.setAttribute("x", mL - 6); txt.setAttribute("y", y + 4);
+        txt.setAttribute("text-anchor", "end"); txt.setAttribute("font-size", "11");
+        txt.setAttribute("fill", axisColor);
+        txt.textContent = r === 26 ? "NR" : r;
+        svg.appendChild(txt);
+    });
+
+    // Chart border
+    const border = document.createElementNS(svgNS, "rect");
+    border.setAttribute("x", mL); border.setAttribute("y", mT);
+    border.setAttribute("width", cW); border.setAttribute("height", cH);
+    border.setAttribute("fill", "none"); border.setAttribute("stroke", "#ddd");
+    border.setAttribute("stroke-width", "1");
+    svg.appendChild(border);
+
+    // Y-axis label
+    const yLbl = document.createElementNS(svgNS, "text");
+    yLbl.setAttribute("x", 10); yLbl.setAttribute("y", mT + cH / 2);
+    yLbl.setAttribute("text-anchor", "middle"); yLbl.setAttribute("font-size", "11");
+    yLbl.setAttribute("fill", axisColor);
+    yLbl.setAttribute("transform", `rotate(-90,10,${mT + cH / 2})`);
+    yLbl.textContent = "Rank";
+    svg.appendChild(yLbl);
+
+    const logoSize = Math.min(20, slotW - 4);
+
+    if (mode === "highlow") {
+        const capW = Math.min(7, slotW * 0.28);
+        chartData.forEach(({ team, avg, hi, lo, color }, i) => {
+            const x = xPos(i);
+            const yHi = yPos(hi);
+            const yLo = yPos(lo);
+            const yAvg = yPos(avg);
+
+            // Vertical high-low line
+            const vLine = document.createElementNS(svgNS, "line");
+            vLine.setAttribute("x1", x); vLine.setAttribute("x2", x);
+            vLine.setAttribute("y1", yHi); vLine.setAttribute("y2", yLo);
+            vLine.setAttribute("stroke", color.fill);
+            vLine.setAttribute("stroke-width", "2.5");
+            vLine.setAttribute("stroke-linecap", "round");
+            svg.appendChild(vLine);
+
+            // Top cap (P90+)
+            const topCap = document.createElementNS(svgNS, "line");
+            topCap.setAttribute("x1", x - capW); topCap.setAttribute("x2", x + capW);
+            topCap.setAttribute("y1", yHi); topCap.setAttribute("y2", yHi);
+            topCap.setAttribute("stroke", color.fill); topCap.setAttribute("stroke-width", "2");
+            svg.appendChild(topCap);
+
+            // Bottom cap (P10-)
+            const botCap = document.createElementNS(svgNS, "line");
+            botCap.setAttribute("x1", x - capW); botCap.setAttribute("x2", x + capW);
+            botCap.setAttribute("y1", yLo); botCap.setAttribute("y2", yLo);
+            botCap.setAttribute("stroke", color.fill); botCap.setAttribute("stroke-width", "2");
+            svg.appendChild(botCap);
+
+            // Mean circle
+            const circle = document.createElementNS(svgNS, "circle");
+            circle.setAttribute("cx", x); circle.setAttribute("cy", yAvg);
+            circle.setAttribute("r", "4");
+            circle.setAttribute("fill", "#fff");
+            circle.setAttribute("stroke", color.stroke); circle.setAttribute("stroke-width", "2.5");
+            svg.appendChild(circle);
+
+            // Team logo
+            const img = document.createElementNS(svgNS, "image");
+            img.setAttribute("href", `cbb-logos/${team}.webp`);
+            img.setAttribute("x", x - logoSize / 2);
+            img.setAttribute("y", mT + cH + 6);
+            img.setAttribute("width", logoSize); img.setAttribute("height", logoSize);
+            svg.appendChild(img);
+
+            // Consensus rank number below logo
+            const rankTxt = document.createElementNS(svgNS, "text");
+            rankTxt.setAttribute("x", x); rankTxt.setAttribute("y", mT + cH + logoSize + 18);
+            rankTxt.setAttribute("text-anchor", "middle"); rankTxt.setAttribute("font-size", "9");
+            rankTxt.setAttribute("fill", axisColor);
+            rankTxt.textContent = i + 1;
+            svg.appendChild(rankTxt);
+        });
+    } else {
+        // Dot plot: one dot per (team, rank), sized by voter count at that rank
+        const maxR = Math.min(slotW * 0.46, 13);
+
+        // Shared tooltip group
+        const tipG = document.createElementNS(svgNS, "g");
+        tipG.setAttribute("pointer-events", "none");
+        tipG.style.display = "none";
+        const tipRect = document.createElementNS(svgNS, "rect");
+        tipRect.setAttribute("rx", "4"); tipRect.setAttribute("ry", "4");
+        tipRect.setAttribute("fill", "#1a1a2e"); tipRect.setAttribute("fill-opacity", "0.92");
+        tipRect.setAttribute("stroke", "#4488cc"); tipRect.setAttribute("stroke-width", "1");
+        tipG.appendChild(tipRect);
+        svg.appendChild(tipG);
+
+        chartData.forEach(({ team, allRanks, rankVoters, color }, i) => {
+            const x = xPos(i);
+
+            // Count votes per integer rank
+            const rankCounts = {};
+            allRanks.forEach(r => { rankCounts[r] = (rankCounts[r] || 0) + 1; });
+
+            Object.entries(rankCounts).forEach(([r, cnt]) => {
+                const radius = Math.min(maxR, 2 + Math.sqrt(cnt) * 1.5);
+                const circle = document.createElementNS(svgNS, "circle");
+                circle.setAttribute("cx", x);
+                circle.setAttribute("cy", yPos(Number(r)));
+                circle.setAttribute("r", radius);
+                circle.setAttribute("fill", color.fill);
+                circle.setAttribute("fill-opacity", "0.7");
+                circle.style.cursor = "default";
+
+                circle.addEventListener("mouseenter", (e) => {
+                    const voters = rankVoters[r] || [];
+                    const lines = voters.length <= 3
+                        ? voters
+                        : [`${voters.length} voters`];
+                    const pad = 8, lineH = 14, fontSize = 11;
+                    const maxW = Math.max(...lines.map(l => l.length)) * fontSize * 0.6 + pad * 2;
+                    const boxH = lines.length * lineH + pad * 1.5;
+
+                    // Position: prefer above the circle, flip if too close to top
+                    const cx = Number(circle.getAttribute("cx"));
+                    const cy = Number(circle.getAttribute("cy"));
+                    const cr = Number(circle.getAttribute("r"));
+                    let tx = cx - maxW / 2;
+                    let ty = cy - cr - boxH - 4;
+                    if (ty < mT) ty = cy + cr + 4;
+                    tx = Math.max(2, Math.min(tx, W - maxW - 2));
+
+                    tipRect.setAttribute("x", tx); tipRect.setAttribute("y", ty);
+                    tipRect.setAttribute("width", maxW); tipRect.setAttribute("height", boxH);
+
+                    // Remove old text nodes
+                    while (tipG.childNodes.length > 1) tipG.removeChild(tipG.lastChild);
+
+                    lines.forEach((line, li) => {
+                        const t = document.createElementNS(svgNS, "text");
+                        t.setAttribute("x", tx + maxW / 2);
+                        t.setAttribute("y", ty + pad + li * lineH + lineH * 0.4);
+                        t.setAttribute("text-anchor", "middle");
+                        t.setAttribute("dominant-baseline", "middle");
+                        t.setAttribute("font-size", fontSize);
+                        t.setAttribute("fill", "#e0e8ff");
+                        t.textContent = line;
+                        tipG.appendChild(t);
+                    });
+
+                    tipG.style.display = "";
+                });
+
+                circle.addEventListener("mouseleave", () => { tipG.style.display = "none"; });
+
+                svg.insertBefore(circle, tipG);
+            });
+
+            // Team logo
+            const img = document.createElementNS(svgNS, "image");
+            img.setAttribute("href", `cbb-logos/${team}.webp`);
+            img.setAttribute("x", x - logoSize / 2);
+            img.setAttribute("y", mT + cH + 6);
+            img.setAttribute("width", logoSize); img.setAttribute("height", logoSize);
+            svg.appendChild(img);
+
+            // Consensus rank number below logo
+            const rankTxt = document.createElementNS(svgNS, "text");
+            rankTxt.setAttribute("x", x); rankTxt.setAttribute("y", mT + cH + logoSize + 18);
+            rankTxt.setAttribute("text-anchor", "middle"); rankTxt.setAttribute("font-size", "9");
+            rankTxt.setAttribute("fill", axisColor);
+            rankTxt.textContent = i + 1;
+            svg.appendChild(rankTxt);
+        });
+    }
+
+    table.appendChild(svg);
+    modal.dataset.chartType = "highlow";
+    modal.dataset.chartMode = mode;
     modal.classList.add("open");
 }
 
@@ -4342,14 +4703,22 @@ function showAvgRankModal(weekId) {
     const currYear = allTabsSorted[currTabIdx]?.dataset.year;
     const prevTab = allTabsSorted[currTabIdx + 1];
     const prevTeamRank = {};
+    const deltaDataForNew = buildDeltaData();
     if (prevTab && prevTab.dataset.year === currYear) {
-        const prevTeams = buildDeltaData()[prevTab.dataset.week]?.["Official Overall"];
+        const prevTeams = deltaDataForNew[prevTab.dataset.week]?.["Official Overall"];
         if (prevTeams) prevTeams.forEach((t, i) => { prevTeamRank[t] = i + 1; });
     }
     const hasPrevWeek = Object.keys(prevTeamRank).length > 0;
 
+    // Build set of all teams that appeared in any prior week's top 25 this season
+    const seasonTeamsSeen = new Set();
+    for (let i = currTabIdx + 1; i < allTabsSorted.length && allTabsSorted[i].dataset.year === currYear; i++) {
+        const wTeams = deltaDataForNew[allTabsSorted[i].dataset.week]?.["Official Overall"];
+        if (wTeams) wTeams.forEach(t => seasonTeamsSeen.add(t));
+    }
+
     // 5-week weighted averages for current and previous weeks
-    const deltaData = buildDeltaData();
+    const deltaData = deltaDataForNew;
     const yearTabs = allTabsSorted.filter(t => t.dataset.year === currYear);
     const curr5W = compute5WeekWeighted(weekId, deltaData, yearTabs);
     const prev5W = (prevTab && prevTab.dataset.year === currYear)
@@ -4368,65 +4737,78 @@ function showAvgRankModal(weekId) {
     const weekLabel = activeTab?.dataset.weeklabel;
     title.textContent = weekLabel ? `${year} ${weekLabel} Statistics` : `${year} #${weekPad} Statistics`;
 
+    const percentileRank = (sortedArr, p) => {
+        if (sortedArr.length === 1) return sortedArr[0];
+        const idx = p * (sortedArr.length - 1);
+        const lo = Math.floor(idx);
+        const hi = Math.ceil(idx);
+        return sortedArr[lo] + (idx - lo) * (sortedArr[hi] - sortedArr[lo]);
+    };
+
     const buildRow = (team, rank) => {
         const avg = teamRankSum[team] / teamVoterCount[team];
         const median = computeMedian(teamRanks[team]);
         const count = teamVoterCount[team];
         const pts = teamPoints[team];
-        const hi = Math.min(...teamRanks[team]);
-        const lo = Math.max(...teamRanks[team]);
-        let deltaCell = '<td></td>';
-        if (hasPrevWeek) {
+        const allRanks = [...teamRanks[team], ...Array(totalVoters - count).fill(26)].sort((a, b) => a - b);
+        const hi = percentileRank(allRanks, 0.10);
+        const lo = percentileRank(allRanks, 0.90);
+        const sdRaw = count / totalVoters > 0.84
+            ? Math.sqrt(teamRanks[team].reduce((s, r) => s + (r - avg) ** 2, 0) / teamRanks[team].length)
+            : null;
+        let rankDelta = '—';
+        if (hasPrevWeek && rank <= 25) {
             const prevRank = prevTeamRank[team];
-            if (!prevRank) {
-                deltaCell = '<td><span class="delta-new">NEW</span></td>';
+            if (!prevRank && !seasonTeamsSeen.has(team)) {
+                rankDelta = `<span class="delta-new">NEW</span>`;
             } else {
                 const diff = prevRank - rank;
                 if (diff > 0) {
-                    deltaCell = `<td><span class="delta-up">${diff}</span></td>`;
+                    rankDelta = `<span class="delta-up">${diff}</span>`;
                 } else if (diff < 0) {
-                    deltaCell = `<td><span class="delta-down">${Math.abs(diff)}</span></td>`;
+                    rankDelta = `<span class="delta-down">${Math.abs(diff)}</span>`;
                 } else {
-                    deltaCell = '<td><span class="delta-same">—</span></td>';
+                    rankDelta = `<span class="delta-same">—</span>`;
                 }
             }
         }
+        const inTop25 = rank <= 25;
+        const rankDisplay = `<div style="font-variant-numeric:tabular-nums;text-align:center">${rank}</div>`;
         let cell5WAvg = '<td>—</td>';
-        let cell5WDelta = '<td>—</td>';
         if (curr5W) {
             const rawSum = curr5W.teamAvgRankSum[team];
             if (rawSum != null) {
                 const avgVal = rawSum / curr5W.totalVoters;
-                cell5WAvg = `<td>${avgVal.toFixed(2)}</td>`;
+                let deltaHtml = '';
                 if (prev5W) {
                     const prevSum = prev5W.teamAvgRankSum[team];
                     if (prevSum != null) {
                         const prevAvgVal = prevSum / prev5W.totalVoters;
                         const diff = prevAvgVal - avgVal; // positive = improved (rank number decreased)
-                        if (Math.abs(diff) < 0.005) {
-                            cell5WDelta = '<td><span class="delta-same">—</span></td>';
+                        if (Math.abs(diff) < 0.05) {
+                            deltaHtml = ' <span class="delta-same">—</span>';
                         } else if (diff > 0) {
-                            cell5WDelta = `<td><span class="delta-up">${diff.toFixed(2)}</span></td>`;
+                            deltaHtml = ` <span class="delta-up">(${diff.toFixed(1)})</span>`;
                         } else {
-                            cell5WDelta = `<td><span class="delta-down">${Math.abs(diff).toFixed(2)}</span></td>`;
+                            deltaHtml = ` <span class="delta-down">(${Math.abs(diff).toFixed(1)})</span>`;
                         }
                     }
                 }
+                cell5WAvg = `<td style="white-space:nowrap">${avgVal.toFixed(1)}${deltaHtml}</td>`;
             }
         }
         return `<tr>
-            <td>${rank}</td>
+            <td>${rankDisplay}</td>
             <td style="padding:2px 4px;"><img class="logo-sm" src="cbb-logos/${team}.webp"></td>
-            <td class="team-col">${team}</td>
-            ${deltaCell}
-            <td>${hi}</td>
-            <td>${Number.isInteger(median) ? median : median.toFixed(1)}</td>
-            <td style="border-right:1px solid #bbb">${lo}</td>
-            <td>${count}/${totalVoters}</td>
+            <td class="team-col">${formatTeamName(team)}</td>
+            <td style="white-space:nowrap">${rankDelta}</td>
+            <td>${inTop25 ? (Number.isInteger(hi) ? hi : hi.toFixed(1)) : ""}</td>
+            <td>${inTop25 ? avg.toFixed(1) : ""}</td>
+            <td>${inTop25 ? (Number.isInteger(lo) ? lo : lo.toFixed(1)) : ""}</td>
+            <td style="border-right:1px solid #bbb">${inTop25 ? (sdRaw != null ? sdRaw.toFixed(1) : "—") : ""}</td>
+            ${inTop25 ? cell5WAvg : "<td></td>"}
+            <td>${count}</td>
             <td>${pts}</td>
-            <td>${avg.toFixed(2)}</td>
-            ${cell5WAvg}
-            ${cell5WDelta}
         </tr>`;
     };
 
@@ -4434,31 +4816,29 @@ function showAvgRankModal(weekId) {
         <col style="width:28px">
         <col style="width:28px">
         <col>
-        <col style="width:40px">
-        <col style="width:36px">
         <col style="width:52px">
-        <col style="width:36px">
-        <col style="width:56px">
+        <col style="width:44px">
+        <col style="width:52px">
+        <col style="width:44px">
+        <col style="width:48px">
+        <col style="width:80px">
         <col style="width:36px">
         <col style="width:64px">
-        <col style="width:64px">
-        <col style="width:52px">
     </colgroup><thead><tr>
         <th>#</th><th></th>
         <th class="team-col">Team</th>
-        <th title="Change from previous week">Δ</th>
-        <th title="Highest rank given by any voter this week">Hi</th>
-        <th>Median</th>
-        <th title="Lowest rank given by any voter this week" style="border-right:1px solid #bbb">Lo</th>
+        <th title="Rank change from previous week">Δ</th>
+        <th title="10th percentile rank across all voters (unranked = 26)">P<sub>90+</sub></th>
+        <th>μ</th>
+        <th title="90th percentile rank across all voters (unranked = 26)">P<sub>10−</sub></th>
+        <th title="Standard deviation of ranks given by voters this week" style="border-right:1px solid #bbb">σ</th>
+        <th title="5-week weighted average rank (change from previous week in parentheses)">μ̄<sub>5</sub><sup>w</sup></th>
         <th>Voters</th>
         <th>Pts</th>
-        <th>Avg Rank</th>
-        <th title="5-week weighted average rank">5W Avg</th>
-        <th title="Change in 5-week weighted average rank from previous week">5W Δ</th>
     </tr></thead><tbody>`;
     top25.forEach((team, i) => { html += buildRow(team, i + 1); });
     if (receivingVotes.length > 0) {
-        html += `<tr class="rv-divider"><td colspan="12">Receiving Votes</td></tr>`;
+        html += `<tr class="rv-divider"><td colspan="11">Receiving Votes</td></tr>`;
         receivingVotes.forEach((team, i) => { html += buildRow(team, 26 + i); });
     }
     html += "</tbody>";
@@ -4952,7 +5332,7 @@ function showSeasonStatsModal() {
         html += `<tr>
             <td>${i + 1}</td>
             <td><img class="logo-sm" src="cbb-logos/${team}.webp"></td>
-            <td class="team-col">${team}</td>
+            <td class="team-col">${formatTeamName(team)}</td>
             <td>${teamWeeksRanked[team]}/${totalWeeks}</td>
             <td>${teamTotalPts[team]}</td>
             <td>${avgRank}</td>
@@ -5322,6 +5702,13 @@ document.addEventListener("keydown", e => {
         return;
     }
 
+    if (e.key === "G" || e.key === "g") {
+        e.preventDefault();
+        const activeTab = document.querySelector(".week-tab.active");
+        if (activeTab) showWeekHighLowChart(activeTab.dataset.week);
+        return;
+    }
+
     if (e.key === "U" || e.key === "u") {
         e.preventDefault();
         showSeasonStatsModal();
@@ -5376,6 +5763,11 @@ document.addEventListener("keydown", e => {
             loadYear(target.dataset.year).then(() => {
                 showWeek(target.dataset.week);
                 if (weekPickerPinned) rebuildWeekPicker();
+                if (document.getElementById("avg-rank-modal").classList.contains("open"))
+                    showAvgRankModal(target.dataset.week);
+                const vhm = document.getElementById("voter-history-modal");
+                if (vhm.classList.contains("open") && vhm.dataset.chartType === "highlow")
+                    showWeekHighLowChart(target.dataset.week, vhm.dataset.chartMode || "highlow");
                 backgroundLoad();
             }).catch(() => {});
         }
@@ -5397,6 +5789,11 @@ document.addEventListener("keydown", e => {
             if (target) {
                 showWeek(target.dataset.week);
                 if (weekPickerPinned) rebuildWeekPicker();
+                if (document.getElementById("avg-rank-modal").classList.contains("open"))
+                    showAvgRankModal(target.dataset.week);
+                const vhm2 = document.getElementById("voter-history-modal");
+                if (vhm2.classList.contains("open") && vhm2.dataset.chartType === "highlow")
+                    showWeekHighLowChart(target.dataset.week, vhm2.dataset.chartMode || "highlow");
                 backgroundLoad();
             }
         }).catch(() => {});

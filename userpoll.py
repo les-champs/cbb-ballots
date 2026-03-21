@@ -877,7 +877,12 @@ def compute_tenure_counts(data_html):
         html = by_year.get(year_str, "")
         return {m.group(1).strip() for m in name_re.finditer(html) if m.group(1).strip() not in SKIP_NAMES}
 
-    for voter in voters_in_year("2022") & voters_in_year("2025"):
+    # Additional voters confirmed to have voted in 2023/2024 but not present in legacy 2022 data
+    EXTRA_BONUS = {"DCProf", "Nacos2001", "Travbowman", "bbbredy", "corndogshuffle",
+                   "danielshap2", "maddydotcom", "oddcharisma"}
+
+    bonus_voters = (voters_in_year("2022") & voters_in_year("2025")) | EXTRA_BONUS
+    for voter in bonus_voters:
         if voter in counts:
             counts[voter] += 36
     return counts
@@ -958,6 +963,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>R</kbd></span><span>Précision leaderboard</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>T</kbd></span><span>Tenure leaderboard</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>Y</kbd></span><span>Week avg rank table</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>G</kbd></span><span>Week rank spread chart</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>U</kbd></span><span>Season statistics</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>P</kbd></span><span>Save table as PNG</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>?</kbd></span><span>Show legend</span></div>

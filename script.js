@@ -7,6 +7,14 @@ const _loadedYears = new Set();
 const _loadingYears = {};
 const HIDDEN_YEARS = new Set(["2024"]);
 
+function formatTeamName(team) {
+    // Always insert space before "State"
+    let name = team.replace(/State/g, " State");
+    // Insert space before uppercase letter when preceded by lowercase (camelCase boundary)
+    name = name.replace(/([a-z])([A-Z])/g, "$1 $2");
+    return name.replace(/  +/g, " ").trim();
+}
+
 function injectVeteranTags(root) {
     root.querySelectorAll(".voter-name").forEach(nameSpan => {
         if (nameSpan.querySelector(".veteran-tag")) return;
@@ -823,7 +831,7 @@ function showTeamRankChart(team, username) {
     const title = document.getElementById("voter-history-title");
     const table = document.getElementById("voter-history-table");
 
-    title.innerHTML = `<img class="logo" src="cbb-logos/${team}.webp" style="height:22px;vertical-align:middle;margin-right:6px;">${team} — ${username || "Unknown"}`;
+    title.innerHTML = `<img class="logo" src="cbb-logos/${team}.webp" style="height:22px;vertical-align:middle;margin-right:6px;">${formatTeamName(team)} — ${username || "Unknown"}`;
     table.innerHTML = "";
     table.style.cssText = "display:block; white-space:normal; width:100%;";
 
@@ -952,11 +960,342 @@ function showTeamRankChart(team, username) {
         msg.setAttribute("x", mL + cW / 2); msg.setAttribute("y", mT + cH / 2);
         msg.setAttribute("text-anchor", "middle"); msg.setAttribute("font-size", "14");
         msg.setAttribute("fill", "#999");
-        msg.textContent = `${team} not ranked by ${username || "this voter"} this season`;
+        msg.textContent = `${formatTeamName(team)} not ranked by ${username || "this voter"} this season`;
         svg.appendChild(msg);
     }
 
     table.appendChild(svg);
+    modal.dataset.chartType = "teamrank";
+    modal.classList.add("open");
+}
+
+function showWeekHighLowChart(weekId, mode = "highlow") {
+    const block = document.getElementById(weekId);
+    if (!block) return;
+    const sections = block.querySelectorAll(".ballot-section");
+    const officialSection = sections[0];
+    if (!officialSection) return;
+
+    const voterRows = Array.from(officialSection.querySelectorAll(".voter-row"))
+        .filter(r => getVoterName(r) !== "Official Overall");
+    const totalVoters = voterRows.length;
+    if (totalVoters === 0) return;
+
+    const teamRankSum = {};
+    const teamVoterCount = {};
+    const teamPoints = {};
+    const teamRanks = {};
+    const teamRankVoters = {};
+    const allVoterNames = [];
+    voterRows.forEach(row => {
+        const voterName = getVoterName(row);
+        allVoterNames.push(voterName);
+        const teams = Array.from(row.querySelectorAll(".team-logo")).map(img => img.dataset.team);
+        teams.slice(0, 25).forEach((team, i) => {
+            const rank = i + 1;
+            teamRankSum[team] = (teamRankSum[team] || 0) + rank;
+            teamVoterCount[team] = (teamVoterCount[team] || 0) + 1;
+            teamPoints[team] = (teamPoints[team] || 0) + (26 - rank);
+            if (!teamRanks[team]) teamRanks[team] = [];
+            teamRanks[team].push(rank);
+            if (!teamRankVoters[team]) teamRankVoters[team] = {};
+            if (!teamRankVoters[team][rank]) teamRankVoters[team][rank] = [];
+            teamRankVoters[team][rank].push(voterName);
+        });
+    });
+    // Populate NR voters (rank 26) for each team
+    Object.keys(teamRankVoters).forEach(team => {
+        const rankedSet = new Set(Object.values(teamRankVoters[team]).flat());
+        const nrVoters = allVoterNames.filter(v => !rankedSet.has(v));
+        if (nrVoters.length > 0) teamRankVoters[team][26] = nrVoters;
+    });
+
+    const percentileRank = (sortedArr, p) => {
+        if (sortedArr.length === 1) return sortedArr[0];
+        const idx = p * (sortedArr.length - 1);
+        const lo = Math.floor(idx);
+        const hi = Math.ceil(idx);
+        return sortedArr[lo] + (idx - lo) * (sortedArr[hi] - sortedArr[lo]);
+    };
+
+    const top25 = Object.entries(teamPoints).sort((a, b) => b[1] - a[1]).map(([t]) => t).slice(0, 25);
+    const chartData = top25.map(team => {
+        const avg = teamRankSum[team] / teamVoterCount[team];
+        const count = teamVoterCount[team];
+        const allRanks = [...teamRanks[team], ...Array(totalVoters - count).fill(26)].sort((a, b) => a - b);
+        const hi = percentileRank(allRanks, 0.10);
+        const lo = percentileRank(allRanks, 0.90);
+        const rankVoters = teamRankVoters[team] || {};
+        return { team, avg, hi, lo, allRanks, rankVoters };
+    });
+
+    // Tier detection: find natural breaks in average ranks.
+    // Gray is always the last color; inner colors are assigned in order based on break count.
+    const innerColors = [
+        { fill: "#cc3333", stroke: "#aa1111" },  // red
+        { fill: "#e88c1a", stroke: "#c06a00" },  // orange
+        { fill: "#2ea043", stroke: "#1a7f37" },  // green
+        { fill: "#4488cc", stroke: "#2266aa" },  // blue
+        { fill: "#8b5cf6", stroke: "#6d38e0" },  // purple
+        { fill: "#e85c9a", stroke: "#c0307a" },  // pink
+        { fill: "#0d9488", stroke: "#0a7070" },  // teal
+        { fill: "#d4a017", stroke: "#a87800" },  // gold
+        { fill: "#e05252", stroke: "#b83030" },  // coral
+    ];
+    const grayColor = { fill: "#999", stroke: "#777" };
+    const avgs = chartData.map(d => d.avg);
+    const gaps = [];
+    for (let i = 1; i < avgs.length; i++) gaps.push({ idx: i, gap: avgs[i] - avgs[i - 1] });
+    const medianGap = gaps.length > 0
+        ? [...gaps].sort((a, b) => a.gap - b.gap)[Math.floor(gaps.length / 2)].gap
+        : 1;
+    const threshold = Math.max(medianGap * 1.5, 0.8);
+    // Find all qualifying breaks (at most innerColors.length, so gray is always reachable)
+    let breakIdxs = gaps.filter(g => g.gap >= threshold).map(g => g.idx)
+        .sort((a, b) => a - b).slice(0, innerColors.length);
+    // Gray must not be the only tier: if all teams fall in one group, no breaks needed
+    // Build the palette for this week: innerColors[0..numTiers-2] + gray
+    const numTiers = breakIdxs.length + 1;
+    const tierColors = innerColors.slice(0, numTiers - 1).concat([grayColor]);
+    // Assign tier index to each team
+    chartData.forEach((d, i) => {
+        let tier = 0;
+        for (const bi of breakIdxs) { if (i >= bi) tier++; }
+        d.tier = Math.min(tier, tierColors.length - 1);
+        d.color = tierColors[d.tier];
+    });
+
+    const modal = document.getElementById("voter-history-modal");
+    const title = document.getElementById("voter-history-title");
+    const table = document.getElementById("voter-history-table");
+
+    const activeTab = document.querySelector(".week-tab.active");
+    const weekNum = activeTab?.dataset.weeknum || "";
+    const year = activeTab?.dataset.year || "";
+    const weekLabel = activeTab?.dataset.weeklabel;
+    title.textContent = weekLabel
+        ? `${year} ${weekLabel} — Rank Spread`
+        : `${year} Week ${String(weekNum).padStart(2, "0")} — Rank Spread`;
+
+    table.innerHTML = "";
+    table.style.cssText = "display:block; white-space:normal; width:100%;";
+
+    // Toggle buttons
+    const toggleDiv = document.createElement("div");
+    toggleDiv.style.cssText = "text-align:center;margin-bottom:10px;";
+    const escapedId = weekId.replace(/'/g, "\\'");
+    toggleDiv.innerHTML = `
+        <button class="spread-toggle${mode === 'highlow' ? ' active' : ''}"
+                onclick="showWeekHighLowChart('${escapedId}', 'highlow')">High-Low</button>
+        <button class="spread-toggle${mode === 'dots' ? ' active' : ''}"
+                onclick="showWeekHighLowChart('${escapedId}', 'dots')">Dot Plot</button>`;
+    table.appendChild(toggleDiv);
+
+    const svgNS = "http://www.w3.org/2000/svg";
+    const W = 900, H = 460;
+    const mL = 44, mR = 16, mT = 28, mB = 52;
+    const cW = W - mL - mR, cH = H - mT - mB;
+
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.style.cssText = "width:min(860px,90vw);display:block;margin:0 auto;";
+
+    const n = chartData.length;
+    const slotW = cW / n;
+    const xPos = i => mL + (i + 0.5) * slotW;
+    const yPos = r => mT + ((r - 1) / 25) * cH;  // rank 1 at top, 26 (NR) at bottom
+
+    const axisColor = "#999", gridColor = "#e8e8e8";
+
+    // Rank gridlines + y-axis labels
+    [1, 5, 10, 15, 20, 25, 26].forEach(r => {
+        const y = yPos(r);
+        const line = document.createElementNS(svgNS, "line");
+        line.setAttribute("x1", mL); line.setAttribute("x2", mL + cW);
+        line.setAttribute("y1", y); line.setAttribute("y2", y);
+        line.setAttribute("stroke", r === 26 ? "#d8d8d8" : gridColor);
+        line.setAttribute("stroke-width", "1");
+        if (r === 26) line.setAttribute("stroke-dasharray", "3,3");
+        svg.appendChild(line);
+        const txt = document.createElementNS(svgNS, "text");
+        txt.setAttribute("x", mL - 6); txt.setAttribute("y", y + 4);
+        txt.setAttribute("text-anchor", "end"); txt.setAttribute("font-size", "11");
+        txt.setAttribute("fill", axisColor);
+        txt.textContent = r === 26 ? "NR" : r;
+        svg.appendChild(txt);
+    });
+
+    // Chart border
+    const border = document.createElementNS(svgNS, "rect");
+    border.setAttribute("x", mL); border.setAttribute("y", mT);
+    border.setAttribute("width", cW); border.setAttribute("height", cH);
+    border.setAttribute("fill", "none"); border.setAttribute("stroke", "#ddd");
+    border.setAttribute("stroke-width", "1");
+    svg.appendChild(border);
+
+    // Y-axis label
+    const yLbl = document.createElementNS(svgNS, "text");
+    yLbl.setAttribute("x", 10); yLbl.setAttribute("y", mT + cH / 2);
+    yLbl.setAttribute("text-anchor", "middle"); yLbl.setAttribute("font-size", "11");
+    yLbl.setAttribute("fill", axisColor);
+    yLbl.setAttribute("transform", `rotate(-90,10,${mT + cH / 2})`);
+    yLbl.textContent = "Rank";
+    svg.appendChild(yLbl);
+
+    const logoSize = Math.min(20, slotW - 4);
+
+    if (mode === "highlow") {
+        const capW = Math.min(7, slotW * 0.28);
+        chartData.forEach(({ team, avg, hi, lo, color }, i) => {
+            const x = xPos(i);
+            const yHi = yPos(hi);
+            const yLo = yPos(lo);
+            const yAvg = yPos(avg);
+
+            // Vertical high-low line
+            const vLine = document.createElementNS(svgNS, "line");
+            vLine.setAttribute("x1", x); vLine.setAttribute("x2", x);
+            vLine.setAttribute("y1", yHi); vLine.setAttribute("y2", yLo);
+            vLine.setAttribute("stroke", color.fill);
+            vLine.setAttribute("stroke-width", "2.5");
+            vLine.setAttribute("stroke-linecap", "round");
+            svg.appendChild(vLine);
+
+            // Top cap (P90+)
+            const topCap = document.createElementNS(svgNS, "line");
+            topCap.setAttribute("x1", x - capW); topCap.setAttribute("x2", x + capW);
+            topCap.setAttribute("y1", yHi); topCap.setAttribute("y2", yHi);
+            topCap.setAttribute("stroke", color.fill); topCap.setAttribute("stroke-width", "2");
+            svg.appendChild(topCap);
+
+            // Bottom cap (P10-)
+            const botCap = document.createElementNS(svgNS, "line");
+            botCap.setAttribute("x1", x - capW); botCap.setAttribute("x2", x + capW);
+            botCap.setAttribute("y1", yLo); botCap.setAttribute("y2", yLo);
+            botCap.setAttribute("stroke", color.fill); botCap.setAttribute("stroke-width", "2");
+            svg.appendChild(botCap);
+
+            // Mean circle
+            const circle = document.createElementNS(svgNS, "circle");
+            circle.setAttribute("cx", x); circle.setAttribute("cy", yAvg);
+            circle.setAttribute("r", "4");
+            circle.setAttribute("fill", "#fff");
+            circle.setAttribute("stroke", color.stroke); circle.setAttribute("stroke-width", "2.5");
+            svg.appendChild(circle);
+
+            // Team logo
+            const img = document.createElementNS(svgNS, "image");
+            img.setAttribute("href", `cbb-logos/${team}.webp`);
+            img.setAttribute("x", x - logoSize / 2);
+            img.setAttribute("y", mT + cH + 6);
+            img.setAttribute("width", logoSize); img.setAttribute("height", logoSize);
+            svg.appendChild(img);
+
+            // Consensus rank number below logo
+            const rankTxt = document.createElementNS(svgNS, "text");
+            rankTxt.setAttribute("x", x); rankTxt.setAttribute("y", mT + cH + logoSize + 18);
+            rankTxt.setAttribute("text-anchor", "middle"); rankTxt.setAttribute("font-size", "9");
+            rankTxt.setAttribute("fill", axisColor);
+            rankTxt.textContent = i + 1;
+            svg.appendChild(rankTxt);
+        });
+    } else {
+        // Dot plot: one dot per (team, rank), sized by voter count at that rank
+        const maxR = Math.min(slotW * 0.46, 13);
+
+        // Shared tooltip group
+        const tipG = document.createElementNS(svgNS, "g");
+        tipG.setAttribute("pointer-events", "none");
+        tipG.style.display = "none";
+        const tipRect = document.createElementNS(svgNS, "rect");
+        tipRect.setAttribute("rx", "4"); tipRect.setAttribute("ry", "4");
+        tipRect.setAttribute("fill", "#1a1a2e"); tipRect.setAttribute("fill-opacity", "0.92");
+        tipRect.setAttribute("stroke", "#4488cc"); tipRect.setAttribute("stroke-width", "1");
+        tipG.appendChild(tipRect);
+        svg.appendChild(tipG);
+
+        chartData.forEach(({ team, allRanks, rankVoters, color }, i) => {
+            const x = xPos(i);
+
+            // Count votes per integer rank
+            const rankCounts = {};
+            allRanks.forEach(r => { rankCounts[r] = (rankCounts[r] || 0) + 1; });
+
+            Object.entries(rankCounts).forEach(([r, cnt]) => {
+                const radius = Math.min(maxR, 2 + Math.sqrt(cnt) * 1.5);
+                const circle = document.createElementNS(svgNS, "circle");
+                circle.setAttribute("cx", x);
+                circle.setAttribute("cy", yPos(Number(r)));
+                circle.setAttribute("r", radius);
+                circle.setAttribute("fill", color.fill);
+                circle.setAttribute("fill-opacity", "0.7");
+                circle.style.cursor = "default";
+
+                circle.addEventListener("mouseenter", (e) => {
+                    const voters = rankVoters[r] || [];
+                    const lines = voters.length <= 3
+                        ? voters
+                        : [`${voters.length} voters`];
+                    const pad = 8, lineH = 14, fontSize = 11;
+                    const maxW = Math.max(...lines.map(l => l.length)) * fontSize * 0.6 + pad * 2;
+                    const boxH = lines.length * lineH + pad * 1.5;
+
+                    // Position: prefer above the circle, flip if too close to top
+                    const cx = Number(circle.getAttribute("cx"));
+                    const cy = Number(circle.getAttribute("cy"));
+                    const cr = Number(circle.getAttribute("r"));
+                    let tx = cx - maxW / 2;
+                    let ty = cy - cr - boxH - 4;
+                    if (ty < mT) ty = cy + cr + 4;
+                    tx = Math.max(2, Math.min(tx, W - maxW - 2));
+
+                    tipRect.setAttribute("x", tx); tipRect.setAttribute("y", ty);
+                    tipRect.setAttribute("width", maxW); tipRect.setAttribute("height", boxH);
+
+                    // Remove old text nodes
+                    while (tipG.childNodes.length > 1) tipG.removeChild(tipG.lastChild);
+
+                    lines.forEach((line, li) => {
+                        const t = document.createElementNS(svgNS, "text");
+                        t.setAttribute("x", tx + maxW / 2);
+                        t.setAttribute("y", ty + pad + li * lineH + lineH * 0.4);
+                        t.setAttribute("text-anchor", "middle");
+                        t.setAttribute("dominant-baseline", "middle");
+                        t.setAttribute("font-size", fontSize);
+                        t.setAttribute("fill", "#e0e8ff");
+                        t.textContent = line;
+                        tipG.appendChild(t);
+                    });
+
+                    tipG.style.display = "";
+                });
+
+                circle.addEventListener("mouseleave", () => { tipG.style.display = "none"; });
+
+                svg.insertBefore(circle, tipG);
+            });
+
+            // Team logo
+            const img = document.createElementNS(svgNS, "image");
+            img.setAttribute("href", `cbb-logos/${team}.webp`);
+            img.setAttribute("x", x - logoSize / 2);
+            img.setAttribute("y", mT + cH + 6);
+            img.setAttribute("width", logoSize); img.setAttribute("height", logoSize);
+            svg.appendChild(img);
+
+            // Consensus rank number below logo
+            const rankTxt = document.createElementNS(svgNS, "text");
+            rankTxt.setAttribute("x", x); rankTxt.setAttribute("y", mT + cH + logoSize + 18);
+            rankTxt.setAttribute("text-anchor", "middle"); rankTxt.setAttribute("font-size", "9");
+            rankTxt.setAttribute("fill", axisColor);
+            rankTxt.textContent = i + 1;
+            svg.appendChild(rankTxt);
+        });
+    }
+
+    table.appendChild(svg);
+    modal.dataset.chartType = "highlow";
+    modal.dataset.chartMode = mode;
     modal.classList.add("open");
 }
 
@@ -1310,14 +1649,22 @@ function showAvgRankModal(weekId) {
     const currYear = allTabsSorted[currTabIdx]?.dataset.year;
     const prevTab = allTabsSorted[currTabIdx + 1];
     const prevTeamRank = {};
+    const deltaDataForNew = buildDeltaData();
     if (prevTab && prevTab.dataset.year === currYear) {
-        const prevTeams = buildDeltaData()[prevTab.dataset.week]?.["Official Overall"];
+        const prevTeams = deltaDataForNew[prevTab.dataset.week]?.["Official Overall"];
         if (prevTeams) prevTeams.forEach((t, i) => { prevTeamRank[t] = i + 1; });
     }
     const hasPrevWeek = Object.keys(prevTeamRank).length > 0;
 
+    // Build set of all teams that appeared in any prior week's top 25 this season
+    const seasonTeamsSeen = new Set();
+    for (let i = currTabIdx + 1; i < allTabsSorted.length && allTabsSorted[i].dataset.year === currYear; i++) {
+        const wTeams = deltaDataForNew[allTabsSorted[i].dataset.week]?.["Official Overall"];
+        if (wTeams) wTeams.forEach(t => seasonTeamsSeen.add(t));
+    }
+
     // 5-week weighted averages for current and previous weeks
-    const deltaData = buildDeltaData();
+    const deltaData = deltaDataForNew;
     const yearTabs = allTabsSorted.filter(t => t.dataset.year === currYear);
     const curr5W = compute5WeekWeighted(weekId, deltaData, yearTabs);
     const prev5W = (prevTab && prevTab.dataset.year === currYear)
@@ -1336,65 +1683,78 @@ function showAvgRankModal(weekId) {
     const weekLabel = activeTab?.dataset.weeklabel;
     title.textContent = weekLabel ? `${year} ${weekLabel} Statistics` : `${year} #${weekPad} Statistics`;
 
+    const percentileRank = (sortedArr, p) => {
+        if (sortedArr.length === 1) return sortedArr[0];
+        const idx = p * (sortedArr.length - 1);
+        const lo = Math.floor(idx);
+        const hi = Math.ceil(idx);
+        return sortedArr[lo] + (idx - lo) * (sortedArr[hi] - sortedArr[lo]);
+    };
+
     const buildRow = (team, rank) => {
         const avg = teamRankSum[team] / teamVoterCount[team];
         const median = computeMedian(teamRanks[team]);
         const count = teamVoterCount[team];
         const pts = teamPoints[team];
-        const hi = Math.min(...teamRanks[team]);
-        const lo = Math.max(...teamRanks[team]);
-        let deltaCell = '<td></td>';
-        if (hasPrevWeek) {
+        const allRanks = [...teamRanks[team], ...Array(totalVoters - count).fill(26)].sort((a, b) => a - b);
+        const hi = percentileRank(allRanks, 0.10);
+        const lo = percentileRank(allRanks, 0.90);
+        const sdRaw = count / totalVoters > 0.84
+            ? Math.sqrt(teamRanks[team].reduce((s, r) => s + (r - avg) ** 2, 0) / teamRanks[team].length)
+            : null;
+        let rankDelta = '—';
+        if (hasPrevWeek && rank <= 25) {
             const prevRank = prevTeamRank[team];
-            if (!prevRank) {
-                deltaCell = '<td><span class="delta-new">NEW</span></td>';
+            if (!prevRank && !seasonTeamsSeen.has(team)) {
+                rankDelta = `<span class="delta-new">NEW</span>`;
             } else {
                 const diff = prevRank - rank;
                 if (diff > 0) {
-                    deltaCell = `<td><span class="delta-up">${diff}</span></td>`;
+                    rankDelta = `<span class="delta-up">${diff}</span>`;
                 } else if (diff < 0) {
-                    deltaCell = `<td><span class="delta-down">${Math.abs(diff)}</span></td>`;
+                    rankDelta = `<span class="delta-down">${Math.abs(diff)}</span>`;
                 } else {
-                    deltaCell = '<td><span class="delta-same">—</span></td>';
+                    rankDelta = `<span class="delta-same">—</span>`;
                 }
             }
         }
+        const inTop25 = rank <= 25;
+        const rankDisplay = `<div style="font-variant-numeric:tabular-nums;text-align:center">${rank}</div>`;
         let cell5WAvg = '<td>—</td>';
-        let cell5WDelta = '<td>—</td>';
         if (curr5W) {
             const rawSum = curr5W.teamAvgRankSum[team];
             if (rawSum != null) {
                 const avgVal = rawSum / curr5W.totalVoters;
-                cell5WAvg = `<td>${avgVal.toFixed(2)}</td>`;
+                let deltaHtml = '';
                 if (prev5W) {
                     const prevSum = prev5W.teamAvgRankSum[team];
                     if (prevSum != null) {
                         const prevAvgVal = prevSum / prev5W.totalVoters;
                         const diff = prevAvgVal - avgVal; // positive = improved (rank number decreased)
-                        if (Math.abs(diff) < 0.005) {
-                            cell5WDelta = '<td><span class="delta-same">—</span></td>';
+                        if (Math.abs(diff) < 0.05) {
+                            deltaHtml = ' <span class="delta-same">—</span>';
                         } else if (diff > 0) {
-                            cell5WDelta = `<td><span class="delta-up">${diff.toFixed(2)}</span></td>`;
+                            deltaHtml = ` <span class="delta-up">(${diff.toFixed(1)})</span>`;
                         } else {
-                            cell5WDelta = `<td><span class="delta-down">${Math.abs(diff).toFixed(2)}</span></td>`;
+                            deltaHtml = ` <span class="delta-down">(${Math.abs(diff).toFixed(1)})</span>`;
                         }
                     }
                 }
+                cell5WAvg = `<td style="white-space:nowrap">${avgVal.toFixed(1)}${deltaHtml}</td>`;
             }
         }
         return `<tr>
-            <td>${rank}</td>
+            <td>${rankDisplay}</td>
             <td style="padding:2px 4px;"><img class="logo-sm" src="cbb-logos/${team}.webp"></td>
-            <td class="team-col">${team}</td>
-            ${deltaCell}
-            <td>${hi}</td>
-            <td>${Number.isInteger(median) ? median : median.toFixed(1)}</td>
-            <td style="border-right:1px solid #bbb">${lo}</td>
-            <td>${count}/${totalVoters}</td>
+            <td class="team-col">${formatTeamName(team)}</td>
+            <td style="white-space:nowrap">${rankDelta}</td>
+            <td>${inTop25 ? (Number.isInteger(hi) ? hi : hi.toFixed(1)) : ""}</td>
+            <td>${inTop25 ? avg.toFixed(1) : ""}</td>
+            <td>${inTop25 ? (Number.isInteger(lo) ? lo : lo.toFixed(1)) : ""}</td>
+            <td style="border-right:1px solid #bbb">${inTop25 ? (sdRaw != null ? sdRaw.toFixed(1) : "—") : ""}</td>
+            ${inTop25 ? cell5WAvg : "<td></td>"}
+            <td>${count}</td>
             <td>${pts}</td>
-            <td>${avg.toFixed(2)}</td>
-            ${cell5WAvg}
-            ${cell5WDelta}
         </tr>`;
     };
 
@@ -1402,31 +1762,29 @@ function showAvgRankModal(weekId) {
         <col style="width:28px">
         <col style="width:28px">
         <col>
-        <col style="width:40px">
-        <col style="width:36px">
         <col style="width:52px">
-        <col style="width:36px">
-        <col style="width:56px">
+        <col style="width:44px">
+        <col style="width:52px">
+        <col style="width:44px">
+        <col style="width:48px">
+        <col style="width:80px">
         <col style="width:36px">
         <col style="width:64px">
-        <col style="width:64px">
-        <col style="width:52px">
     </colgroup><thead><tr>
         <th>#</th><th></th>
         <th class="team-col">Team</th>
-        <th title="Change from previous week">Δ</th>
-        <th title="Highest rank given by any voter this week">Hi</th>
-        <th>Median</th>
-        <th title="Lowest rank given by any voter this week" style="border-right:1px solid #bbb">Lo</th>
+        <th title="Rank change from previous week">Δ</th>
+        <th title="10th percentile rank across all voters (unranked = 26)">P<sub>90+</sub></th>
+        <th>μ</th>
+        <th title="90th percentile rank across all voters (unranked = 26)">P<sub>10−</sub></th>
+        <th title="Standard deviation of ranks given by voters this week" style="border-right:1px solid #bbb">σ</th>
+        <th title="5-week weighted average rank (change from previous week in parentheses)">μ̄<sub>5</sub><sup>w</sup></th>
         <th>Voters</th>
         <th>Pts</th>
-        <th>Avg Rank</th>
-        <th title="5-week weighted average rank">5W Avg</th>
-        <th title="Change in 5-week weighted average rank from previous week">5W Δ</th>
     </tr></thead><tbody>`;
     top25.forEach((team, i) => { html += buildRow(team, i + 1); });
     if (receivingVotes.length > 0) {
-        html += `<tr class="rv-divider"><td colspan="12">Receiving Votes</td></tr>`;
+        html += `<tr class="rv-divider"><td colspan="11">Receiving Votes</td></tr>`;
         receivingVotes.forEach((team, i) => { html += buildRow(team, 26 + i); });
     }
     html += "</tbody>";
@@ -1920,7 +2278,7 @@ function showSeasonStatsModal() {
         html += `<tr>
             <td>${i + 1}</td>
             <td><img class="logo-sm" src="cbb-logos/${team}.webp"></td>
-            <td class="team-col">${team}</td>
+            <td class="team-col">${formatTeamName(team)}</td>
             <td>${teamWeeksRanked[team]}/${totalWeeks}</td>
             <td>${teamTotalPts[team]}</td>
             <td>${avgRank}</td>
@@ -2290,6 +2648,13 @@ document.addEventListener("keydown", e => {
         return;
     }
 
+    if (e.key === "G" || e.key === "g") {
+        e.preventDefault();
+        const activeTab = document.querySelector(".week-tab.active");
+        if (activeTab) showWeekHighLowChart(activeTab.dataset.week);
+        return;
+    }
+
     if (e.key === "U" || e.key === "u") {
         e.preventDefault();
         showSeasonStatsModal();
@@ -2344,6 +2709,11 @@ document.addEventListener("keydown", e => {
             loadYear(target.dataset.year).then(() => {
                 showWeek(target.dataset.week);
                 if (weekPickerPinned) rebuildWeekPicker();
+                if (document.getElementById("avg-rank-modal").classList.contains("open"))
+                    showAvgRankModal(target.dataset.week);
+                const vhm = document.getElementById("voter-history-modal");
+                if (vhm.classList.contains("open") && vhm.dataset.chartType === "highlow")
+                    showWeekHighLowChart(target.dataset.week, vhm.dataset.chartMode || "highlow");
                 backgroundLoad();
             }).catch(() => {});
         }
@@ -2365,6 +2735,11 @@ document.addEventListener("keydown", e => {
             if (target) {
                 showWeek(target.dataset.week);
                 if (weekPickerPinned) rebuildWeekPicker();
+                if (document.getElementById("avg-rank-modal").classList.contains("open"))
+                    showAvgRankModal(target.dataset.week);
+                const vhm2 = document.getElementById("voter-history-modal");
+                if (vhm2.classList.contains("open") && vhm2.dataset.chartType === "highlow")
+                    showWeekHighLowChart(target.dataset.week, vhm2.dataset.chartMode || "highlow");
                 backgroundLoad();
             }
         }).catch(() => {});

@@ -201,7 +201,8 @@ td.logo-cell .logo {
     vertical-align: baseline;
 }
 
-body.hide-veteran-tags .veteran-tag {
+body.hide-veteran-tags .veteran-tag,
+.voter-row.voter-cell-hover .veteran-tag {
     display: none;
 }
 
@@ -583,6 +584,7 @@ kbd {
     text-align: center;
     border-bottom: 1px solid #ddd;
     white-space: nowrap;
+    vertical-align: bottom;
 }
 #avg-rank-table th.team-col { text-align: left; }
 #avg-rank-table td {
@@ -722,6 +724,25 @@ body.year-loading::after {
     font-size: 14px;
     z-index: 9999;
     pointer-events: none;
+}
+
+.spread-toggle {
+    padding: 4px 14px;
+    margin: 0 3px;
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    background: #f5f5f5;
+    cursor: pointer;
+    font-size: 13px;
+    color: #333;
+}
+.spread-toggle.active {
+    background: #2277cc;
+    color: #fff;
+    border-color: #2277cc;
+}
+.spread-toggle:hover:not(.active) {
+    background: #e8e8e8;
 }
 
 @media (max-device-width: 768px) {
