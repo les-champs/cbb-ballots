@@ -13,6 +13,7 @@ from PIL import Image
 BASE_HTML_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_HTML_DIR, "cbb-logos")
 HTML_PATH = os.path.join(BASE_HTML_DIR, "index.html")
+AP_HTML_PATH = os.path.join(BASE_HTML_DIR, "ap-ballots.html")
 CSS_PATH = os.path.join(BASE_HTML_DIR, "style.css")
 JS_PATH = os.path.join(BASE_HTML_DIR, "script.js")
 
@@ -710,6 +711,365 @@ def _cbbpoll_voters_to_tuples(voters):
         results.append((flair_logo, username, ballot_url, ballot_logos))
     return sorted(results, key=lambda x: x[1].lower())
 
+# ── AP 25 Scraper (collegepolltracker.com) ─────────────────────────────────
+
+AP25_BASE = "https://collegepolltracker.com/basketball/grid"
+
+# Site year → our year: site's 2025 = 2025-26 season = our 2026
+# Available site years: 2021-2025 → our 2022-2026
+AP25_SITE_YEARS = {2021: 2022, 2022: 2023, 2023: 2024, 2024: 2025, 2025: 2026}
+
+# AP-specific name overrides (title attributes from collegepolltracker.com)
+# Most names match cbbpoll overrides already; add AP-specific ones here.
+AP25_NAME_OVERRIDES = {
+    "McNeese State": "McNeese",
+    "Pittsburgh": "Pitt",
+}
+
+def _normalize_ap_team_name(display_name):
+    """Normalize an AP team display name to our logo filename."""
+    # Check AP-specific overrides first, then fall back to cbbpoll overrides
+    if display_name in AP25_NAME_OVERRIDES:
+        return AP25_NAME_OVERRIDES[display_name]
+    return _normalize_team_name(display_name)
+
+def ap25_fetch_grid(site_year, week_slug):
+    """Fetch an AP grid page and extract voter ballots.
+
+    Returns (voters, actual_week_slug) where voters is a list of
+    {"username": str, "affiliation": str, "teams": [str]} dicts.
+    actual_week_slug is what the page actually shows (to detect redirects).
+    """
+    url = f"{AP25_BASE}/{site_year}/{week_slug}"
+    page_html = fetch_page_html(url)
+
+    # Detect which week the page is actually showing (redirect detection)
+    selected_match = re.search(
+        r'<option value="([^"]*)" selected="selected">[^<]*</option>(?=.*</select>.*<select)',
+        page_html, re.DOTALL
+    )
+    # Simpler: find the week dropdown's selected value
+    # The week select comes second; find all selected options
+    selected_options = re.findall(r'<option value="([^"]*)" selected="selected">', page_html)
+    actual_week = selected_options[1] if len(selected_options) >= 2 else week_slug
+
+    # Parse grid rows
+    parts = page_html.split('<div class="gridRow">')
+    voters = []
+    for part in parts[1:]:  # skip preamble before first row
+        # Voter name
+        voter_match = re.search(r'<a href="[^"]*">([^<]+)</a>', part)
+        if not voter_match:
+            continue
+        username = html_mod.unescape(voter_match.group(1).strip())
+
+        # Affiliation
+        aff_match = re.search(r'gridPollsterAffiliation">([^<]+)', part)
+        affiliation = html_mod.unescape(aff_match.group(1).strip()) if aff_match else ""
+
+        # Teams from title attributes
+        teams_raw = re.findall(r'title="([^"]+)"', part)
+        teams = [html_mod.unescape(t) for t in teams_raw[:25]]
+
+        voters.append({
+            "username": username,
+            "affiliation": affiliation,
+            "teams": teams,
+        })
+
+    return voters, actual_week
+
+def ap25_scrape_season(our_year):
+    """Scrape an entire AP season from collegepolltracker.com to JSON."""
+    site_year = our_year - 1
+    if site_year not in AP25_SITE_YEARS:
+        print(f"✗ Year {our_year} not available. Valid our-years: {sorted(AP25_SITE_YEARS.values())}")
+        return
+
+    json_path = os.path.join(BASE_HTML_DIR, f"ap25-{our_year}.json")
+
+    # Load existing cache
+    if os.path.exists(json_path):
+        with open(json_path, "r") as f:
+            data = json.load(f)
+        print(f"Loaded existing cache: {json_path}")
+    else:
+        data = {"year": our_year, "site_year": site_year, "weeks": {}}
+
+    # Week slugs to try: pre-season, then week-2 through week-19, then final-rankings
+    week_slugs = ["pre-season"] + [f"week-{w}" for w in range(2, 20)] + ["final-rankings"]
+    unmapped_names = set()
+
+    for week_slug in week_slugs:
+        # Map week slug to our week number
+        if week_slug == "pre-season":
+            week_num = 0
+        elif week_slug == "final-rankings":
+            week_num = 20
+        else:
+            week_num = int(week_slug.split("-")[1])
+        week_key = str(week_num)
+
+        # Skip already-cached weeks
+        if week_key in data["weeks"] and data["weeks"][week_key].get("voters"):
+            n = len(data["weeks"][week_key]["voters"])
+            print(f"Week {week_num}: already cached ({n} voters)")
+            continue
+
+        print(f"\nWeek {week_num} ({week_slug}): fetching grid...")
+        try:
+            voters, actual_week = ap25_fetch_grid(site_year, week_slug)
+        except Exception as e:
+            print(f"  ✗ Failed to fetch: {e}")
+            continue
+
+        # Detect redirect to different week (invalid week)
+        if actual_week != week_slug:
+            print(f"  → Redirected to {actual_week}, skipping (week doesn't exist)")
+            continue
+
+        if not voters:
+            print(f"  → No voter data found, skipping")
+            continue
+
+        print(f"  Found {len(voters)} voters")
+
+        # Track unmapped names
+        for v in voters:
+            for team_name in v["teams"]:
+                logo = _normalize_ap_team_name(team_name)
+                if not os.path.exists(os.path.join(OUTPUT_DIR, f"{logo}.webp")):
+                    unmapped_names.add(team_name)
+
+        data["weeks"][week_key] = {"voters": voters}
+
+        # Save after each week for resume support
+        with open(json_path, "w") as f:
+            json.dump(data, f, indent=2)
+        print(f"  ✓ Saved week {week_num} to {json_path}")
+        time.sleep(0.3)
+
+    if unmapped_names:
+        print(f"\n⚠️  Unmapped AP team names (no matching logo file):")
+        for name in sorted(unmapped_names):
+            print(f"    {name!r} → {_normalize_ap_team_name(name)!r}")
+
+    print(f"\n✓ Done scraping AP {our_year} (site {site_year}). Data saved to {json_path}")
+
+def ap25_build_season(our_year):
+    """Build HTML week blocks from cached AP JSON data (batch — one fragment write per year)."""
+    json_path = os.path.join(BASE_HTML_DIR, f"ap25-{our_year}.json")
+    if not os.path.exists(json_path):
+        print(f"✗ No cached data at {json_path}. Run --ap25 --year {our_year} first.")
+        return
+
+    with open(json_path, "r") as f:
+        data = json.load(f)
+
+    weeks = sorted(data["weeks"].keys(), key=lambda w: int(w))
+    print(f"Building AP HTML for {our_year}: {len(weeks)} weeks")
+
+    # Build all week blocks and tabs for this year in memory
+    new_tabs = []
+    new_blocks = []
+    for week_key in weeks:
+        week = int(week_key)
+        week_data = data["weeks"][week_key]
+        voters = week_data.get("voters", [])
+        if not voters:
+            print(f"  Week {week}: no voter data, skipping")
+            continue
+
+        voter_tuples = []
+        for v in voters:
+            if not v["teams"]:
+                continue
+            ballot_logos = [_normalize_ap_team_name(t) + ".png" for t in v["teams"]]
+            voter_tuples.append(("", v["username"], None, ballot_logos))
+        voter_tuples.sort(key=lambda x: x[1].lower())
+
+        week_label = "Pre-Season" if week == 0 else ("Final" if week == 20 else None)
+        week_block = build_ap_week_block(week, our_year, voter_tuples)
+        new_blocks.append(week_block)
+
+        week_id = f"week-ap-{our_year}-{week}"
+        label_attr = f' data-weeklabel="{week_label}"' if week_label else ""
+        tab_text = f"{our_year} {week_label}" if week_label else f"{our_year} #{week}"
+        new_tab = f'<button class="week-tab" data-week="{week_id}" data-weeknum="{week}" data-year="{our_year}" data-poll="ap"{label_attr}>{tab_text}</button>'
+        new_tabs.append(new_tab)
+        print(f"  ✓ Week {week}: {len(voter_tuples)} voters")
+
+    # Write fragment file for this year (single write)
+    base_dir = os.path.dirname(HTML_PATH) or "."
+    frag_path = os.path.join(base_dir, f"data-ap-{our_year}.html")
+    with open(frag_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(b.strip() for b in new_blocks))
+
+    # Also write appage fragment file with clean IDs (no 'ap-' prefix) for ap-ballots.html
+    appage_blocks = []
+    for week_key in weeks:
+        week = int(week_key)
+        week_data = data["weeks"][week_key]
+        voters = week_data.get("voters", [])
+        if not voters:
+            continue
+        voter_tuples = []
+        for v in voters:
+            if not v["teams"]:
+                continue
+            ballot_logos = [_normalize_ap_team_name(t) + ".png" for t in v["teams"]]
+            voter_tuples.append(("", v["username"], None, ballot_logos))
+        voter_tuples.sort(key=lambda x: x[1].lower())
+        appage_blocks.append(build_appage_week_block(week, our_year, voter_tuples))
+    appage_frag_path = os.path.join(base_dir, f"data-appage-{our_year}.html")
+    with open(appage_frag_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(b.strip() for b in appage_blocks))
+
+    # Update index.html: read existing AP tabs, remove this year's tabs, add new ones
+    _update_ap_tabs_for_year(HTML_PATH, our_year, new_tabs)
+
+    # Regenerate ap-ballots.html
+    rebuild_ap_html()
+
+    print(f"\n✓ Built AP HTML for {our_year}.")
+
+def build_ap_week_block(week, year, voters):
+    """Build the full HTML block for one AP week."""
+    week_id = f"week-ap-{year}-{week}"
+    official_table = build_table_html(voters)
+
+    # Build aggregate row labeled "AP Overall"
+    points = {}
+    for _, _, _, ballot_logos in voters:
+        for i, logo in enumerate(ballot_logos[:25]):
+            team = canonical_logo_name(logo)
+            points[team] = points.get(team, 0) + (25 - i)
+    ranked = sorted(points.items(), key=lambda x: -x[1])[:25]
+    ballot_logo_cells = "".join(
+        f'<td class="logo-cell"><img class="logo team-logo" data-team="{team}" data-src="{team}"></td>'
+        for team, _ in ranked
+    )
+    agg_voter_cell = '<div class="voter-cell" ><span class="voter-name">AP Overall</span></div>'
+    agg_row = f'<tr class="voter-row"><td>{agg_voter_cell}</td>{ballot_logo_cells}</tr>\n'
+    aggregate_table = build_table(agg_row)
+
+    return f"""
+<div id="{week_id}" class="week-block" data-poll="ap" style="display:none;">
+  <div id="{week_id}-official" class="ballot-section">
+    <div class="table-scroll"><div class="table-container">{official_table}</div></div>
+  </div>
+  <div id="{week_id}-provisional" class="ballot-section" style="display:none;">
+    <div class="table-scroll"><div class="table-container">{build_table("")}</div></div>
+  </div>
+  <div id="{week_id}-aggregate" class="ballot-section" style="display:none;">
+    <div class="table-scroll"><div class="table-container">{aggregate_table}</div></div>
+  </div>
+</div><!-- /week-block:{week_id} -->"""
+
+def build_appage_week_block(week, year, voters):
+    """Build an AP week block with clean IDs (no 'ap-' prefix, no data-poll) for ap-ballots.html."""
+    week_id = f"week-{year}-{week}"
+    official_table = build_table_html(voters)
+
+    # Build aggregate row labeled "AP Overall"
+    points = {}
+    for _, _, _, ballot_logos in voters:
+        for i, logo in enumerate(ballot_logos[:25]):
+            team = canonical_logo_name(logo)
+            points[team] = points.get(team, 0) + (25 - i)
+    ranked = sorted(points.items(), key=lambda x: -x[1])[:25]
+    ballot_logo_cells = "".join(
+        f'<td class="logo-cell"><img class="logo team-logo" data-team="{team}" data-src="{team}"></td>'
+        for team, _ in ranked
+    )
+    agg_voter_cell = '<div class="voter-cell" ><span class="voter-name">AP Overall</span></div>'
+    agg_row = f'<tr class="voter-row"><td>{agg_voter_cell}</td>{ballot_logo_cells}</tr>\n'
+    aggregate_table = build_table(agg_row)
+
+    return f"""
+<div id="{week_id}" class="week-block" style="display:none;">
+  <div id="{week_id}-official" class="ballot-section">
+    <div class="table-scroll"><div class="table-container">{official_table}</div></div>
+  </div>
+  <div id="{week_id}-provisional" class="ballot-section" style="display:none;">
+    <div class="table-scroll"><div class="table-container">{build_table("")}</div></div>
+  </div>
+  <div id="{week_id}-aggregate" class="ballot-section" style="display:none;">
+    <div class="table-scroll"><div class="table-container">{aggregate_table}</div></div>
+  </div>
+</div><!-- /week-block:{week_id} -->"""
+
+def _update_ap_tabs_for_year(html_path, year, new_tabs):
+    """Update AP tabs in index.html: remove this year's old tabs, add new ones, update AP_FRAGMENT_YEARS."""
+    if not os.path.exists(html_path):
+        return
+    with open(html_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Extract existing AP tabs
+    tabs_match = re.search(r'<!-- AP-TABS -->\n(.*?)(?=\n<!-- /AP-TABS -->)', content, re.DOTALL)
+    existing_tabs = tabs_match.group(1).strip() if tabs_match else ""
+
+    # Remove tabs for this year
+    year_str = str(year)
+    kept_lines = [line for line in existing_tabs.split("\n")
+                  if line.strip() and f'data-year="{year_str}" data-poll="ap"' not in line]
+    # Add new tabs
+    all_tabs = kept_lines + new_tabs
+    ap_tabs_html = "\n".join(all_tabs).strip()
+
+    # Discover AP fragment years from filesystem
+    base_dir = os.path.dirname(html_path) or "."
+    ap_fragment_years = sorted([
+        re.match(r'data-ap-(\d+)\.html$', f).group(1)
+        for f in os.listdir(base_dir)
+        if re.match(r'data-ap-\d+\.html$', f)
+    ])
+
+    _update_ap_in_index(html_path, ap_tabs_html, ap_fragment_years)
+
+def _update_ap_in_index(html_path, ap_tabs_html, ap_fragment_years):
+    """Update the AP tabs section and AP_FRAGMENT_YEARS constant in index.html."""
+    if not os.path.exists(html_path):
+        return
+    with open(html_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Update AP tabs section
+    ap_tabs_block = f"<!-- AP-TABS -->\n{ap_tabs_html}\n<!-- /AP-TABS -->"
+    if "<!-- AP-TABS -->" in content:
+        # Replace existing AP-TABS block in-place
+        content = re.sub(
+            r'<!-- AP-TABS -->\n.*?\n<!-- /AP-TABS -->',
+            ap_tabs_block,
+            content, flags=re.DOTALL
+        )
+    else:
+        # Insert before the closing </div> of week-tabs (which precedes voter-history-modal)
+        content = content.replace(
+            "</div>\n\n<div id=\"voter-history-modal\">",
+            f"\n{ap_tabs_block}\n</div>\n\n<div id=\"voter-history-modal\">",
+            1,
+        )
+
+    # Update AP_FRAGMENT_YEARS
+    ap_years_js = json.dumps(ap_fragment_years)
+    if "const AP_FRAGMENT_YEARS" in content:
+        content = re.sub(
+            r'const AP_FRAGMENT_YEARS = \[.*?\];',
+            f'const AP_FRAGMENT_YEARS = {ap_years_js};',
+            content
+        )
+    else:
+        content = content.replace(
+            "const FRAGMENT_YEARS",
+            f"const AP_FRAGMENT_YEARS = {ap_years_js};\nconst FRAGMENT_YEARS",
+        )
+
+    with open(html_path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+
 # ── HTML Building ────────────────────────────────────────────────────────────
 
 def build_table_rows(voters_with_ballots):
@@ -717,11 +1077,11 @@ def build_table_rows(voters_with_ballots):
     for logo_filename, username, ballot_url, ballot_logos in voters_with_ballots:
         team_name = canonical_logo_name(logo_filename)
         ballot_attr = f' data-ballot-url="{ballot_url}"' if ballot_url else ''
-        img_path = team_name
-        inner = (
-            f'<img class="logo" data-src="{img_path}" alt="{team_name}">'
-            f'<span class="voter-name">{username}</span>'
-        )
+        if team_name:
+            flair_html = f'<img class="logo" data-src="{team_name}" alt="{team_name}">'
+        else:
+            flair_html = ''
+        inner = flair_html + f'<span class="voter-name">{username}</span>'
         voter_cell = f'<div class="voter-cell" {ballot_attr}>{inner}</div>'
         ballot_logo_cells = "".join(
             f'<td class="logo-cell"><img class="logo team-logo" data-team="{canonical_logo_name(bl)}" data-src="{canonical_logo_name(bl)}"></td>'
@@ -834,6 +1194,22 @@ def load_js():
 WEEK_TABS_MARKER = "<!-- WEEK-TABS -->"
 WEEK_DATA_MARKER = "<!-- WEEK-DATA -->"
 
+def get_ap_info(html_path):
+    """Return (ap_tabs_html, ap_fragment_years) from existing index.html + fragment files."""
+    ap_tabs_html = ""
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        tabs_match = re.search(r'<!-- AP-TABS -->\n(.*?)(?=\n<!-- /AP-TABS -->)', content, re.DOTALL)
+        ap_tabs_html = tabs_match.group(1).strip() if tabs_match else ""
+    base_dir = os.path.dirname(html_path) or "."
+    ap_fragment_years = sorted([
+        re.match(r'data-ap-(\d+)\.html$', f).group(1)
+        for f in os.listdir(base_dir)
+        if re.match(r'data-ap-\d+\.html$', f)
+    ])
+    return ap_tabs_html, ap_fragment_years
+
 def split_data_by_year(data_html):
     """Split data_html into a dict of { year_str: year_data_html }."""
     parts = re.split(r'(?=<div [^>]*id="week-\d+-\d+")', data_html)
@@ -887,11 +1263,12 @@ def compute_tenure_counts(data_html):
             counts[voter] += 36
     return counts
 
-def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_counts=None):
+def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_counts=None, ap_tabs_html="", ap_fragment_years=None):
     CSS = load_css()
     JS = load_js()
     fragment_years_js = json.dumps(fragment_years or [])
     tenure_counts_js = json.dumps(tenure_counts or {})
+    ap_fragment_years_js = json.dumps(ap_fragment_years or [])
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -929,6 +1306,9 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
 <div class="week-tabs" style="display:none;">
 {WEEK_TABS_MARKER}
 {week_tabs_html}
+<!-- AP-TABS -->
+{ap_tabs_html}
+<!-- /AP-TABS -->
 </div>
 
 <div id="voter-history-modal">
@@ -1005,6 +1385,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
 {week_data_html}
 </div>
 <script>
+const AP_FRAGMENT_YEARS = {ap_fragment_years_js};
 const FRAGMENT_YEARS = {fragment_years_js};
 const TENURE_COUNTS = {tenure_counts_js};
 {JS}
@@ -1026,6 +1407,8 @@ def load_existing_weeks(html_path):
         content, re.DOTALL
     )
     tabs_html = tabs_match.group(1).strip() if tabs_match else ""
+    # Strip any AP-TABS block captured inside tabs_html — handled separately by get_ap_info
+    tabs_html = re.sub(r'\n?<!-- AP-TABS -->.*?<!-- /AP-TABS -->', '', tabs_html, flags=re.DOTALL).strip()
 
     # Extract existing week data blocks (handle both old format and new year-data-container format)
     data_match = re.search(
@@ -1077,7 +1460,8 @@ def save_html(week, year, new_week_block, html_path, week_label=None):
     write_year_fragments(data_by_year, current_year, base_dir)
     tenure_counts = compute_tenure_counts(data_html)
 
-    full_html = build_full_html(tabs_html, inline_data, fragment_years, tenure_counts)
+    ap_tabs_html, ap_fragment_years = get_ap_info(html_path)
+    full_html = build_full_html(tabs_html, inline_data, fragment_years, tenure_counts, ap_tabs_html, ap_fragment_years)
     with open(html_path, "w", encoding="utf-8") as f:
         f.write(full_html)
     print(f"✓ Saved to: {html_path}")
@@ -1133,10 +1517,123 @@ def delete_week(week, year):
             os.remove(frag_path)
     tenure_counts = compute_tenure_counts(data_html)
 
-    full_html = build_full_html(tabs_html, inline_data, fragment_years, tenure_counts)
+    ap_tabs_html, ap_fragment_years = get_ap_info(HTML_PATH)
+    full_html = build_full_html(tabs_html, inline_data, fragment_years, tenure_counts, ap_tabs_html, ap_fragment_years)
     with open(HTML_PATH, "w", encoding="utf-8") as f:
         f.write(full_html)
     print(f"✓ Deleted week {week} {year} from HTML.")
+
+def build_ap_html(week_tabs_html, week_data_html, fragment_years=None):
+    """Build the full ap-ballots.html from the template, with AP weeks as primary content."""
+    full_html = build_full_html(
+        week_tabs_html=week_tabs_html,
+        week_data_html=week_data_html,
+        fragment_years=fragment_years or [],
+        tenure_counts={},
+        ap_tabs_html="",
+        ap_fragment_years=[],
+    )
+    # Update title and meta
+    full_html = full_html.replace("<title>Userpoll Landscape</title>", "<title>AP Ballots Landscape</title>")
+    full_html = full_html.replace('content="Userpoll Landscape"', 'content="AP Ballots Landscape"')
+    full_html = full_html.replace(
+        'content="Landscape view of r/collegebasketball userpoll ballots."',
+        'content="Landscape view of AP Top 25 individual voter ballots."'
+    )
+    # Set toggle-text to "AP Ballots" (click will be a no-op; exitApBallots returns early when _apCurrentYear is null)
+    full_html = full_html.replace(
+        '<span id="toggle-text">Official Ballots</span>',
+        '<span id="toggle-text" style="cursor:default;">AP Ballots</span>'
+    )
+    # Replace the userpoll forward link with a back link to index.html
+    full_html = full_html.replace(
+        '<a href="ap-ballots.html" class="ap-forward-link">AP Ballots →</a>',
+        '<a href="index.html" class="ap-back-link">← Userpoll</a>'
+    )
+    # Inject IS_AP_PAGE and FRAG_PATH_PREFIX constants before the inlined JS
+    fragment_years_js = json.dumps(fragment_years or [])
+    full_html = full_html.replace(
+        f"const FRAGMENT_YEARS = {fragment_years_js};",
+        f"const IS_AP_PAGE = true;\nconst FRAG_PATH_PREFIX = 'data-appage-';\nconst FRAGMENT_YEARS = {fragment_years_js};"
+    )
+    return full_html
+
+
+def rebuild_ap_html():
+    """Rebuild ap-ballots.html from cached ap25-YEAR.json and data-appage-YEAR.html fragment files."""
+    base_dir = BASE_HTML_DIR
+
+    # Discover available appage years from fragment files
+    appage_years = sorted([
+        re.match(r'data-appage-(\d+)\.html$', fname).group(1)
+        for fname in os.listdir(base_dir)
+        if re.match(r'data-appage-\d+\.html$', fname)
+    ])
+    if not appage_years:
+        print("No data-appage-YEAR.html files found; skipping ap-ballots.html rebuild.")
+        return
+
+    current_year = max(appage_years)
+    fragment_years = [y for y in appage_years if y != current_year]
+
+    # Build inline data and tabs for the current year from ap25-YEAR.json
+    json_path = os.path.join(base_dir, f"ap25-{current_year}.json")
+    inline_data = ""
+    tabs_html_lines = []
+
+    if os.path.exists(json_path):
+        with open(json_path, "r") as f:
+            data = json.load(f)
+        for week_key in sorted(data["weeks"].keys(), key=lambda w: int(w)):
+            week = int(week_key)
+            week_data = data["weeks"][week_key]
+            voters = week_data.get("voters", [])
+            if not voters:
+                continue
+            voter_tuples = []
+            for v in voters:
+                if not v["teams"]:
+                    continue
+                ballot_logos = [_normalize_ap_team_name(t) + ".png" for t in v["teams"]]
+                voter_tuples.append(("", v["username"], None, ballot_logos))
+            voter_tuples.sort(key=lambda x: x[1].lower())
+            block = build_appage_week_block(week, current_year, voter_tuples)
+            inline_data = (inline_data + "\n" + block).strip()
+            week_label = "Pre-Season" if week == 0 else ("Final" if week == 20 else None)
+            label_attr = f' data-weeklabel="{week_label}"' if week_label else ""
+            tab_text = f"{current_year} {week_label}" if week_label else f"{current_year} #{week}"
+            week_id = f"week-{current_year}-{week}"
+            tabs_html_lines.append(
+                f'<button class="week-tab" data-week="{week_id}" data-weeknum="{week}"'
+                f' data-year="{current_year}"{label_attr}>{tab_text}</button>'
+            )
+
+    # Build tabs for prior fragment years by reading their week IDs from the fragment files
+    for year in sorted(appage_years):
+        if year == current_year:
+            continue
+        frag_path = os.path.join(base_dir, f"data-appage-{year}.html")
+        if not os.path.exists(frag_path):
+            continue
+        with open(frag_path, "r", encoding="utf-8") as f:
+            frag = f.read()
+        for wid_match in re.finditer(r'<div id="(week-(\d+)-(\d+))"', frag):
+            wid, yr, wn_str = wid_match.group(1), wid_match.group(2), wid_match.group(3)
+            wn = int(wn_str)
+            week_label = "Pre-Season" if wn == 0 else ("Final" if wn == 20 else None)
+            label_attr = f' data-weeklabel="{week_label}"' if week_label else ""
+            tab_text = f"{yr} {week_label}" if week_label else f"{yr} #{wn}"
+            tabs_html_lines.append(
+                f'<button class="week-tab" data-week="{wid}" data-weeknum="{wn}"'
+                f' data-year="{yr}"{label_attr}>{tab_text}</button>'
+            )
+
+    tabs_html = "\n".join(tabs_html_lines)
+    full_html = build_ap_html(tabs_html, inline_data, fragment_years)
+    with open(AP_HTML_PATH, "w", encoding="utf-8") as f:
+        f.write(full_html)
+    print(f"✓ Rebuilt ap-ballots.html ({current_year} inline, {len(fragment_years)} year fragments).")
+
 
 def rebuild_html():
     """Rewrite index.html using existing tab/data content but updated CSS/JS/structure."""
@@ -1253,10 +1750,12 @@ def rebuild_html():
     write_year_fragments(data_by_year, current_year, base_dir)
     tenure_counts = compute_tenure_counts(data_html)
 
-    full_html = build_full_html(tabs_html, inline_data, fragment_years, tenure_counts)
+    ap_tabs_html, ap_fragment_years = get_ap_info(HTML_PATH)
+    full_html = build_full_html(tabs_html, inline_data, fragment_years, tenure_counts, ap_tabs_html, ap_fragment_years)
     with open(HTML_PATH, "w", encoding="utf-8") as f:
         f.write(full_html)
     print(f"✓ Rebuilt HTML with {len(week_ids)} weeks ({current_year} inline, {len(fragment_years)} year fragments).")
+    rebuild_ap_html()
 
 def parse_voter_tuples_from_section_html(section_html):
     """
@@ -1617,6 +2116,8 @@ def main():
                         help="Remove rows from data-YEAR.html whose ballot IDs appear in data-REF_YEAR.html (detects reused/overwritten ballot IDs)")
     parser.add_argument("--cbbpoll", action="store_true", help="Scrape from cbbpoll.com (legacy site)")
     parser.add_argument("--cbbpoll-build", action="store_true", help="Build HTML from cached cbbpoll.com data")
+    parser.add_argument("--ap25", action="store_true", help="Scrape AP 25 data from collegepolltracker.com")
+    parser.add_argument("--ap25-build", action="store_true", help="Build HTML from cached AP 25 data")
     args = parser.parse_args()
 
     if args.to_webp:
@@ -1669,6 +2170,26 @@ def main():
                 cbbpoll_build_season(y)
         else:
             cbbpoll_build_season(args.year)
+        return
+
+    if args.ap25:
+        if args.year is None:
+            parser.error("--year is required with --ap25 (our year, e.g. 2026, or 0 for all)")
+        if args.year == 0:
+            for our_y in sorted(AP25_SITE_YEARS.values()):
+                ap25_scrape_season(our_y)
+        else:
+            ap25_scrape_season(args.year)
+        return
+
+    if args.ap25_build:
+        if args.year is None:
+            parser.error("--year is required with --ap25-build (our year, e.g. 2026, or 0 for all)")
+        if args.year == 0:
+            for our_y in sorted(AP25_SITE_YEARS.values()):
+                ap25_build_season(our_y)
+        else:
+            ap25_build_season(args.year)
         return
 
     if not args.week or not args.year:

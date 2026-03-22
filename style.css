@@ -32,6 +32,7 @@ h1 span:hover {
     transform: scale(1.02);
 }
 
+
 .dropdown-wrapper {
     position: relative;
     display: inline-block;
@@ -743,6 +744,17 @@ body.year-loading::after {
 }
 .spread-toggle:hover:not(.active) {
     background: #e8e8e8;
+}
+
+.ap-back-link {
+    font-size: 13px;
+    color: #888;
+    text-decoration: none;
+    margin-left: 12px;
+    vertical-align: middle;
+}
+.ap-back-link:hover {
+    color: #555;
 }
 
 @media (max-device-width: 768px) {

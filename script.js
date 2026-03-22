@@ -2,6 +2,10 @@ let _sortedTabsCache = null;
 let _leaderboardDataCache = null;
 let _deltaDataCache = null;
 let _deltaDataCacheIsProvisional = null;
+let _apChordPending = false;
+let _apChordTimer = null;
+let _apCurrentYear = null;
+let _apCurrentWeekNum = null;
 
 const _loadedYears = new Set();
 const _loadingYears = {};
@@ -39,7 +43,7 @@ async function loadYear(year) {
     _loadingYears[year] = (async () => {
         try {
             document.body.classList.add('year-loading');
-            const resp = await fetch(`data-${year}.html`);
+            const resp = await fetch(`${typeof FRAG_PATH_PREFIX !== 'undefined' ? FRAG_PATH_PREFIX : 'data-'}${year}.html`);
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const html = await resp.text();
             const container = document.getElementById('year-data-container');
@@ -58,6 +62,32 @@ async function loadYear(year) {
         }
     })();
     return _loadingYears[year];
+}
+
+async function loadApYear(year) {
+    const key = `ap-${year}`;
+    if (_loadedYears.has(key)) return;
+    if (_loadingYears[key]) return _loadingYears[key];
+    const fragList = typeof AP_FRAGMENT_YEARS !== 'undefined' ? AP_FRAGMENT_YEARS : [];
+    if (!fragList.includes(year)) {
+        _loadedYears.add(key);
+        return;
+    }
+    _loadingYears[key] = (async () => {
+        try {
+            const resp = await fetch(`data-ap-${year}.html`);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const html = await resp.text();
+            const container = document.getElementById('year-data-container');
+            container.insertAdjacentHTML('beforeend', html);
+            _loadedYears.add(key);
+        } catch (e) {
+            console.error(`Failed to load AP year ${year}:`, e);
+        } finally {
+            delete _loadingYears[key];
+        }
+    })();
+    return _loadingYears[key];
 }
 
 const highlightClasses = [
@@ -185,8 +215,14 @@ function lazyLoadWeek(block) {
 function getSortedTabs() {
     if (_sortedTabsCache) return _sortedTabsCache;
     _sortedTabsCache = Array.from(document.querySelectorAll(".week-tab"))
+        .filter(t => t.dataset.poll !== "ap")
         .sort((a, b) => parseInt(b.dataset.year) - parseInt(a.dataset.year) || parseInt(b.dataset.weeknum) - parseInt(a.dataset.weeknum));
     return _sortedTabsCache;
+}
+
+function getSortedApTabs() {
+    return Array.from(document.querySelectorAll(".week-tab[data-poll='ap']"))
+        .sort((a, b) => parseInt(b.dataset.year) - parseInt(a.dataset.year) || parseInt(b.dataset.weeknum) - parseInt(a.dataset.weeknum));
 }
 
 function getVoterName(row) {
@@ -1351,52 +1387,55 @@ function closeAllPickers(forceCloseYear = false) {
 }
 
 function rebuildYearPicker() {
-    const tabs = Array.from(document.querySelectorAll(".week-tab"));
+    const isAp = _apCurrentYear !== null;
+    const allTabs = isAp ? getSortedApTabs() : Array.from(document.querySelectorAll(".week-tab")).filter(t => t.dataset.poll !== "ap");
     const byYear = {};
-    tabs.forEach(t => {
+    allTabs.forEach(t => {
         const y = t.dataset.year;
         if (!byYear[y]) byYear[y] = [];
         byYear[y].push(t);
     });
-    const years = Object.keys(byYear).filter(y => !HIDDEN_YEARS.has(y)).sort();
+    const showHidden = isAp || (typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE);
+    const years = Object.keys(byYear).filter(y => showHidden || !HIDDEN_YEARS.has(y)).sort();
 
     const yearPicker = document.getElementById("year-picker");
     yearPicker.innerHTML = "";
-    const activeTab = document.querySelector(".week-tab.active");
-    const activeYear = activeTab ? activeTab.dataset.year : null;
+    const activeYear = isAp ? _apCurrentYear : (document.querySelector(".week-tab.active")?.dataset.year ?? null);
     years.forEach(y => {
         const btn = document.createElement("button");
         btn.className = "picker-btn";
         btn.textContent = y;
         btn.dataset.year = y;
-        if (y === activeYear) {
-            btn.style.textDecoration = "underline";
-        }
+        if (y === activeYear) btn.style.textDecoration = "underline";
         btn.addEventListener("click", async e => {
             e.stopPropagation();
-            try { await loadYear(y); } catch { return; }
-            const activeTab = document.querySelector(".week-tab.active");
-            const currentWeekNum = activeTab ? parseInt(activeTab.dataset.weeknum) : null;
-            const sameWeek = currentWeekNum
-                ? byYear[y].find(t => parseInt(t.dataset.weeknum) === currentWeekNum)
-                : null;
-            const target = sameWeek || byYear[y][byYear[y].length - 1];
-            showWeek(target.dataset.week);
-            backgroundLoad();
             const weekWasPinned = weekPickerPinned;
-            // Always close year picker explicitly
             const yearPicker = document.getElementById("year-picker");
-            const yearText = document.getElementById("year-text");
             yearPicker.classList.remove("open");
-            yearText.style.display = "";
-            // Restore week picker if pinned, otherwise close everything
+            document.getElementById("year-text").style.display = "";
+
+            if (isAp) {
+                await loadApYear(y);
+                const apTabsForYear = getSortedApTabs().filter(t => t.dataset.year === y);
+                const sameWeek = apTabsForYear.find(t => t.dataset.weeknum === _apCurrentWeekNum);
+                const target = sameWeek || apTabsForYear[0];
+                if (target) await showApWeek(target.dataset.year, target.dataset.weeknum);
+            } else {
+                try { await loadYear(y); } catch { return; }
+                const activeTab = document.querySelector(".week-tab.active");
+                const currentWeekNum = activeTab ? parseInt(activeTab.dataset.weeknum) : null;
+                const sameWeek = currentWeekNum ? byYear[y].find(t => parseInt(t.dataset.weeknum) === currentWeekNum) : null;
+                const target = sameWeek || byYear[y][byYear[y].length - 1];
+                showWeek(target.dataset.week);
+                backgroundLoad();
+            }
+
             if (weekWasPinned) {
                 weekPickerPinned = true;
                 const weekPicker = document.getElementById("week-picker");
-                const weekText = document.getElementById("week-text");
                 rebuildWeekPicker();
                 weekPicker.classList.add("open");
-                weekText.style.display = "none";
+                document.getElementById("week-text").style.display = "none";
             } else {
                 closeAllPickers();
             }
@@ -1406,44 +1445,79 @@ function rebuildYearPicker() {
 }
 
 function rebuildWeekPicker() {
-    const currentYear = document.getElementById("year-text").innerText;
-    const activeTab = document.querySelector(".week-tab.active");
-    const tabs = Array.from(document.querySelectorAll(`.week-tab[data-year="${currentYear}"]`))
-        .filter(t => parseInt(t.dataset.weeknum) !== 0)
-        .sort((a, b) => parseInt(a.dataset.weeknum) - parseInt(b.dataset.weeknum));
+    const isAp = _apCurrentYear !== null;
+    const currentYear = isAp ? _apCurrentYear : document.getElementById("year-text").innerText;
     const weekPicker = document.getElementById("week-picker");
     weekPicker.innerHTML = "";
-    tabs.forEach(t => {
-        const btn = document.createElement("button");
-        btn.className = "picker-btn";
-        const wnum = parseInt(t.dataset.weeknum);
-        btn.textContent = wnum < 10 ? "0" + wnum : String(wnum);
-        btn.dataset.week = t.dataset.week;
-        if (activeTab && t.dataset.week === activeTab.dataset.week) {
-            btn.style.textDecoration = "underline";
-        }
-        btn.addEventListener("click", e => {
-            e.stopPropagation();
-            if (weekPickerPinned) {
-                const activeTab = document.querySelector(".week-tab.active");
-                if (activeTab && activeTab.dataset.week === t.dataset.week) {
-                    // Clicking the current week while pinned: unpin and close
-                    weekPickerPinned = false;
+
+    if (isAp) {
+        const tabs = getSortedApTabs()
+            .filter(t => t.dataset.year === currentYear)
+            .sort((a, b) => parseInt(a.dataset.weeknum) - parseInt(b.dataset.weeknum));
+        tabs.forEach(t => {
+            const btn = document.createElement("button");
+            btn.className = "picker-btn";
+            const wnum = parseInt(t.dataset.weeknum);
+            const label = t.dataset.weeklabel;
+            if (label) {
+                if (label.toLowerCase().includes("final")) btn.textContent = "Final";
+                else if (label.toLowerCase().includes("pre")) btn.textContent = "Pre";
+                else btn.textContent = label;
+            } else {
+                btn.textContent = wnum < 10 ? "0" + wnum : String(wnum);
+            }
+            if (t.dataset.weeknum === _apCurrentWeekNum) btn.style.textDecoration = "underline";
+            btn.addEventListener("click", async e => {
+                e.stopPropagation();
+                if (weekPickerPinned) {
+                    if (t.dataset.weeknum === _apCurrentWeekNum) {
+                        weekPickerPinned = false;
+                        closeAllPickers();
+                    } else {
+                        await showApWeek(t.dataset.year, t.dataset.weeknum);
+                        rebuildWeekPicker();
+                    }
+                } else {
+                    await showApWeek(t.dataset.year, t.dataset.weeknum);
                     closeAllPickers();
+                }
+            });
+            weekPicker.appendChild(btn);
+        });
+    } else {
+        const activeTab = document.querySelector(".week-tab.active");
+        const tabs = Array.from(document.querySelectorAll(`.week-tab[data-year="${currentYear}"]`))
+            .filter(t => t.dataset.poll !== "ap")
+            .filter(t => parseInt(t.dataset.weeknum) !== 0)
+            .sort((a, b) => parseInt(a.dataset.weeknum) - parseInt(b.dataset.weeknum));
+        tabs.forEach(t => {
+            const btn = document.createElement("button");
+            btn.className = "picker-btn";
+            const wnum = parseInt(t.dataset.weeknum);
+            btn.textContent = wnum < 10 ? "0" + wnum : String(wnum);
+            btn.dataset.week = t.dataset.week;
+            if (activeTab && t.dataset.week === activeTab.dataset.week) btn.style.textDecoration = "underline";
+            btn.addEventListener("click", e => {
+                e.stopPropagation();
+                if (weekPickerPinned) {
+                    if (activeTab && activeTab.dataset.week === t.dataset.week) {
+                        weekPickerPinned = false;
+                        closeAllPickers();
+                    } else {
+                        showWeek(t.dataset.week);
+                        rebuildWeekPicker();
+                    }
                 } else {
                     showWeek(t.dataset.week);
-                    rebuildWeekPicker();
+                    closeAllPickers();
                 }
-            } else {
-                showWeek(t.dataset.week);
-                closeAllPickers();
-            }
+            });
+            weekPicker.appendChild(btn);
         });
-        weekPicker.appendChild(btn);
-    });
+    }
 }
 
-function showWeek(weekId) {
+async function showWeek(weekId) {
     document.querySelectorAll(".week-block").forEach(b => b.style.display = "none");
     document.querySelectorAll(".week-tab").forEach(t => t.classList.remove("active"));
     const block = document.getElementById(weekId);
@@ -1488,19 +1562,145 @@ function showWeek(weekId) {
     updateAvgRankLines();
 }
 
-// Toggle Official / Provisional within current week
-document.getElementById("toggle-text").addEventListener("click", () => {
+// Show a specific AP week — the AP-mode equivalent of showWeek().
+// Updates _apCurrentYear/_apCurrentWeekNum, hides the previous AP block,
+// loads the year fragment if needed, shows the new block, and rebuilds pickers.
+async function showApWeek(year, weekNum) {
+    year = String(year);
+    weekNum = String(weekNum);
+
+    // Hide previous AP block
+    if (_apCurrentYear && _apCurrentWeekNum) {
+        const prev = document.getElementById(`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`);
+        if (prev) prev.style.display = "none";
+    }
+    _apCurrentYear = year;
+    _apCurrentWeekNum = weekNum;
+
+    await loadApYear(year);
+    const apBlock = document.getElementById(`week-ap-${year}-${weekNum}`);
+    if (apBlock) {
+        apBlock.style.display = "";
+        apBlock.querySelectorAll(".ballot-section").forEach(s => s.style.display = "none");
+        const apSections = apBlock.querySelectorAll(".ballot-section");
+        if (apSections[0]) apSections[0].style.display = "block";
+        lazyLoadWeek(apBlock);
+    }
+
+    if (!isMobile()) {
+        const apTab = document.querySelector(`.week-tab[data-poll="ap"][data-year="${year}"][data-weeknum="${weekNum}"]`);
+        const label = apTab?.dataset.weeklabel;
+        const wn = parseInt(weekNum);
+        let weekDisplay;
+        if (label) {
+            if (label.toLowerCase().includes("final")) weekDisplay = "Final";
+            else if (label.toLowerCase().includes("pre")) weekDisplay = "Pre";
+            else weekDisplay = label;
+        } else {
+            weekDisplay = "#" + (wn < 10 ? "0" + wn : wn);
+        }
+        document.getElementById("week-text").innerText = weekDisplay;
+        document.getElementById("year-text").innerText = year;
+        rebuildYearPicker();
+        rebuildWeekPicker();
+    }
+
+    bindTeamLogos();
+    bindRankHeaders();
+    bindVoterCells();
+    bindVotersToggle();
+    applyTableSort(currentSort);
+    updateAvgRankLines();
+}
+
+// Enter AP Ballots mode from whatever userpoll week is currently active.
+async function switchToApBallots() {
+    const activeTab = document.querySelector(".week-tab.active");
+    if (!activeTab || activeTab.dataset.poll === "ap") return;
+    const year = activeTab.dataset.year;
+    const weekNum = activeTab.dataset.weeknum;
+
+    document.getElementById("toggle-text").innerText = "AP Ballots";
+
+    // Hide userpoll block
+    const activeBlock = document.getElementById(activeTab.dataset.week);
+    if (activeBlock) activeBlock.style.display = "none";
+
+    // Load AP year so we can find which weeks exist
+    await loadApYear(year);
+    let targetWeekNum = weekNum;
+    const apTabsForYear = getSortedApTabs().filter(t => t.dataset.year === year);
+    const exactMatch = apTabsForYear.find(t => t.dataset.weeknum === weekNum);
+    if (!exactMatch && apTabsForYear.length > 0) {
+        // Find the closest available AP week
+        const closest = apTabsForYear.reduce((best, t) =>
+            Math.abs(parseInt(t.dataset.weeknum) - parseInt(weekNum)) <
+            Math.abs(parseInt(best.dataset.weeknum) - parseInt(weekNum)) ? t : best
+        );
+        targetWeekNum = closest.dataset.weeknum;
+    }
+
+    await showApWeek(year, targetWeekNum);
+}
+
+// Exit AP Ballots mode and restore the userpoll view.
+function exitApBallots() {
+    if (!_apCurrentYear || !_apCurrentWeekNum) return;
+
+    // Hide current AP block
+    const apBlock = document.getElementById(`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`);
+    if (apBlock) apBlock.style.display = "none";
+
+    _apCurrentYear = null;
+    _apCurrentWeekNum = null;
+
+    document.getElementById("toggle-text").innerText = "Official Ballots";
+
+    // Restore userpoll block for the current userpoll active tab
+    const activeTab = document.querySelector(".week-tab.active");
+    if (activeTab && activeTab.dataset.poll !== "ap") {
+        const activeBlock = document.getElementById(activeTab.dataset.week);
+        if (activeBlock) {
+            activeBlock.style.display = "";
+            activeBlock.querySelectorAll(".ballot-section").forEach(s => s.style.display = "none");
+            const sections = activeBlock.querySelectorAll(".ballot-section");
+            if (sections[0]) sections[0].style.display = "block";
+        }
+        if (!isMobile()) {
+            const wn = parseInt(activeTab.dataset.weeknum);
+            document.getElementById("week-text").innerText = "#" + (wn < 10 ? "0" + wn : wn);
+            document.getElementById("year-text").innerText = activeTab.dataset.year;
+            rebuildYearPicker();
+            rebuildWeekPicker();
+        }
+    }
+
+    _deltaDataCache = null;
+    applyTableSort(currentSort);
+    updateAvgRankLines();
+}
+
+// Toggle Official → Provisional → Official (AP Ballots only via Shift+A+P)
+document.getElementById("toggle-text").addEventListener("click", async () => {
+    const current = document.getElementById("toggle-text").innerText;
+
+    if (current === "AP Ballots") {
+        exitApBallots();
+        return;
+    }
+
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab) return;
     const activeBlock = document.getElementById(activeTab.dataset.week);
     if (!activeBlock) return;
     const sections = activeBlock.querySelectorAll(".ballot-section");
-    const current = document.getElementById("toggle-text").innerText;
     sections.forEach(s => s.style.display = "none");
+
     if (current === "Official Ballots") {
         if (sections[1]) sections[1].style.display = "block";
         document.getElementById("toggle-text").innerText = "Provisional Ballots";
     } else {
+        // Provisional → Official
         if (sections[0]) sections[0].style.display = "block";
         document.getElementById("toggle-text").innerText = "Official Ballots";
     }
@@ -2588,7 +2788,14 @@ document.addEventListener("keydown", e => {
 
     if (e.key === "A" || e.key === "a") {
         e.preventDefault();
-        applyTableSort("alphabetic");
+        // Chord: Shift+A then Shift+P → AP Ballots; otherwise alphabetic sort after short delay
+        _apChordPending = true;
+        if (_apChordTimer) clearTimeout(_apChordTimer);
+        _apChordTimer = setTimeout(() => {
+            _apChordPending = false;
+            _apChordTimer = null;
+            applyTableSort("alphabetic");
+        }, 250);
         return;
     }
 
@@ -2677,7 +2884,35 @@ document.addEventListener("keydown", e => {
 
     if (e.key === "P" || e.key === "p") {
         e.preventDefault();
-        saveTableAsPng();
+        if (_apChordPending) {
+            // Chord: Shift+A+P → toggle AP Ballots
+            clearTimeout(_apChordTimer);
+            _apChordPending = false;
+            _apChordTimer = null;
+            if (_apCurrentYear !== null) {
+                exitApBallots();
+            } else {
+                switchToApBallots();
+            }
+        } else {
+            saveTableAsPng();
+        }
+        return;
+    }
+
+    if (e.key === "O" || e.key === "o") {
+        if (_apChordPending) {
+            // Chord: Shift+A+O → toggle AP Ballots
+            e.preventDefault();
+            clearTimeout(_apChordTimer);
+            _apChordPending = false;
+            _apChordTimer = null;
+            if (_apCurrentYear !== null) {
+                exitApBallots();
+            } else {
+                switchToApBallots();
+            }
+        }
         return;
     }
 
@@ -2685,8 +2920,8 @@ document.addEventListener("keydown", e => {
         e.preventDefault();
         const preSeasonTab = document.querySelector(`.week-tab[data-year="${currentYear}"][data-weeknum="0"]`);
         if (preSeasonTab) {
-            loadYear(currentYear).then(() => {
-                showWeek(preSeasonTab.dataset.week);
+            loadYear(currentYear).then(async () => {
+                await showWeek(preSeasonTab.dataset.week);
                 if (weekPickerPinned) rebuildWeekPicker();
             }).catch(() => {});
         }
@@ -2695,54 +2930,81 @@ document.addEventListener("keydown", e => {
 
     if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
         e.preventDefault();
-        const sortedAll = getSortedTabs().filter(t => parseInt(t.dataset.weeknum) !== 0).slice().reverse();
-        let idx = sortedAll.findIndex(t => t.dataset.week === activeTab.dataset.week);
-        if (idx === -1 && currentWeekNum === 0) {
-            // Currently on pre-season; treat as just before week 1 of this year
-            const firstOfYear = sortedAll.findIndex(t => t.dataset.year === currentYear);
-            idx = firstOfYear - 1;
-        }
-        const target = e.key === "ArrowRight"
-            ? sortedAll[idx + 1]
-            : sortedAll[idx - 1];
-        if (target) {
-            loadYear(target.dataset.year).then(() => {
-                showWeek(target.dataset.week);
-                if (weekPickerPinned) rebuildWeekPicker();
-                if (document.getElementById("avg-rank-modal").classList.contains("open"))
-                    showAvgRankModal(target.dataset.week);
-                const vhm = document.getElementById("voter-history-modal");
-                if (vhm.classList.contains("open") && vhm.dataset.chartType === "highlow")
-                    showWeekHighLowChart(target.dataset.week, vhm.dataset.chartMode || "highlow");
-                backgroundLoad();
-            }).catch(() => {});
+        if (_apCurrentYear !== null) {
+            // AP mode: navigate AP weeks
+            const sortedApAll = getSortedApTabs().slice().reverse(); // ascending
+            const idx = sortedApAll.findIndex(t => t.dataset.year === _apCurrentYear && t.dataset.weeknum === _apCurrentWeekNum);
+            const target = e.key === "ArrowRight" ? sortedApAll[idx + 1] : sortedApAll[idx - 1];
+            if (target) {
+                loadApYear(target.dataset.year).then(async () => {
+                    await showApWeek(target.dataset.year, target.dataset.weeknum);
+                    if (weekPickerPinned) rebuildWeekPicker();
+                }).catch(() => {});
+            }
+        } else {
+            const sortedAll = getSortedTabs().filter(t => parseInt(t.dataset.weeknum) !== 0).slice().reverse();
+            let idx = sortedAll.findIndex(t => t.dataset.week === activeTab.dataset.week);
+            if (idx === -1 && currentWeekNum === 0) {
+                // Currently on pre-season; treat as just before week 1 of this year
+                const firstOfYear = sortedAll.findIndex(t => t.dataset.year === currentYear);
+                idx = firstOfYear - 1;
+            }
+            const target = e.key === "ArrowRight" ? sortedAll[idx + 1] : sortedAll[idx - 1];
+            if (target) {
+                loadYear(target.dataset.year).then(async () => {
+                    await showWeek(target.dataset.week);
+                    if (weekPickerPinned) rebuildWeekPicker();
+                    if (document.getElementById("avg-rank-modal").classList.contains("open"))
+                        showAvgRankModal(target.dataset.week);
+                    const vhm = document.getElementById("voter-history-modal");
+                    if (vhm.classList.contains("open") && vhm.dataset.chartType === "highlow")
+                        showWeekHighLowChart(target.dataset.week, vhm.dataset.chartMode || "highlow");
+                    backgroundLoad();
+                }).catch(() => {});
+            }
         }
     }
 
     if (e.key === "ArrowUp" || e.key === "ArrowDown") {
         e.preventDefault();
-        const tabs = getSortedTabs();
-        const years = [...new Set(tabs.map(t => t.dataset.year))].filter(y => !HIDDEN_YEARS.has(y)).sort();
-        const yearIdx = years.indexOf(currentYear);
-        const targetYear = e.key === "ArrowUp"
-            ? years[yearIdx + 1]
-            : years[yearIdx - 1];
-        if (!targetYear) return;
-        loadYear(targetYear).then(() => {
-            const yearTabs = getSortedTabs().filter(t => t.dataset.year === targetYear);
-            const sameWeek = yearTabs.find(t => parseInt(t.dataset.weeknum) === currentWeekNum);
-            const target = sameWeek || yearTabs.sort((a, b) => parseInt(b.dataset.weeknum) - parseInt(a.dataset.weeknum))[0];
-            if (target) {
-                showWeek(target.dataset.week);
-                if (weekPickerPinned) rebuildWeekPicker();
-                if (document.getElementById("avg-rank-modal").classList.contains("open"))
-                    showAvgRankModal(target.dataset.week);
-                const vhm2 = document.getElementById("voter-history-modal");
-                if (vhm2.classList.contains("open") && vhm2.dataset.chartType === "highlow")
-                    showWeekHighLowChart(target.dataset.week, vhm2.dataset.chartMode || "highlow");
-                backgroundLoad();
-            }
-        }).catch(() => {});
+        if (_apCurrentYear !== null) {
+            // AP mode: navigate AP years
+            const apTabs = getSortedApTabs();
+            const years = [...new Set(apTabs.map(t => t.dataset.year))].sort();
+            const yearIdx = years.indexOf(_apCurrentYear);
+            const targetYear = e.key === "ArrowUp" ? years[yearIdx + 1] : years[yearIdx - 1];
+            if (!targetYear) return;
+            loadApYear(targetYear).then(async () => {
+                const yearApTabs = getSortedApTabs().filter(t => t.dataset.year === targetYear);
+                const sameWeek = yearApTabs.find(t => t.dataset.weeknum === _apCurrentWeekNum);
+                const target = sameWeek || yearApTabs[0]; // [0] = latest (sorted desc)
+                if (target) {
+                    await showApWeek(target.dataset.year, target.dataset.weeknum);
+                    if (weekPickerPinned) rebuildWeekPicker();
+                }
+            }).catch(() => {});
+        } else {
+            const tabs = getSortedTabs();
+            const years = [...new Set(tabs.map(t => t.dataset.year))].filter(y => (typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE) || !HIDDEN_YEARS.has(y)).sort();
+            const yearIdx = years.indexOf(currentYear);
+            const targetYear = e.key === "ArrowUp" ? years[yearIdx + 1] : years[yearIdx - 1];
+            if (!targetYear) return;
+            loadYear(targetYear).then(async () => {
+                const yearTabs = getSortedTabs().filter(t => t.dataset.year === targetYear);
+                const sameWeek = yearTabs.find(t => parseInt(t.dataset.weeknum) === currentWeekNum);
+                const target = sameWeek || yearTabs.sort((a, b) => parseInt(b.dataset.weeknum) - parseInt(a.dataset.weeknum))[0];
+                if (target) {
+                    await showWeek(target.dataset.week);
+                    if (weekPickerPinned) rebuildWeekPicker();
+                    if (document.getElementById("avg-rank-modal").classList.contains("open"))
+                        showAvgRankModal(target.dataset.week);
+                    const vhm2 = document.getElementById("voter-history-modal");
+                    if (vhm2.classList.contains("open") && vhm2.dataset.chartType === "highlow")
+                        showWeekHighLowChart(target.dataset.week, vhm2.dataset.chartMode || "highlow");
+                    backgroundLoad();
+                }
+            }).catch(() => {});
+        }
     }
 
     if (e.key === "?") {
