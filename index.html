@@ -3798,7 +3798,10 @@ function applyTableSort(sort) {
     });
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab) return;
-    const block = document.getElementById(activeTab.dataset.week);
+    const blockId = _apCurrentYear !== null
+        ? `week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`
+        : activeTab.dataset.week;
+    const block = document.getElementById(blockId);
     if (!block) return;
 
     // Show/hide rank number headers based on sort
