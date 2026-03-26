@@ -2,8 +2,6 @@ let _sortedTabsCache = null;
 let _leaderboardDataCache = null;
 let _deltaDataCache = null;
 let _deltaDataCacheIsProvisional = null;
-let _apChordPending = false;
-let _apChordTimer = null;
 let _apCurrentYear = null;
 let _apCurrentWeekNum = null;
 
@@ -397,8 +395,9 @@ function bindVotersToggle() {
                     document.body.appendChild(picker);
                 }
                 const rect = toggle.getBoundingClientRect();
+                const tableLeft = (toggle.closest("table") || toggle).getBoundingClientRect().left;
                 picker.style.top = rect.top + "px";
-                picker.style.left = rect.left + "px";
+                picker.style.left = tableLeft + "px";
                 // Match toggle font exactly
                 const ts = getComputedStyle(toggle);
                 picker.style.font = ts.font;
@@ -420,7 +419,7 @@ document.addEventListener("mousedown", e => {
     if (!opt) return;
     e.stopPropagation();
     const sort = opt.dataset.sort;
-    document.querySelectorAll(".consensus-dist").forEach(el => el.remove());
+    const action = opt.dataset.action;
     const picker = opt.closest(".sort-picker");
     // Show the toggle again
     if (picker._toggle) picker._toggle.style.display = "";
@@ -428,12 +427,52 @@ document.addEventListener("mousedown", e => {
     // Restore rank headers when picker closes
     const block = picker._sourceBlock || picker.closest(".week-block");
     showRankHeaders(block);
-    applyTableSort(sort);
+    if (sort) {
+        applyTableSort(sort);
+    } else if (action) {
+        handlePickerAction(action);
+    }
 }, true);
+
+function handlePickerAction(action) {
+    const activeTab = document.querySelector(".week-tab.active");
+    const weekId = _apCurrentYear !== null
+        ? `week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`
+        : activeTab?.dataset.week;
+    switch (action) {
+        case "weeklyStats":
+            if (weekId) showAvgRankModal(weekId);
+            break;
+        case "yearlyStats":
+            showSeasonStatsModal();
+            break;
+        case "dotPlot":
+            if (weekId) showWeekHighLowChart(weekId, "dots");
+            break;
+        case "highLow":
+            if (weekId) showWeekHighLowChart(weekId, "highlow");
+            break;
+        case "weightedRecency":
+            if (weekId) showWeekHighLowChart(weekId, "weighted");
+            break;
+        case "heatmap":
+            showHeatmapModal();
+            break;
+        case "precisionLeaderboard":
+            showPrecisionModal();
+            break;
+        case "expandDeltas":
+            toggleAllDeltas();
+            break;
+        case "legend":
+            document.getElementById("keybind-legend-modal").classList.toggle("open");
+            break;
+    }
+}
 
 let currentSort = "alphabetic";
 
-const SORT_LABELS = { alphabetic: "Alphabetic", zetabetique: "Zétabétique", consensus: "Consensus" };
+const SORT_LABELS = { alphabetic: "Functions", zetabetique: "Zétabétique", consensus: "Consensus" };
 
 function setGlobalSort(sort) {
     currentSort = sort;
@@ -451,7 +490,11 @@ function setGlobalSort(sort) {
 function applyTableSort(sort) {
     setGlobalSort(sort);
     // Close all sort pickers
-    document.querySelectorAll(".sort-picker.open").forEach(p => p.classList.remove("open"));
+    document.querySelectorAll(".sort-picker.open").forEach(p => {
+        if (p._toggle) p._toggle.style.display = "";
+        showRankHeaders(p._sourceBlock || p.closest(".week-block"));
+        p.classList.remove("open");
+    });
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab) return;
     const block = document.getElementById(activeTab.dataset.week);
@@ -669,9 +712,10 @@ function compute5WeekWeighted(weekId, deltaData, yearTabs) {
 
 // Build a map of { weekId -> teams[] | null } for the given username across all loaded weeks.
 // Works for regular voters, "Official Overall" (aggregate row), and "5-Week Weighted" (computed).
-function buildSeasonDataForUser(username) {
+// Pass `tabs` to override which tabs (and their blocks) are scanned — used for AP mode.
+function buildSeasonDataForUser(username, tabs) {
     const result = {};
-    const allTabsSorted = getSortedTabs();
+    const allTabsSorted = tabs || getSortedTabs();
     if (username === "5-Week Weighted") {
         const deltaData = buildDeltaData();
         const yearGroups = {};
@@ -751,14 +795,15 @@ function renderVoterHistoryTable(mergedData, yearTabs, container) {
 
 
 function showVoterHistory(username) {
-    const allTabsSorted = getSortedTabs();
+    const isAp = _apCurrentYear !== null;
+    const allTabsSorted = isAp ? getSortedApTabs() : getSortedTabs();
 
     // Build ballot data for all weeks
-    const mergedData = buildSeasonDataForUser(username);
+    const mergedData = buildSeasonDataForUser(username, allTabsSorted);
 
     // Use the active week's year
     const activeTab = document.querySelector(".week-tab.active");
-    const currentYear = activeTab?.dataset.year || allTabsSorted[0]?.dataset.year;
+    const currentYear = isAp ? _apCurrentYear : (activeTab?.dataset.year || allTabsSorted[0]?.dataset.year);
     const yearTabs = allTabsSorted
         .filter(t => t.dataset.year === currentYear)
         .reverse();
@@ -784,6 +829,12 @@ function bindTeamLogos(root) {
         if (logo.dataset.bound) return;
         logo.dataset.bound = "1";
         logo.addEventListener("click", (e) => {
+            if (e.altKey) {
+                e.stopPropagation();
+                e.preventDefault();
+                showTeamSeasonDotPlot(logo.dataset.team);
+                return;
+            }
             if (e.shiftKey) {
                 e.stopPropagation();
                 const team = logo.dataset.team;
@@ -839,14 +890,15 @@ function bindRankHeaders() {
 }
 
 function showTeamRankChart(team, username) {
-    const allTabsSorted = getSortedTabs();
+    const isAp = _apCurrentYear !== null;
+    const allTabsSorted = isAp ? getSortedApTabs() : getSortedTabs();
 
     // Build ballot data for all weeks (works for all row types)
-    const mergedData = username ? buildSeasonDataForUser(username) : {};
+    const mergedData = username ? buildSeasonDataForUser(username, allTabsSorted) : {};
 
     // Current year's weeks in chronological order
     const activeTab = document.querySelector(".week-tab.active");
-    const currentYear = activeTab?.dataset.year || allTabsSorted[0]?.dataset.year;
+    const currentYear = isAp ? _apCurrentYear : (activeTab?.dataset.year || allTabsSorted[0]?.dataset.year);
     const yearTabs = allTabsSorted.filter(t => t.dataset.year === currentYear).reverse();
 
     // Build data points: rank per week (null = not ranked, hasBallot = submitted a ballot that week)
@@ -1005,6 +1057,229 @@ function showTeamRankChart(team, username) {
     modal.classList.add("open");
 }
 
+
+function showTeamSeasonDotPlot(team, mode = "dots") {
+    const isAp = _apCurrentYear !== null;
+    const allTabsSorted = isAp ? getSortedApTabs() : getSortedTabs();
+    const activeTab = document.querySelector(".week-tab.active");
+    const currentYear = isAp ? _apCurrentYear : (activeTab?.dataset.year || allTabsSorted[0]?.dataset.year);
+    if (!currentYear) return;
+
+    // Chronological order (ascending weeknum)
+    const yearTabs = allTabsSorted.filter(t => t.dataset.year === currentYear).reverse();
+    if (yearTabs.length === 0) return;
+
+    // For each week, collect per-rank voter lists for this team
+    const weekData = yearTabs.map(tab => {
+        const weekId = tab.dataset.week;
+        const block = document.getElementById(weekId);
+        const rankVoters = {};
+        let totalBallots = 0;
+        if (block) {
+            const officialSection = block.querySelectorAll(".ballot-section")[0];
+            if (officialSection) {
+                const voterRows = Array.from(officialSection.querySelectorAll(".voter-row"))
+                    .filter(r => getVoterName(r) !== "Official Overall");
+                totalBallots = voterRows.length;
+                voterRows.forEach(row => {
+                    const voterName = getVoterName(row);
+                    const teams = Array.from(row.querySelectorAll(".team-logo")).map(img => img.dataset.team);
+                    const idx = teams.indexOf(team);
+                    if (idx !== -1) {
+                        const rank = idx + 1;
+                        if (!rankVoters[rank]) rankVoters[rank] = [];
+                        rankVoters[rank].push(voterName);
+                    }
+                });
+            }
+        }
+        return {
+            weekNum: parseInt(tab.dataset.weeknum),
+            weekLabel: tab.dataset.weeklabel,
+            rankVoters,
+            totalBallots,
+        };
+    }).filter(w => w.totalBallots > 0);
+
+    if (weekData.length === 0) return;
+
+    const modal = document.getElementById("voter-history-modal");
+    const title = document.getElementById("voter-history-title");
+    const table = document.getElementById("voter-history-table");
+
+    title.innerHTML = `<img class="logo" src="cbb-logos/${team}.webp" style="height:22px;vertical-align:middle;margin-right:6px;">${formatTeamName(team)} \u2013 ${currentYear} Season`;
+    table.innerHTML = "";
+    table.style.cssText = "display:block; white-space:normal; width:100%;";
+
+    // Toggle buttons
+    const escapedTeam = team.replace(/'/g, "\\'");
+    const toggleDiv = document.createElement("div");
+    toggleDiv.style.cssText = "text-align:center;margin-bottom:10px;";
+    toggleDiv.innerHTML = `
+        <button class="spread-toggle${mode === 'dots' ? ' active' : ''}"
+                onclick="showTeamSeasonDotPlot('${escapedTeam}', 'dots')">Dot Plot</button>
+        <button class="spread-toggle${mode === 'count' ? ' active' : ''}"
+                onclick="showTeamSeasonDotPlot('${escapedTeam}', 'count')">Vote Count</button>`;
+    table.appendChild(toggleDiv);
+
+    const svgNS = "http://www.w3.org/2000/svg";
+    const W = 900, H = 460;
+    const mL = 44, mR = 16, mT = 28, mB = 52;
+    const cW = W - mL - mR, cH = H - mT - mB;
+
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.style.cssText = "width:min(860px,90vw);display:block;margin:0 auto;";
+
+    const n = weekData.length;
+    const slotW = cW / n;
+    const xPos = i => mL + (i + 0.5) * slotW;
+    const yPos = r => mT + ((r - 1) / 24) * cH;
+    const maxR = Math.min(slotW * 0.46, 13);
+
+    const axisColor = "#999", gridColor = "#e8e8e8";
+    const dotFill = "#4488cc";
+
+    // Y gridlines + labels
+    [1, 5, 10, 15, 20, 25].forEach(r => {
+        const y = yPos(r);
+        const line = document.createElementNS(svgNS, "line");
+        line.setAttribute("x1", mL); line.setAttribute("x2", mL + cW);
+        line.setAttribute("y1", y); line.setAttribute("y2", y);
+        line.setAttribute("stroke", gridColor);
+        line.setAttribute("stroke-width", "1");
+        svg.appendChild(line);
+        const txt = document.createElementNS(svgNS, "text");
+        txt.setAttribute("x", mL - 6); txt.setAttribute("y", y + 4);
+        txt.setAttribute("text-anchor", "end"); txt.setAttribute("font-size", "11");
+        txt.setAttribute("fill", axisColor);
+        txt.textContent = r;
+        svg.appendChild(txt);
+    });
+
+    // Chart border
+    const border = document.createElementNS(svgNS, "rect");
+    border.setAttribute("x", mL); border.setAttribute("y", mT);
+    border.setAttribute("width", cW); border.setAttribute("height", cH);
+    border.setAttribute("fill", "none"); border.setAttribute("stroke", "#ddd");
+    border.setAttribute("stroke-width", "1");
+    svg.appendChild(border);
+
+    // Y-axis label
+    const yLbl = document.createElementNS(svgNS, "text");
+    yLbl.setAttribute("x", 10); yLbl.setAttribute("y", mT + cH / 2);
+    yLbl.setAttribute("text-anchor", "middle"); yLbl.setAttribute("font-size", "11");
+    yLbl.setAttribute("fill", axisColor);
+    yLbl.setAttribute("transform", `rotate(-90,10,${mT + cH / 2})`);
+    yLbl.textContent = "Rank";
+    svg.appendChild(yLbl);
+
+    // Tooltip group
+    const tipG = document.createElementNS(svgNS, "g");
+    tipG.setAttribute("pointer-events", "none");
+    tipG.style.display = "none";
+    const tipRect = document.createElementNS(svgNS, "rect");
+    tipRect.setAttribute("rx", "4"); tipRect.setAttribute("ry", "4");
+    tipRect.setAttribute("fill", "#1a1a2e"); tipRect.setAttribute("fill-opacity", "0.92");
+    tipRect.setAttribute("stroke", "#4488cc"); tipRect.setAttribute("stroke-width", "1");
+    tipG.appendChild(tipRect);
+    svg.appendChild(tipG);
+
+    // Dots or count labels + X-axis week labels
+    weekData.forEach((w, i) => {
+        const x = xPos(i);
+
+        Object.entries(w.rankVoters).forEach(([r, voters]) => {
+            const cnt = voters.length;
+            const cy = yPos(Number(r));
+
+            if (mode === "count") {
+                const txt = document.createElementNS(svgNS, "text");
+                txt.setAttribute("x", x);
+                txt.setAttribute("y", cy);
+                txt.setAttribute("text-anchor", "middle");
+                txt.setAttribute("dominant-baseline", "middle");
+                txt.setAttribute("font-size", Math.min(Math.min(20, slotW * 0.45), 7 + Math.sqrt(cnt) * 1.7));
+                txt.setAttribute("fill", dotFill);
+                txt.setAttribute("font-weight", cnt >= 10 ? "700" : "400");
+                txt.textContent = cnt;
+                svg.insertBefore(txt, tipG);
+            } else {
+                const radius = Math.min(maxR, 2 + Math.sqrt(cnt) * 1.5);
+                const circle = document.createElementNS(svgNS, "circle");
+                circle.setAttribute("cx", x);
+                circle.setAttribute("cy", cy);
+                circle.setAttribute("r", radius);
+                circle.setAttribute("fill", dotFill);
+                circle.setAttribute("fill-opacity", "0.7");
+                circle.style.cursor = "default";
+
+                circle.addEventListener("mouseenter", () => {
+                    const lines = voters.length <= 3 ? voters : [`${voters.length} voters`];
+                    const pad = 8, lineH = 14, fontSize = 11;
+                    const maxW = Math.max(...lines.map(l => l.length)) * fontSize * 0.6 + pad * 2;
+                    const boxH = lines.length * lineH + pad * 1.5;
+                    const cx = Number(circle.getAttribute("cx"));
+                    const cr = Number(circle.getAttribute("r"));
+                    let tx = cx - maxW / 2;
+                    let ty = cy - cr - boxH - 4;
+                    if (ty < mT) ty = cy + cr + 4;
+                    tx = Math.max(2, Math.min(tx, W - maxW - 2));
+                    tipRect.setAttribute("x", tx); tipRect.setAttribute("y", ty);
+                    tipRect.setAttribute("width", maxW); tipRect.setAttribute("height", boxH);
+                    while (tipG.childNodes.length > 1) tipG.removeChild(tipG.lastChild);
+                    lines.forEach((line, li) => {
+                        const t = document.createElementNS(svgNS, "text");
+                        t.setAttribute("x", tx + maxW / 2);
+                        t.setAttribute("y", ty + pad + li * lineH + lineH * 0.4);
+                        t.setAttribute("text-anchor", "middle");
+                        t.setAttribute("dominant-baseline", "middle");
+                        t.setAttribute("font-size", fontSize);
+                        t.setAttribute("fill", "#e0e8ff");
+                        t.textContent = line;
+                        tipG.appendChild(t);
+                    });
+                    tipG.style.display = "";
+                });
+                circle.addEventListener("mouseleave", () => { tipG.style.display = "none"; });
+                svg.insertBefore(circle, tipG);
+
+                if (radius >= 8) {
+                    const lbl = document.createElementNS(svgNS, "text");
+                    lbl.setAttribute("x", x);
+                    lbl.setAttribute("y", cy);
+                    lbl.setAttribute("text-anchor", "middle");
+                    lbl.setAttribute("dominant-baseline", "middle");
+                    lbl.setAttribute("font-size", Math.min(radius * 1.1, 11));
+                    lbl.setAttribute("fill", "white");
+                    lbl.setAttribute("font-weight", "600");
+                    lbl.setAttribute("pointer-events", "none");
+                    lbl.textContent = cnt;
+                    svg.insertBefore(lbl, tipG);
+                }
+            }
+        });
+
+        // X-axis week label
+        const wl = w.weekLabel || "";
+        const lbl = document.createElementNS(svgNS, "text");
+        lbl.setAttribute("x", x);
+        lbl.setAttribute("y", mT + cH + 16);
+        lbl.setAttribute("text-anchor", "middle");
+        lbl.setAttribute("font-size", "9");
+        lbl.setAttribute("fill", axisColor);
+        lbl.textContent = wl.toLowerCase().includes("pre") ? "Pre"
+            : wl.toLowerCase().includes("final") ? "Fin"
+            : String(w.weekNum);
+        svg.appendChild(lbl);
+    });
+
+    table.appendChild(svg);
+    modal.dataset.chartType = "teamseason";
+    modal.classList.add("open");
+}
+
+
 function showWeekHighLowChart(weekId, mode = "highlow") {
     const block = document.getElementById(weekId);
     if (!block) return;
@@ -1055,7 +1330,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
     };
 
     const top25 = Object.entries(teamPoints).sort((a, b) => b[1] - a[1]).map(([t]) => t).slice(0, 25);
-    const chartData = top25.map(team => {
+    let chartData = top25.map(team => {
         const avg = teamRankSum[team] / teamVoterCount[team];
         const count = teamVoterCount[team];
         const allRanks = [...teamRanks[team], ...Array(totalVoters - count).fill(26)].sort((a, b) => a - b);
@@ -1064,6 +1339,42 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
         const rankVoters = teamRankVoters[team] || {};
         return { team, avg, hi, lo, allRanks, rankVoters };
     });
+
+    // Weighted Recency mode: circle = 5-week recency-weighted voter avg (compute5WeekWeighted);
+    // hi/lo bars = best and worst per-week voter avg rank across the last 3 weeks.
+    // Both use the same voter pool so the circle always falls within the bar range.
+    if (mode === "weighted") {
+        const wDelta = buildDeltaData();
+        const wTab = document.querySelector(`.week-tab[data-week="${weekId}"]`);
+        const wYear = wTab?.dataset.year || "";
+        const isApWeek = weekId.startsWith("week-ap-");
+        const wAllTabs = isApWeek ? getSortedApTabs() : getSortedTabs();
+        const wYearTabs = wAllTabs.filter(t => t.dataset.year === wYear);
+        const wCurrIdx = wYearTabs.findIndex(t => t.dataset.week === weekId);
+        const wLast3 = [];
+        for (let i = wCurrIdx; i < wYearTabs.length && wLast3.length < 5; i++) {
+            wLast3.push(wYearTabs[i].dataset.week);
+        }
+        if (wLast3.length === 0) return;
+        // Circle: 5-week weighted avg per compute5WeekWeighted (same as weekly stats table)
+        const w5Result = compute5WeekWeighted(weekId, wDelta, wYearTabs);
+        if (!w5Result) return;
+        const wTop25 = w5Result.ranked;
+        if (wTop25.length === 0) return;
+        // Hi/Lo: best and worst Official Overall rank across the last 3 weeks (integer ranks)
+        chartData = wTop25.map(team => {
+            const officialRanks = wLast3.map(wid => {
+                const overall = wDelta[wid]?.["Official Overall"];
+                if (!overall) return null;
+                const pos = overall.indexOf(team);
+                return pos === -1 ? 26 : pos + 1;
+            }).filter(r => r !== null);
+            const hi = officialRanks.length > 0 ? Math.min(...officialRanks) : 26;
+            const lo = officialRanks.length > 0 ? Math.max(...officialRanks) : 26;
+            const avg = w5Result.teamAvgRankSum[team] / w5Result.totalVoters;
+            return { team, avg, hi, lo, allRanks: [], rankVoters: {} };
+        });
+    }
 
     // Tier detection: find natural breaks in average ranks.
     // Gray is always the last color; inner colors are assigned in order based on break count.
@@ -1089,6 +1400,29 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
     // Find all qualifying breaks (at most innerColors.length, so gray is always reachable)
     let breakIdxs = gaps.filter(g => g.gap >= threshold).map(g => g.idx)
         .sort((a, b) => a - b).slice(0, innerColors.length);
+    // Max tier size: force-split any tier with more than 6 teams at its largest internal gap
+    const maxTierSize = 6;
+    let changed = true;
+    while (changed && breakIdxs.length < innerColors.length) {
+        changed = false;
+        const boundaries = [0, ...breakIdxs, chartData.length];
+        for (let t = 0; t < boundaries.length - 1; t++) {
+            const start = boundaries[t], end = boundaries[t + 1];
+            if (end - start > maxTierSize) {
+                let bestIdx = -1, bestGap = -1;
+                for (let i = start + 1; i < end; i++) {
+                    const g = avgs[i] - avgs[i - 1];
+                    if (g > bestGap) { bestGap = g; bestIdx = i; }
+                }
+                if (bestIdx !== -1) {
+                    breakIdxs.push(bestIdx);
+                    breakIdxs.sort((a, b) => a - b);
+                    changed = true;
+                    break;
+                }
+            }
+        }
+    }
     // Gray must not be the only tier: if all teams fall in one group, no breaks needed
     // Build the palette for this week: innerColors[0..numTiers-2] + gray
     const numTiers = breakIdxs.length + 1;
@@ -1105,13 +1439,16 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
     const title = document.getElementById("voter-history-title");
     const table = document.getElementById("voter-history-table");
 
-    const activeTab = document.querySelector(".week-tab.active");
-    const weekNum = activeTab?.dataset.weeknum || "";
-    const year = activeTab?.dataset.year || "";
-    const weekLabel = activeTab?.dataset.weeklabel;
+    const titleTab = (_apCurrentYear !== null
+        ? document.querySelector(`.week-tab[data-poll="ap"][data-year="${_apCurrentYear}"][data-weeknum="${_apCurrentWeekNum}"]`)
+        : null) || document.querySelector(".week-tab.active");
+    const weekNum = titleTab?.dataset.weeknum || "";
+    const year = titleTab?.dataset.year || "";
+    const weekLabel = titleTab?.dataset.weeklabel;
+    const spreadLabel = mode === "weighted" ? "Weighted Recency Spread" : "Rank Spread";
     title.textContent = weekLabel
-        ? `${year} ${weekLabel} — Rank Spread`
-        : `${year} Week ${String(weekNum).padStart(2, "0")} — Rank Spread`;
+        ? `${year} ${weekLabel} — ${spreadLabel}`
+        : `${year} Week ${String(weekNum).padStart(2, "0")} — ${spreadLabel}`;
 
     table.innerHTML = "";
     table.style.cssText = "display:block; white-space:normal; width:100%;";
@@ -1124,7 +1461,9 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
         <button class="spread-toggle${mode === 'highlow' ? ' active' : ''}"
                 onclick="showWeekHighLowChart('${escapedId}', 'highlow')">High-Low</button>
         <button class="spread-toggle${mode === 'dots' ? ' active' : ''}"
-                onclick="showWeekHighLowChart('${escapedId}', 'dots')">Dot Plot</button>`;
+                onclick="showWeekHighLowChart('${escapedId}', 'dots')">Dot Plot</button>
+        <button class="spread-toggle${mode === 'weighted' ? ' active' : ''}"
+                onclick="showWeekHighLowChart('${escapedId}', 'weighted')">Weighted Recency</button>`;
     table.appendChild(toggleDiv);
 
     const svgNS = "http://www.w3.org/2000/svg";
@@ -1180,8 +1519,20 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
 
     const logoSize = Math.min(20, slotW - 4);
 
-    if (mode === "highlow") {
+    if (mode === "highlow" || mode === "weighted") {
         const capW = Math.min(7, slotW * 0.28);
+
+        // Shared tooltip group
+        const tipG = document.createElementNS(svgNS, "g");
+        tipG.setAttribute("pointer-events", "none");
+        tipG.style.display = "none";
+        const tipRect = document.createElementNS(svgNS, "rect");
+        tipRect.setAttribute("rx", "4"); tipRect.setAttribute("ry", "4");
+        tipRect.setAttribute("fill", "#1a1a2e"); tipRect.setAttribute("fill-opacity", "0.92");
+        tipRect.setAttribute("stroke", "#4488cc"); tipRect.setAttribute("stroke-width", "1");
+        tipG.appendChild(tipRect);
+        svg.appendChild(tipG);
+
         chartData.forEach(({ team, avg, hi, lo, color }, i) => {
             const x = xPos(i);
             const yHi = yPos(hi);
@@ -1195,21 +1546,21 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
             vLine.setAttribute("stroke", color.fill);
             vLine.setAttribute("stroke-width", "2.5");
             vLine.setAttribute("stroke-linecap", "round");
-            svg.appendChild(vLine);
+            svg.insertBefore(vLine, tipG);
 
             // Top cap (P90+)
             const topCap = document.createElementNS(svgNS, "line");
             topCap.setAttribute("x1", x - capW); topCap.setAttribute("x2", x + capW);
             topCap.setAttribute("y1", yHi); topCap.setAttribute("y2", yHi);
             topCap.setAttribute("stroke", color.fill); topCap.setAttribute("stroke-width", "2");
-            svg.appendChild(topCap);
+            svg.insertBefore(topCap, tipG);
 
             // Bottom cap (P10-)
             const botCap = document.createElementNS(svgNS, "line");
             botCap.setAttribute("x1", x - capW); botCap.setAttribute("x2", x + capW);
             botCap.setAttribute("y1", yLo); botCap.setAttribute("y2", yLo);
             botCap.setAttribute("stroke", color.fill); botCap.setAttribute("stroke-width", "2");
-            svg.appendChild(botCap);
+            svg.insertBefore(botCap, tipG);
 
             // Mean circle
             const circle = document.createElementNS(svgNS, "circle");
@@ -1217,7 +1568,36 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
             circle.setAttribute("r", "4");
             circle.setAttribute("fill", "#fff");
             circle.setAttribute("stroke", color.stroke); circle.setAttribute("stroke-width", "2.5");
-            svg.appendChild(circle);
+            circle.style.cursor = "default";
+
+            circle.addEventListener("mouseenter", () => {
+                const label = avg.toFixed(1);
+                const pad = 8, fontSize = 11;
+                const boxW = label.length * fontSize * 0.6 + pad * 2;
+                const boxH = fontSize + pad * 1.5;
+                let tx = x - boxW / 2;
+                let ty = yAvg - 4 - boxH - 4;
+                if (ty < mT) ty = yAvg + 4 + 4;
+                tx = Math.max(2, Math.min(tx, W - boxW - 2));
+
+                tipRect.setAttribute("x", tx); tipRect.setAttribute("y", ty);
+                tipRect.setAttribute("width", boxW); tipRect.setAttribute("height", boxH);
+
+                while (tipG.childNodes.length > 1) tipG.removeChild(tipG.lastChild);
+                const t = document.createElementNS(svgNS, "text");
+                t.setAttribute("x", tx + boxW / 2);
+                t.setAttribute("y", ty + boxH / 2);
+                t.setAttribute("text-anchor", "middle");
+                t.setAttribute("dominant-baseline", "middle");
+                t.setAttribute("font-size", fontSize);
+                t.setAttribute("fill", "#e0e8ff");
+                t.textContent = label;
+                tipG.appendChild(t);
+                tipG.style.display = "";
+            });
+            circle.addEventListener("mouseleave", () => { tipG.style.display = "none"; });
+
+            svg.insertBefore(circle, tipG);
 
             // Team logo
             const img = document.createElementNS(svgNS, "image");
@@ -1680,12 +2060,11 @@ function exitApBallots() {
     updateAvgRankLines();
 }
 
-// Toggle Official → Provisional → Official (AP Ballots only via Shift+A+P)
+// Toggle Official → Provisional → Official (no-op when in AP Ballots mode)
 document.getElementById("toggle-text").addEventListener("click", async () => {
     const current = document.getElementById("toggle-text").innerText;
 
     if (current === "AP Ballots") {
-        exitApBallots();
         return;
     }
 
@@ -1844,7 +2223,8 @@ function showAvgRankModal(weekId) {
     const receivingVotes = allTeams.slice(25);
 
     // Use cached delta data for previous week's Official Overall ranking
-    const allTabsSorted = getSortedTabs();
+    const isApWeek = weekId.startsWith("week-ap-");
+    const allTabsSorted = isApWeek ? getSortedApTabs() : getSortedTabs();
     const currTabIdx = allTabsSorted.findIndex(t => t.dataset.week === weekId);
     const currYear = allTabsSorted[currTabIdx]?.dataset.year;
     const prevTab = allTabsSorted[currTabIdx + 1];
@@ -1871,16 +2251,16 @@ function showAvgRankModal(weekId) {
         ? compute5WeekWeighted(prevTab.dataset.week, deltaData, yearTabs)
         : null;
 
-    const activeTab = document.querySelector(".week-tab.active");
-    const weekNum = activeTab?.dataset.weeknum || "";
-    const year = activeTab?.dataset.year || "";
+    const titleTab = allTabsSorted[currTabIdx] || document.querySelector(".week-tab.active");
+    const weekNum = titleTab?.dataset.weeknum || "";
+    const year = titleTab?.dataset.year || "";
+    const weekLabel = titleTab?.dataset.weeklabel;
 
     const modal = document.getElementById("avg-rank-modal");
     const title = document.getElementById("avg-rank-title");
     const table = document.getElementById("avg-rank-table");
 
     const weekPad = String(weekNum).padStart(2, "0");
-    const weekLabel = activeTab?.dataset.weeklabel;
     title.textContent = weekLabel ? `${year} ${weekLabel} Statistics` : `${year} #${weekPad} Statistics`;
 
     const percentileRank = (sortedArr, p) => {
@@ -1975,9 +2355,9 @@ function showAvgRankModal(weekId) {
         <th class="team-col">Team</th>
         <th title="Rank change from previous week">Δ</th>
         <th title="10th percentile rank across all voters (unranked = 26)">P<sub>90+</sub></th>
-        <th>μ</th>
+        <th>Avg</th>
         <th title="90th percentile rank across all voters (unranked = 26)">P<sub>10−</sub></th>
-        <th title="Standard deviation of ranks given by voters this week" style="border-right:1px solid #bbb">σ</th>
+        <th title="Standard deviation of ranks given by voters this week" style="border-right:1px solid #bbb">Dev</th>
         <th title="5-week weighted average rank (change from previous week in parentheses)">μ̄<sub>5</sub><sup>w</sup></th>
         <th>Voters</th>
         <th>Pts</th>
@@ -2381,13 +2761,13 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
     });
 }
 
-
 function showSeasonStatsModal() {
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab) return;
-    const currentYear = activeTab.dataset.year;
+    const currentYear = _apCurrentYear !== null ? _apCurrentYear : activeTab.dataset.year;
 
-    const allTabs = getSortedTabs();
+    const isApMode = _apCurrentYear !== null;
+    const allTabs = isApMode ? getSortedApTabs() : getSortedTabs();
     const yearTabs = allTabs.filter(t => t.dataset.year === currentYear).reverse();
     if (yearTabs.length === 0) return;
 
@@ -2407,7 +2787,8 @@ function showSeasonStatsModal() {
         const weekId = tab.dataset.week;
         const block = document.getElementById(weekId);
         if (!block) return;
-        const officialSection = block.querySelectorAll(".ballot-section")[0];
+        const sections = block.querySelectorAll(".ballot-section");
+        const officialSection = sections[0];
         if (!officialSection) return;
 
         const seenThisWeek = new Set();
@@ -2415,7 +2796,7 @@ function showSeasonStatsModal() {
             const voterName = getVoterName(row);
             const teams = Array.from(row.querySelectorAll(".team-logo")).map(img => img.dataset.team);
             if (voterName === "Official Overall") {
-                // Track best/worst consensus rank from the weekly aggregate
+                // Track best/worst consensus rank from the weekly aggregate (userpoll mode)
                 teams.slice(0, 25).forEach((team, i) => {
                     const rank = i + 1;
                     if (!teamBestConsensusRank[team] || rank < teamBestConsensusRank[team]) teamBestConsensusRank[team] = rank;
@@ -2436,6 +2817,18 @@ function showSeasonStatsModal() {
         seenThisWeek.forEach(team => {
             teamWeeksRanked[team] = (teamWeeksRanked[team] || 0) + 1;
         });
+        // In AP mode, track consensus ranks from the aggregate section (sections[2])
+        if (isApMode && sections[2]) {
+            const aggRow = sections[2].querySelector(".voter-row");
+            if (aggRow) {
+                Array.from(aggRow.querySelectorAll(".team-logo")).map(img => img.dataset.team)
+                    .slice(0, 25).forEach((team, i) => {
+                        const rank = i + 1;
+                        if (!teamBestConsensusRank[team] || rank < teamBestConsensusRank[team]) teamBestConsensusRank[team] = rank;
+                        if (!teamWorstConsensusRank[team] || rank > teamWorstConsensusRank[team]) teamWorstConsensusRank[team] = rank;
+                    });
+            }
+        }
     });
 
     // Sort by total season points descending
@@ -2445,7 +2838,7 @@ function showSeasonStatsModal() {
     const title = document.getElementById("season-stats-title");
     const table = document.getElementById("season-stats-table");
 
-    title.textContent = `${currentYear} Season Statistics`;
+    title.textContent = isApMode ? `${currentYear} AP Season Statistics` : `${currentYear} Season Statistics`;
 
     let html = `<colgroup>
         <col style="width:24px">
@@ -2491,6 +2884,175 @@ function showSeasonStatsModal() {
 
     html += `</tbody>`;
     table.innerHTML = html;
+    modal.classList.add("open");
+}
+
+function showBumpChartModal() { showHeatmapModal('dots'); }
+
+let _hmHighlightedTeam = null;
+function hmHighlight(team) {
+    const imgs = document.querySelectorAll('#heatmap-container .hm-logo');
+    if (_hmHighlightedTeam === team) {
+        imgs.forEach(img => img.style.opacity = '');
+        _hmHighlightedTeam = null;
+    } else {
+        imgs.forEach(img => img.style.opacity = img.dataset.hmTeam === team ? '1' : '0.15');
+        _hmHighlightedTeam = team;
+    }
+}
+
+function showHeatmapModal(mode = 'grid') {
+    const activeTab = document.querySelector(".week-tab.active");
+    if (!activeTab) return;
+    const isApMode = _apCurrentYear !== null;
+    const currentYear = isApMode ? String(_apCurrentYear) : activeTab.dataset.year;
+    const allTabs = isApMode ? getSortedApTabs() : getSortedTabs();
+    const yearTabs = allTabs.filter(t => t.dataset.year === currentYear).reverse(); // oldest → newest
+    if (yearTabs.length === 0) return;
+
+    function getConsensusRanks(weekId) {
+        const block = document.getElementById(weekId);
+        if (!block) return null;
+        const sections = block.querySelectorAll(".ballot-section");
+        const aggSection = sections[2];
+        if (aggSection) {
+            const aggRow = aggSection.querySelector(".voter-row");
+            if (aggRow) {
+                const rankMap = {};
+                Array.from(aggRow.querySelectorAll(".team-logo")).forEach((img, i) => {
+                    if (i < 25) rankMap[img.dataset.team] = i + 1;
+                });
+                if (Object.keys(rankMap).length > 0) return rankMap;
+            }
+        }
+        const officialSection = sections[0];
+        if (!officialSection) return null;
+        for (const row of officialSection.querySelectorAll(".voter-row")) {
+            if (getVoterName(row) === "Official Overall") {
+                const rankMap = {};
+                Array.from(row.querySelectorAll(".team-logo")).forEach((img, i) => {
+                    if (i < 25) rankMap[img.dataset.team] = i + 1;
+                });
+                return Object.keys(rankMap).length > 0 ? rankMap : null;
+            }
+        }
+        return null;
+    }
+
+    // Top 25 from most recent loaded week
+    let top25 = null;
+    for (let i = yearTabs.length - 1; i >= 0; i--) {
+        const ranks = getConsensusRanks(yearTabs[i].dataset.week);
+        if (ranks) {
+            top25 = Object.entries(ranks).sort((a, b) => a[1] - b[1]).map(([t]) => t);
+            break;
+        }
+    }
+    if (!top25 || top25.length === 0) return;
+
+    // Only show weeks that have loaded consensus data
+    const weekData = yearTabs
+        .map(tab => ({ tab, ranks: getConsensusRanks(tab.dataset.week) }))
+        .filter(d => d.ranks !== null);
+    if (weekData.length === 0) return;
+
+    // Ranks 1–26: deep green → pale green
+    function rankColor(rank) {
+        const t = (rank - 1) / 25;
+        const r = Math.round(20  + t * 210); // 20  → 230
+        const g = Math.round(110 + t * 130); // 110 → 240
+        const b = Math.round(40  + t * 180); // 40  → 220
+        return { bg: `rgb(${r},${g},${b})`, fg: '#fff' };
+    }
+
+    const escapedYear = CSS.escape(currentYear);
+    const toggles = ``;
+
+    let html;
+
+    if (mode === 'dots') {
+        // SVG bump chart: X = week, Y = rank, each team = unique color
+        const W = 1150, H = 600;
+        const mL = 44, mR = 16, mT = 20, mB = 44;
+        const cW = W - mL - mR, cH = H - mT - mB;
+        const n = weekData.length;
+        const xPos = i => mL + (i + 0.5) * (cW / n);
+        const yPos = r => mT + ((r - 1) / 24) * cH; // r=1 top, r=25 bottom
+        const sz = 18;
+        _hmHighlightedTeam = null;
+
+        let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="width:min(1120px,92vw);display:block;margin:0 auto;">`;
+
+        // Gridlines + y-axis labels
+        [1, 5, 10, 15, 20, 25].forEach(r => {
+            const y = yPos(r).toFixed(1);
+            s += `<line x1="${mL}" x2="${mL + cW}" y1="${y}" y2="${y}" stroke="#e8e8e8" stroke-width="1"/>`;
+            s += `<text x="${mL - 6}" y="${(yPos(r) + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="#999">${r}</text>`;
+        });
+
+        // Chart border
+        s += `<rect x="${mL}" y="${mT}" width="${cW}" height="${cH}" fill="none" stroke="#ddd" stroke-width="1"/>`;
+
+        // Y-axis label
+        const yMid = (mT + cH / 2).toFixed(1);
+        s += `<text x="10" y="${yMid}" text-anchor="middle" font-size="11" fill="#999" transform="rotate(-90,10,${yMid})">Rank</text>`;
+
+        // X-axis week labels
+        weekData.forEach(({ tab }, wi) => {
+            const wn = tab.dataset.weeknum;
+            const label = wn === "0" ? "Pre" : `W${wn}`;
+            s += `<text x="${xPos(wi).toFixed(1)}" y="${(mT + cH + 14).toFixed(1)}" text-anchor="middle" font-size="10" fill="#999">${label}</text>`;
+        });
+
+        // Per-team rank arrays (ranked weeks only)
+        const teamPoints = top25.map((team, ti) => ({
+            team, ti,
+            pts: weekData.map(({ ranks }, wi) => ({ wi, rank: ranks[team] || null }))
+        }));
+
+        // Logos — uniform size, clickable to highlight
+        teamPoints.forEach(({ team, pts }) => {
+            const name = formatTeamName(team);
+            pts.forEach(({ wi, rank }) => {
+                if (!rank) return;
+                const cx = xPos(wi);
+                const cy = yPos(rank);
+                s += `<image class="hm-logo" data-hm-team="${team}" href="cbb-logos/${team}.webp" x="${(cx - sz / 2).toFixed(1)}" y="${(cy - sz / 2).toFixed(1)}" width="${sz}" height="${sz}" style="cursor:pointer" onclick="hmHighlight('${team}')"><title>${name} — #${rank}</title></image>`;
+            });
+        });
+
+        s += `</svg>`;
+        html = toggles + s;
+    } else {
+        html = toggles + `<table class="heatmap-table"><thead><tr>
+            <th class="heatmap-rank-col"></th>
+            <th class="heatmap-team-col">Team</th>`;
+        weekData.forEach(({ tab }) => {
+            const wn = tab.dataset.weeknum;
+            html += `<th class="heatmap-wk-th">${wn === "0" ? "Pre" : wn}</th>`;
+        });
+        html += `</tr></thead><tbody>`;
+        top25.forEach((team, idx) => {
+            html += `<tr><td class="heatmap-rank-col">${idx + 1}</td>
+                <td class="heatmap-team-col"><img class="heatmap-logo" src="cbb-logos/${team}.webp" width="16" height="16" onerror="this.style.display='none'"><span>${formatTeamName(team)}</span></td>`;
+            weekData.forEach(({ ranks }) => {
+                const rank = ranks[team] || null;
+                const { bg, fg } = rankColor(rank ?? 26);
+                const label = rank ?? 'x';
+                const title = rank ? `#${rank}` : 'NR';
+                html += `<td class="heatmap-cell" style="background:${bg};color:${fg}" title="${title}">${label}</td>`;
+            });
+            html += `</tr>`;
+        });
+        html += `</tbody></table>`;
+    }
+
+    const modal = document.getElementById("heatmap-modal");
+    document.getElementById("heatmap-title").textContent = mode === 'dots'
+        ? `${currentYear} Season Rank Trajectory`
+        : `${currentYear} Season Consensus Rank Heatmap`;
+    document.getElementById("heatmap-container").innerHTML = html;
+    modal.dataset.mode = mode;
     modal.classList.add("open");
 }
 
@@ -2770,6 +3332,12 @@ document.getElementById("season-stats-modal").addEventListener("click", e => {
         document.getElementById("season-stats-modal").classList.remove("open");
 });
 
+document.getElementById("heatmap-modal").addEventListener("click", e => {
+    if (e.target === document.getElementById("heatmap-modal"))
+        document.getElementById("heatmap-modal").classList.remove("open");
+});
+
+
 document.addEventListener("keydown", e => {
     if (e.key === "Escape") {
         document.getElementById("voter-history-modal").classList.remove("open");
@@ -2778,6 +3346,7 @@ document.addEventListener("keydown", e => {
         document.getElementById("season-stats-modal").classList.remove("open");
         document.getElementById("precision-modal").classList.remove("open");
         document.getElementById("tenure-modal").classList.remove("open");
+        document.getElementById("heatmap-modal").classList.remove("open");
     }
     if (!e.shiftKey) return;
     const activeTab = document.querySelector(".week-tab.active");
@@ -2788,14 +3357,7 @@ document.addEventListener("keydown", e => {
 
     if (e.key === "A" || e.key === "a") {
         e.preventDefault();
-        // Chord: Shift+A then Shift+P → AP Ballots; otherwise alphabetic sort after short delay
-        _apChordPending = true;
-        if (_apChordTimer) clearTimeout(_apChordTimer);
-        _apChordTimer = setTimeout(() => {
-            _apChordPending = false;
-            _apChordTimer = null;
-            applyTableSort("alphabetic");
-        }, 250);
+        applyTableSort("alphabetic");
         return;
     }
 
@@ -2850,15 +3412,23 @@ document.addEventListener("keydown", e => {
 
     if (e.key === "Y" || e.key === "y") {
         e.preventDefault();
-        const activeTab = document.querySelector(".week-tab.active");
-        if (activeTab) showAvgRankModal(activeTab.dataset.week);
+        if (_apCurrentYear !== null) {
+            showAvgRankModal(`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`);
+        } else {
+            const activeTab = document.querySelector(".week-tab.active");
+            if (activeTab) showAvgRankModal(activeTab.dataset.week);
+        }
         return;
     }
 
     if (e.key === "G" || e.key === "g") {
         e.preventDefault();
-        const activeTab = document.querySelector(".week-tab.active");
-        if (activeTab) showWeekHighLowChart(activeTab.dataset.week);
+        if (_apCurrentYear !== null) {
+            showWeekHighLowChart(`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`);
+        } else {
+            const activeTab = document.querySelector(".week-tab.active");
+            if (activeTab) showWeekHighLowChart(activeTab.dataset.week);
+        }
         return;
     }
 
@@ -2867,6 +3437,18 @@ document.addEventListener("keydown", e => {
         showSeasonStatsModal();
         return;
     }
+
+    if (e.key === "H" || e.key === "h") {
+        e.preventDefault();
+        showHeatmapModal();
+        return;
+    }
+    if (e.key === "B" || e.key === "b") {
+        e.preventDefault();
+        showBumpChartModal();
+        return;
+    }
+
 
     if (e.code >= "Digit1" && e.code <= "Digit9") {
         e.preventDefault();
@@ -2884,34 +3466,16 @@ document.addEventListener("keydown", e => {
 
     if (e.key === "P" || e.key === "p") {
         e.preventDefault();
-        if (_apChordPending) {
-            // Chord: Shift+A+P → toggle AP Ballots
-            clearTimeout(_apChordTimer);
-            _apChordPending = false;
-            _apChordTimer = null;
-            if (_apCurrentYear !== null) {
-                exitApBallots();
-            } else {
-                switchToApBallots();
-            }
-        } else {
-            saveTableAsPng();
-        }
+        saveTableAsPng();
         return;
     }
 
-    if (e.key === "O" || e.key === "o") {
-        if (_apChordPending) {
-            // Chord: Shift+A+O → toggle AP Ballots
-            e.preventDefault();
-            clearTimeout(_apChordTimer);
-            _apChordPending = false;
-            _apChordTimer = null;
-            if (_apCurrentYear !== null) {
-                exitApBallots();
-            } else {
-                switchToApBallots();
-            }
+    if (e.key === "X" || e.key === "x") {
+        e.preventDefault();
+        if (_apCurrentYear !== null) {
+            exitApBallots();
+        } else {
+            switchToApBallots();
         }
         return;
     }
@@ -2939,6 +3503,12 @@ document.addEventListener("keydown", e => {
                 loadApYear(target.dataset.year).then(async () => {
                     await showApWeek(target.dataset.year, target.dataset.weeknum);
                     if (weekPickerPinned) rebuildWeekPicker();
+                    const apWeekId = `week-ap-${target.dataset.year}-${target.dataset.weeknum}`;
+                    if (document.getElementById("avg-rank-modal").classList.contains("open"))
+                        showAvgRankModal(apWeekId);
+                    const vhm = document.getElementById("voter-history-modal");
+                    if (vhm.classList.contains("open") && vhm.dataset.chartType === "highlow")
+                        showWeekHighLowChart(apWeekId, vhm.dataset.chartMode || "highlow");
                 }).catch(() => {});
             }
         } else {
@@ -2981,6 +3551,12 @@ document.addEventListener("keydown", e => {
                 if (target) {
                     await showApWeek(target.dataset.year, target.dataset.weeknum);
                     if (weekPickerPinned) rebuildWeekPicker();
+                    const apWeekId = `week-ap-${target.dataset.year}-${target.dataset.weeknum}`;
+                    if (document.getElementById("avg-rank-modal").classList.contains("open"))
+                        showAvgRankModal(apWeekId);
+                    const vhm2 = document.getElementById("voter-history-modal");
+                    if (vhm2.classList.contains("open") && vhm2.dataset.chartType === "highlow")
+                        showWeekHighLowChart(apWeekId, vhm2.dataset.chartMode || "highlow");
                 }
             }).catch(() => {});
         } else {

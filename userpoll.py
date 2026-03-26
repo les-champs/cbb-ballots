@@ -1112,10 +1112,20 @@ def build_aggregate_row(official):
 RANK_HEADERS = "".join(f"<th><span class='rank-header-num'>{i+1}</span></th>" for i in range(25))
 THEAD_HTML = (
     f"<thead><tr>"
-    f"<th><span class='voters-toggle' style='cursor:pointer; display:inline-block; transition:transform 0.1s ease;'>Alphabetic</span>"
+    f"<th><span class='voters-toggle' style='cursor:pointer; display:inline-block; transition:transform 0.1s ease;'>Functions</span>"
     f"<span class='sort-picker'>"
+    f"<span class='picker-category'>Sort</span>"
     f"<span class='sort-option active' data-sort='alphabetic'>Alphabetic</span>"
+    f"<span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span>"
     f"<span class='sort-option' data-sort='consensus'>Consensus</span>"
+    f"<span class='picker-category'>Tables</span>"
+    f"<span class='sort-option' data-action='weeklyStats'>Week</span>"
+    f"<span class='sort-option' data-action='yearlyStats'>Year</span>"
+    f"<span class='picker-category'>Graphs</span>"
+    f"<span class='sort-option' data-action='dotPlot'>Spread</span>"
+    f"<span class='sort-option' data-action='heatmap'>Heatmap</span>"
+    f"<span class='picker-category'>Actions</span>"
+    f"<span class='sort-option' data-action='expandDeltas'>Deltas</span>"
     f"</span></th>"
     f"{RANK_HEADERS}</tr></thead>"
 )
@@ -1345,6 +1355,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>Y</kbd></span><span>Week avg rank table</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>G</kbd></span><span>Week rank spread chart</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>U</kbd></span><span>Season statistics</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>H</kbd></span><span>Season rank heatmap</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>P</kbd></span><span>Save table as PNG</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>?</kbd></span><span>Show legend</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Esc</kbd></span><span>Close</span></div>
@@ -1366,6 +1377,13 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
   </div>
 </div>
 
+<div id="heatmap-modal">
+  <div id="heatmap-box">
+    <h2 id="heatmap-title"></h2>
+    <div id="heatmap-container"></div>
+  </div>
+</div>
+
 <div id="precision-modal">
   <div id="precision-box">
     <h2 id="precision-title"></h2>
@@ -1379,6 +1397,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
     <table id="tenure-table"></table>
   </div>
 </div>
+
 
 <div id="year-data-container">
 {WEEK_DATA_MARKER}
@@ -1608,6 +1627,21 @@ def rebuild_ap_html():
                 f' data-year="{current_year}"{label_attr}>{tab_text}</button>'
             )
 
+    # Patch all data-appage-YEAR.html fragment files to current THEAD_HTML
+    for year in appage_years:
+        if year == current_year:
+            continue
+        frag_path = os.path.join(base_dir, f"data-appage-{year}.html")
+        if not os.path.exists(frag_path):
+            continue
+        with open(frag_path, "r", encoding="utf-8") as f:
+            frag_content = f.read()
+        patched = re.sub(r'<thead>.*?</thead>', THEAD_HTML, frag_content, flags=re.DOTALL)
+        if patched != frag_content:
+            with open(frag_path, "w", encoding="utf-8") as f:
+                f.write(patched)
+            print(f"  ✓ Patched thead in data-appage-{year}.html")
+
     # Build tabs for prior fragment years by reading their week IDs from the fragment files
     for year in sorted(appage_years):
         if year == current_year:
@@ -1749,6 +1783,18 @@ def rebuild_html():
     base_dir = os.path.dirname(HTML_PATH) or "."
     write_year_fragments(data_by_year, current_year, base_dir)
     tenure_counts = compute_tenure_counts(data_html)
+
+    # Patch data-ap-YEAR.html fragment files to current THEAD_HTML
+    for fname in os.listdir(base_dir):
+        if re.match(r'data-ap-\d+\.html$', fname):
+            frag_path = os.path.join(base_dir, fname)
+            with open(frag_path, "r", encoding="utf-8") as f:
+                frag_content = f.read()
+            patched = re.sub(r'<thead>.*?</thead>', THEAD_HTML, frag_content, flags=re.DOTALL)
+            if patched != frag_content:
+                with open(frag_path, "w", encoding="utf-8") as f:
+                    f.write(patched)
+                print(f"  ✓ Patched thead in {fname}")
 
     ap_tabs_html, ap_fragment_years = get_ap_info(HTML_PATH)
     full_html = build_full_html(tabs_html, inline_data, fragment_years, tenure_counts, ap_tabs_html, ap_fragment_years)
