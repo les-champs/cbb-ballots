@@ -3442,14 +3442,28 @@ function logoSrc(team) {
     return `cbb-logos/${team}${suffix}.webp`;
 }
 
+// Sets img.src via logoSrc and adds a one-shot onerror fallback to the
+// light-mode logo so dark logo 404s (e.g. CDN propagation lag) degrade
+// gracefully instead of showing broken-image icons.
+function setLogoSrc(img, team) {
+    const src = logoSrc(team);
+    img.src = src;
+    const dark = document.body.classList.contains('dark');
+    if (dark && DARK_LOGO_TEAMS.has(team)) {
+        img.addEventListener('error', () => {
+            img.src = `cbb-logos/${team}.webp`;
+        }, { once: true });
+    }
+}
+
 function refreshBlockLogos(block) {
     // Update already-loaded logos in a single block to the current dark/light mode.
     // Images still pending lazy-load (data-src present) are skipped — they call
-    // logoSrc() themselves when loaded and pick up the current mode automatically.
+    // setLogoSrc() themselves when loaded and pick up the current mode automatically.
     if (!block) return;
     block.querySelectorAll('img[data-team]:not([data-src])').forEach(img => {
         const team = img.dataset.team;
-        if (DARK_LOGO_TEAMS.has(team)) img.src = logoSrc(team);
+        if (DARK_LOGO_TEAMS.has(team)) setLogoSrc(img, team);
     });
 }
 
@@ -3681,7 +3695,7 @@ function updateAvgRankLines() {
 function lazyLoadWeek(block) {
     if (!block) return;
     block.querySelectorAll("img[data-src]").forEach(img => {
-        img.src = logoSrc(img.dataset.src);
+        setLogoSrc(img, img.dataset.src);
         img.removeAttribute("data-src");
     });
 }
@@ -4266,7 +4280,7 @@ function renderVoterHistoryTable(mergedData, yearTabs, container) {
             const td = document.createElement("td");
             const img = document.createElement("img");
             img.className = "logo team-logo";
-            img.src = logoSrc(team);
+            setLogoSrc(img, team);
             img.alt = team;
             img.dataset.team = team;
             td.appendChild(img);
@@ -5984,7 +5998,8 @@ function loadImageQueue(queue) {
                 if (index >= queue.length) break;
                 const img = queue[index++];
                 active++;
-                img.src = logoSrc(img.dataset.src);
+                const team = img.dataset.src;
+                setLogoSrc(img, team);
                 img.removeAttribute("data-src");
                 const onDone = () => {
                     active--;

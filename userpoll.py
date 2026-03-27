@@ -170,6 +170,124 @@ def fetch_unique_logos(html):
     encoded = re.findall(r'%2Fstatic%2FD1%2F([^&"]+\.png)', html)
     return sorted(set(unquote(e) for e in encoded))
 
+# ESPN location name → our canonical logo filename stem (for cases where stripping spaces fails)
+ESPN_NAME_OVERRIDES = {
+    "Connecticut":              "UConn",
+    "Louisiana State":          "LSU",
+    "Southern California":      "USC",
+    "Texas Christian":          "TCU",
+    "Brigham Young":            "BYU",
+    "Nevada Las Vegas":         "UNLV",
+    "Miami":                    "MiamiFL",
+    "Miami (OH)":               "MiamiOH",
+    "Pittsburgh":               "Pitt",
+    "Massachusetts":            "UMass",
+    "Central Florida":          "UCF",
+    "Alabama Birmingham":       "UAB",
+    "California":               "Cal",
+    "Texas El Paso":            "UTEP",
+    "Texas San Antonio":        "UTSA",
+    "Virginia Commonwealth":    "VCU",
+    "Southern Methodist":       "SMU",
+    "Alabama A&M":              "AlabamaAM",
+    "Florida A&M":              "FloridaAM",
+    "Prairie View A&M":         "PrairieViewAM",
+    "Texas A&M Corpus Christi": "TexasAMCorpusChristi",
+    "Wisconsin Green Bay":      "GreenBay",
+    "Wisconsin Milwaukee":      "Milwaukee",
+    "Missouri Kansas City":     "KansasCity",
+    "North Carolina Charlotte": "Charlotte",
+    "North Carolina Greensboro":"UNCGreensboro",
+    "North Carolina Wilmington":"UNCWilmington",
+    "McNeese State":            "McNeese",
+    "St. John's (NY)":          "StJohns",
+    "William & Mary":           "WilliamandMary",
+    "Stephen F. Austin":        "StephenFAustin",
+    "Arkansas Pine Bluff":      "ArkansasPineBluff",
+    "Texas Rio Grande Valley":  "TexasRGV",
+    "Texas Arlington":          "TexasArlington",
+}
+
+def get_dark_logo_teams():
+    """Return sorted list of team name stems that have -dark.webp variants."""
+    teams = []
+    for fname in os.listdir(OUTPUT_DIR):
+        m = re.match(r'^(.+)-dark\.webp$', fname)
+        if m:
+            teams.append(m.group(1))
+    return sorted(teams)
+
+def download_dark_logos():
+    """Download ESPN dark-mode logos for all teams we have regular logos for."""
+    api_url = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams?limit=1000"
+    print("Fetching ESPN teams list...")
+    req = urllib.request.Request(api_url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req) as resp:
+        data = json.loads(resp.read())
+
+    # Build ESPN location → ESPN ID map
+    espn_map = {}
+    for sport in data.get("sports", []):
+        for league in sport.get("leagues", []):
+            for entry in league.get("teams", []):
+                t = entry.get("team", {})
+                location = t.get("location", "")
+                espn_id = t.get("id", "")
+                if location and espn_id:
+                    espn_map[location] = espn_id
+    print(f"  ESPN has {len(espn_map)} teams")
+
+    # Build our_name → ESPN ID by iterating all ESPN teams
+    our_logos = set(
+        fname[:-5]  # strip .webp
+        for fname in os.listdir(OUTPUT_DIR)
+        if fname.endswith(".webp") and not fname.endswith("-dark.webp")
+    )
+    espn_id_for = {}
+    for location, espn_id in espn_map.items():
+        if location in ESPN_NAME_OVERRIDES:
+            our_name = ESPN_NAME_OVERRIDES[location]
+        else:
+            our_name = location.replace(' ', '')
+        if our_name in our_logos:
+            espn_id_for[our_name] = espn_id
+
+    unmatched = our_logos - set(espn_id_for.keys())
+    print(f"  Matched {len(espn_id_for)} teams, {len(unmatched)} unmatched")
+    if unmatched:
+        sample = sorted(unmatched)[:20]
+        print(f"  Unmatched: {', '.join(sample)}" + (" ..." if len(unmatched) > 20 else ""))
+
+    # Download dark logos
+    downloaded = skipped = failed = no_dark = 0
+    for team, espn_id in sorted(espn_id_for.items()):
+        dest = os.path.join(OUTPUT_DIR, f"{team}-dark.webp")
+        if os.path.exists(dest):
+            skipped += 1
+            continue
+        url = f"https://a.espncdn.com/i/teamlogos/ncaa/500-dark/{espn_id}.png"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req) as resp:
+                raw = resp.read()
+            img = Image.open(BytesIO(raw))
+            img.save(dest, format="WEBP", lossless=True)
+            downloaded += 1
+            print(f"  ✓ {team} (ESPN id={espn_id})")
+            time.sleep(0.15)
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                no_dark += 1
+            else:
+                print(f"  ✗ {team}: HTTP {e.code}")
+                failed += 1
+        except Exception as e:
+            print(f"  ✗ {team}: {e}")
+            failed += 1
+
+    print(f"\n✓ Done. Downloaded {downloaded}, skipped {skipped} existing, "
+          f"{no_dark} had no dark variant on ESPN, {failed} errors.")
+
 def convert_all_to_webp():
     """One-time batch conversion of all existing PNGs to WebP."""
     logos = [f for f in os.listdir(OUTPUT_DIR) if f.lower().endswith(".png")]
@@ -1078,7 +1196,7 @@ def build_table_rows(voters_with_ballots):
         team_name = canonical_logo_name(logo_filename)
         ballot_attr = f' data-ballot-url="{ballot_url}"' if ballot_url else ''
         if team_name:
-            flair_html = f'<img class="logo" data-src="{team_name}" alt="{team_name}">'
+            flair_html = f'<img class="logo" data-team="{team_name}" data-src="{team_name}">'
         else:
             flair_html = ''
         inner = flair_html + f'<span class="voter-name">{username}</span>'
@@ -1126,6 +1244,7 @@ THEAD_HTML = (
     f"<span class='sort-option' data-action='heatmap'>Heatmap</span>"
     f"<span class='picker-category'>Actions</span>"
     f"<span class='sort-option' data-action='expandDeltas'>Deltas</span>"
+    f"<span class='sort-option dark-mode-toggle' data-action='darkMode'>Dark Mode</span>"
     f"</span></th>"
     f"{RANK_HEADERS}</tr></thead>"
 )
@@ -1301,6 +1420,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
     tenure_counts_js = json.dumps(tenure_counts or {})
     ap_tenure_counts_js = json.dumps(ap_tenure_counts or {})
     ap_fragment_years_js = json.dumps(ap_fragment_years or [])
+    dark_logo_teams_js = "new Set(" + json.dumps(get_dark_logo_teams()) + ")"
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -1430,6 +1550,7 @@ const AP_FRAGMENT_YEARS = {ap_fragment_years_js};
 const FRAGMENT_YEARS = {fragment_years_js};
 const TENURE_COUNTS = {tenure_counts_js};
 const AP_TENURE_COUNTS = {ap_tenure_counts_js};
+const DARK_LOGO_TEAMS = {dark_logo_teams_js};
 {JS}
 </script>
 
@@ -1842,7 +1963,7 @@ def parse_voter_tuples_from_section_html(section_html):
     row_re      = re.compile(r'<tr class="voter-row">.*?</tr>', re.DOTALL)
     name_re     = re.compile(r'voter-name[^>]*>([^<]+)<')
     ballot_re   = re.compile(r'data-ballot-url="([^"]+)"')
-    flair_re    = re.compile(r'<img class="logo" data-src="([^"]+)"')
+    flair_re    = re.compile(r'<img class="logo" data-team="([^"]+)"')
     team_re     = re.compile(r'<td[^>]*><img[^>]*data-team="([^"]+)"')
     for row_m in row_re.finditer(section_html):
         row_html = row_m.group(0)
@@ -1886,7 +2007,7 @@ def apply_recovery(year=2024):
             ref_html = f.read()
         voter_re = re.compile(
             r'class="voter-cell"[^>]*data-ballot-url="[^"]*">.*?'
-            r'<img class="logo" data-src="([^"]+)".*?voter-name[^>]*>([^<]+)<',
+            r'<img class="logo" data-team="([^"]+)".*?voter-name[^>]*>([^<]+)<',
             re.DOTALL
         )
         for m in voter_re.finditer(ref_html):
@@ -2183,6 +2304,7 @@ def main():
     parser.add_argument("--year", type=int, help="Poll year (e.g. 2026)")
     parser.add_argument("--rebuild", action="store_true", help="Rebuild HTML from existing data without scraping")
     parser.add_argument("--to-webp", action="store_true", help="Convert all existing PNG logos to WebP and exit")
+    parser.add_argument("--dark-logos", action="store_true", help="Download ESPN dark-mode logos for all teams")
     parser.add_argument("--delete", action="store_true", help="Delete a specific week from the HTML")
     parser.add_argument("--apply-recovery", action="store_true", help="Apply recovered ballot data from cbbpoll-YEAR-recovery.json")
     parser.add_argument("--fix-contamination", action="store_true", help="Remove wrong-season ballot rows from data-YEAR.html")
@@ -2196,6 +2318,10 @@ def main():
 
     if args.to_webp:
         convert_all_to_webp()
+        return
+
+    if args.dark_logos:
+        download_dark_logos()
         return
 
     if args.delete:

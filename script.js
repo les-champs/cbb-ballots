@@ -9,6 +9,89 @@ const _loadedYears = new Set();
 const _loadingYears = {};
 const HIDDEN_YEARS = new Set(["2024"]);
 
+function svgColors() {
+    const dark = document.body.classList.contains('dark');
+    return {
+        axisColor:   dark ? "#888" : "#999",
+        gridColor:   dark ? "#383838" : "#e8e8e8",
+        borderColor: dark ? "#444" : "#ddd",
+        nrLineColor: dark ? "#444" : "#eee",
+        nrGridColor: dark ? "#3a3a3a" : "#d8d8d8",
+        nrTextColor: dark ? "#666" : "#ccc",
+        circleStroke: dark ? "#1a1a1a" : "#fff",
+    };
+}
+
+function updateDarkModeLabel() {
+    const dark = document.body.classList.contains('dark');
+    document.querySelectorAll('.dark-mode-toggle').forEach(el => {
+        el.textContent = dark ? 'Light Mode' : 'Dark Mode';
+    });
+}
+
+function logoSrc(team) {
+    const dark = document.body.classList.contains('dark');
+    const suffix = (dark && DARK_LOGO_TEAMS.has(team)) ? '-dark' : '';
+    return `cbb-logos/${team}${suffix}.webp`;
+}
+
+// Sets img.src via logoSrc and adds a one-shot onerror fallback to the
+// light-mode logo so dark logo 404s (e.g. CDN propagation lag) degrade
+// gracefully instead of showing broken-image icons.
+function setLogoSrc(img, team) {
+    const src = logoSrc(team);
+    img.src = src;
+    const dark = document.body.classList.contains('dark');
+    if (dark && DARK_LOGO_TEAMS.has(team)) {
+        img.addEventListener('error', () => {
+            img.src = `cbb-logos/${team}.webp`;
+        }, { once: true });
+    }
+}
+
+function refreshBlockLogos(block) {
+    // Update already-loaded logos in a single block to the current dark/light mode.
+    // Images still pending lazy-load (data-src present) are skipped — they call
+    // setLogoSrc() themselves when loaded and pick up the current mode automatically.
+    if (!block) return;
+    block.querySelectorAll('img[data-team]:not([data-src])').forEach(img => {
+        const team = img.dataset.team;
+        if (DARK_LOGO_TEAMS.has(team)) setLogoSrc(img, team);
+    });
+}
+
+function refreshLogos() {
+    // Only refresh the visible block(s) — scanning the entire DOM for every toggle
+    // is far too expensive once background loading has populated all week blocks.
+    // Blocks that are currently hidden get refreshed on demand in showWeek/showApWeek.
+    const activeTab = document.querySelector('.week-tab.active');
+    if (activeTab) refreshBlockLogos(document.getElementById(activeTab.dataset.week));
+    if (_apCurrentYear && _apCurrentWeekNum)
+        refreshBlockLogos(document.getElementById(`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`));
+}
+
+function toggleDarkMode() {
+    document.body.classList.toggle('dark');
+    localStorage.setItem('darkMode', document.body.classList.contains('dark') ? '1' : '0');
+    updateDarkModeLabel();
+    refreshLogos();
+}
+
+(function() {
+    const stored = localStorage.getItem('darkMode');
+    const prefersDark = stored !== null
+        ? stored === '1'
+        : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (prefersDark) document.body.classList.add('dark');
+    updateDarkModeLabel();
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+        if (localStorage.getItem('darkMode') === null) {
+            document.body.classList.toggle('dark', e.matches);
+            updateDarkModeLabel();
+        }
+    });
+})();
+
 function formatTeamName(team) {
     // Always insert space before "State"
     let name = team.replace(/State/g, " State");
@@ -205,7 +288,7 @@ function updateAvgRankLines() {
 function lazyLoadWeek(block) {
     if (!block) return;
     block.querySelectorAll("img[data-src]").forEach(img => {
-        img.src = "cbb-logos/" + img.dataset.src + ".webp";
+        setLogoSrc(img, img.dataset.src);
         img.removeAttribute("data-src");
     });
 }
@@ -421,12 +504,14 @@ document.addEventListener("mousedown", e => {
     const sort = opt.dataset.sort;
     const action = opt.dataset.action;
     const picker = opt.closest(".sort-picker");
-    // Show the toggle again
-    if (picker._toggle) picker._toggle.style.display = "";
-    picker.classList.remove("open");
-    // Restore rank headers when picker closes
-    const block = picker._sourceBlock || picker.closest(".week-block");
-    showRankHeaders(block);
+    if (action !== "darkMode") {
+        // Show the toggle again
+        if (picker._toggle) picker._toggle.style.display = "";
+        picker.classList.remove("open");
+        // Restore rank headers when picker closes
+        const block = picker._sourceBlock || picker.closest(".week-block");
+        showRankHeaders(block);
+    }
     if (sort) {
         applyTableSort(sort);
     } else if (action) {
@@ -463,6 +548,9 @@ function handlePickerAction(action) {
             break;
         case "expandDeltas":
             toggleAllDeltas();
+            break;
+        case "darkMode":
+            toggleDarkMode();
             break;
         case "legend":
             document.getElementById("keybind-legend-modal").classList.toggle("open");
@@ -785,7 +873,7 @@ function renderVoterHistoryTable(mergedData, yearTabs, container) {
             const td = document.createElement("td");
             const img = document.createElement("img");
             img.className = "logo team-logo";
-            img.src = "cbb-logos/" + team + ".webp";
+            setLogoSrc(img, team);
             img.alt = team;
             img.dataset.team = team;
             td.appendChild(img);
@@ -922,7 +1010,7 @@ function showTeamRankChart(team, username) {
     const title = document.getElementById("voter-history-title");
     const table = document.getElementById("voter-history-table");
 
-    title.innerHTML = `<img class="logo" src="cbb-logos/${team}.webp" style="height:22px;vertical-align:middle;margin-right:6px;">${formatTeamName(team)} — ${username || "Unknown"}`;
+    title.innerHTML = `<img class="logo" src="${logoSrc(team)}" style="height:22px;vertical-align:middle;margin-right:6px;">${formatTeamName(team)} — ${username || "Unknown"}`;
     table.innerHTML = "";
     table.style.cssText = "display:block; white-space:normal; width:100%;";
 
@@ -942,7 +1030,7 @@ function showTeamRankChart(team, username) {
     const xPos = w => mL + ((w - minW) / wRange) * cW;
     const yPos = r => mT + ((r - 1) / 24) * cH;  // rank 1 at top
 
-    const axisColor = "#999", gridColor = "#e8e8e8";
+    const { axisColor, gridColor, borderColor, nrLineColor, nrTextColor, circleStroke } = svgColors();
 
     // Rank gridlines + y-axis labels
     [1, 5, 10, 15, 20, 25].forEach(r => {
@@ -964,7 +1052,7 @@ function showTeamRankChart(team, username) {
     const border = document.createElementNS(svgNS, "rect");
     border.setAttribute("x", mL); border.setAttribute("y", mT);
     border.setAttribute("width", cW); border.setAttribute("height", cH);
-    border.setAttribute("fill", "none"); border.setAttribute("stroke", "#ddd");
+    border.setAttribute("fill", "none"); border.setAttribute("stroke", borderColor);
     border.setAttribute("stroke-width", "1");
     svg.appendChild(border);
 
@@ -1007,13 +1095,13 @@ function showTeamRankChart(team, username) {
         const nrLine = document.createElementNS(svgNS, "line");
         nrLine.setAttribute("x1", x); nrLine.setAttribute("x2", x);
         nrLine.setAttribute("y1", mT); nrLine.setAttribute("y2", mT + cH);
-        nrLine.setAttribute("stroke", "#eee"); nrLine.setAttribute("stroke-width", "1");
+        nrLine.setAttribute("stroke", nrLineColor); nrLine.setAttribute("stroke-width", "1");
         nrLine.setAttribute("stroke-dasharray", "3,3");
         svg.appendChild(nrLine);
         const nrTxt = document.createElementNS(svgNS, "text");
         nrTxt.setAttribute("x", x); nrTxt.setAttribute("y", mT + cH - 5);
         nrTxt.setAttribute("text-anchor", "middle"); nrTxt.setAttribute("font-size", "9");
-        nrTxt.setAttribute("fill", "#ccc");
+        nrTxt.setAttribute("fill", nrTextColor);
         nrTxt.textContent = "NR";
         svg.appendChild(nrTxt);
     });
@@ -1035,7 +1123,7 @@ function showTeamRankChart(team, username) {
         const circle = document.createElementNS(svgNS, "circle");
         circle.setAttribute("cx", x); circle.setAttribute("cy", y);
         circle.setAttribute("r", "5"); circle.setAttribute("fill", "#2277cc");
-        circle.setAttribute("stroke", "#fff"); circle.setAttribute("stroke-width", "2");
+        circle.setAttribute("stroke", circleStroke); circle.setAttribute("stroke-width", "2");
         svg.appendChild(circle);
         const lbl = document.createElementNS(svgNS, "text");
         lbl.setAttribute("x", x); lbl.setAttribute("y", y - 9);
@@ -1110,7 +1198,7 @@ function showTeamSeasonDotPlot(team, mode = "dots") {
     const title = document.getElementById("voter-history-title");
     const table = document.getElementById("voter-history-table");
 
-    title.innerHTML = `<img class="logo" src="cbb-logos/${team}.webp" style="height:22px;vertical-align:middle;margin-right:6px;">${formatTeamName(team)} \u2013 ${currentYear} Season`;
+    title.innerHTML = `<img class="logo" src="${logoSrc(team)}" style="height:22px;vertical-align:middle;margin-right:6px;">${formatTeamName(team)} \u2013 ${currentYear} Season`;
     table.innerHTML = "";
     table.style.cssText = "display:block; white-space:normal; width:100%;";
 
@@ -1140,7 +1228,7 @@ function showTeamSeasonDotPlot(team, mode = "dots") {
     const yPos = r => mT + ((r - 1) / 24) * cH;
     const maxR = Math.min(slotW * 0.46, 13);
 
-    const axisColor = "#999", gridColor = "#e8e8e8";
+    const { axisColor, gridColor, borderColor } = svgColors();
     const dotFill = "#4488cc";
 
     // Y gridlines + labels
@@ -1164,7 +1252,7 @@ function showTeamSeasonDotPlot(team, mode = "dots") {
     const border = document.createElementNS(svgNS, "rect");
     border.setAttribute("x", mL); border.setAttribute("y", mT);
     border.setAttribute("width", cW); border.setAttribute("height", cH);
-    border.setAttribute("fill", "none"); border.setAttribute("stroke", "#ddd");
+    border.setAttribute("fill", "none"); border.setAttribute("stroke", borderColor);
     border.setAttribute("stroke-width", "1");
     svg.appendChild(border);
 
@@ -1483,7 +1571,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
     const xPos = i => mL + (i + 0.5) * slotW;
     const yPos = r => mT + ((r - 1) / 25) * cH;  // rank 1 at top, 26 (NR) at bottom
 
-    const axisColor = "#999", gridColor = "#e8e8e8";
+    const { axisColor, gridColor, borderColor, nrGridColor, circleStroke } = svgColors();
 
     // Rank gridlines + y-axis labels
     [1, 5, 10, 15, 20, 25, 26].forEach(r => {
@@ -1491,7 +1579,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
         const line = document.createElementNS(svgNS, "line");
         line.setAttribute("x1", mL); line.setAttribute("x2", mL + cW);
         line.setAttribute("y1", y); line.setAttribute("y2", y);
-        line.setAttribute("stroke", r === 26 ? "#d8d8d8" : gridColor);
+        line.setAttribute("stroke", r === 26 ? nrGridColor : gridColor);
         line.setAttribute("stroke-width", "1");
         if (r === 26) line.setAttribute("stroke-dasharray", "3,3");
         svg.appendChild(line);
@@ -1507,7 +1595,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
     const border = document.createElementNS(svgNS, "rect");
     border.setAttribute("x", mL); border.setAttribute("y", mT);
     border.setAttribute("width", cW); border.setAttribute("height", cH);
-    border.setAttribute("fill", "none"); border.setAttribute("stroke", "#ddd");
+    border.setAttribute("fill", "none"); border.setAttribute("stroke", borderColor);
     border.setAttribute("stroke-width", "1");
     svg.appendChild(border);
 
@@ -1569,7 +1657,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
             const circle = document.createElementNS(svgNS, "circle");
             circle.setAttribute("cx", x); circle.setAttribute("cy", yAvg);
             circle.setAttribute("r", "4");
-            circle.setAttribute("fill", "#fff");
+            circle.setAttribute("fill", circleStroke);
             circle.setAttribute("stroke", color.stroke); circle.setAttribute("stroke-width", "2.5");
             circle.style.cursor = "default";
 
@@ -1604,7 +1692,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
 
             // Team logo
             const img = document.createElementNS(svgNS, "image");
-            img.setAttribute("href", `cbb-logos/${team}.webp`);
+            img.setAttribute("href", logoSrc(team));
             img.setAttribute("x", x - logoSize / 2);
             img.setAttribute("y", mT + cH + 6);
             img.setAttribute("width", logoSize); img.setAttribute("height", logoSize);
@@ -1696,7 +1784,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
 
             // Team logo
             const img = document.createElementNS(svgNS, "image");
-            img.setAttribute("href", `cbb-logos/${team}.webp`);
+            img.setAttribute("href", logoSrc(team));
             img.setAttribute("x", x - logoSize / 2);
             img.setAttribute("y", mT + cH + 6);
             img.setAttribute("width", logoSize); img.setAttribute("height", logoSize);
@@ -1734,7 +1822,7 @@ function updateFavicon(n) {
     canvas.height = size;
     const ctx = canvas.getContext('2d');
 
-    const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const dark = document.body.classList.contains('dark');
 
     const label = String(n);
     let fontSize = size;
@@ -1931,6 +2019,7 @@ async function showWeek(weekId) {
         if (targetSection) targetSection.style.display = "block";
         else if (sections[0]) sections[0].style.display = "block";
         lazyLoadWeek(block);
+        refreshBlockLogos(block);
         if (isAggregate) {
             const newActiveTab = document.querySelector(".week-tab.active");
             if (newActiveTab) injectWeightedRankingRow(newActiveTab, block);
@@ -1968,6 +2057,7 @@ async function showApWeek(year, weekNum) {
         const apSections = apBlock.querySelectorAll(".ballot-section");
         if (apSections[0]) apSections[0].style.display = "block";
         lazyLoadWeek(apBlock);
+        refreshBlockLogos(apBlock);
     }
 
     if (!isMobile()) {
@@ -2130,7 +2220,7 @@ function injectWeightedRankingRow(activeTab, activeBlock) {
     tr.className = "voter-row row-weighted-ranking";
 
     const voterTd = document.createElement("td");
-    voterTd.innerHTML = `<div class="voter-cell"><span class="voter-name" style="color:#555;">5-Week Weighted</span></div>`;
+    voterTd.innerHTML = `<div class="voter-cell"><span class="voter-name voter-weighted-name">5-Week Weighted</span></div>`;
     tr.appendChild(voterTd);
 
     ranked.forEach((team, idx) => {
@@ -2161,7 +2251,7 @@ function injectWeightedRankingRow(activeTab, activeBlock) {
         const img = document.createElement("img");
         img.className = "logo team-logo";
         img.dataset.team = team;
-        img.src = "cbb-logos/" + team + ".webp";
+        img.src = logoSrc(team);
         td.appendChild(img);
 
         const avgLabel = document.createElement("span");
@@ -2328,13 +2418,13 @@ function showAvgRankModal(weekId) {
         }
         return `<tr>
             <td>${rankDisplay}</td>
-            <td style="padding:2px 4px;"><img class="logo-sm" src="cbb-logos/${team}.webp"></td>
+            <td style="padding:2px 4px;"><img class="logo-sm" src="${logoSrc(team)}"></td>
             <td class="team-col">${formatTeamName(team)}</td>
             <td style="white-space:nowrap">${rankDelta}</td>
             <td>${inTop25 ? (Number.isInteger(hi) ? hi : hi.toFixed(1)) : ""}</td>
             <td>${inTop25 ? avg.toFixed(1) : ""}</td>
             <td>${inTop25 ? (Number.isInteger(lo) ? lo : lo.toFixed(1)) : ""}</td>
-            <td style="border-right:1px solid #bbb">${inTop25 ? (sdRaw != null ? sdRaw.toFixed(1) : "—") : ""}</td>
+            <td>${inTop25 ? (sdRaw != null ? sdRaw.toFixed(1) : "—") : ""}</td>
             ${inTop25 ? cell5WAvg : "<td></td>"}
             <td>${count}</td>
             <td>${pts}</td>
@@ -2360,7 +2450,7 @@ function showAvgRankModal(weekId) {
         <th title="10th percentile rank across all voters (unranked = 26)">P<sub>90+</sub></th>
         <th>Avg</th>
         <th title="90th percentile rank across all voters (unranked = 26)">P<sub>10−</sub></th>
-        <th title="Standard deviation of ranks given by voters this week" style="border-right:1px solid #bbb">Dev</th>
+        <th title="Standard deviation of ranks given by voters this week">Dev</th>
         <th title="5-week weighted average rank (change from previous week in parentheses)">μ̄<sub>5</sub><sup>w</sup></th>
         <th>Voters</th>
         <th>Pts</th>
@@ -2501,7 +2591,8 @@ function loadImageQueue(queue) {
                 if (index >= queue.length) break;
                 const img = queue[index++];
                 active++;
-                img.src = "cbb-logos/" + img.dataset.src + ".webp";
+                const team = img.dataset.src;
+                setLogoSrc(img, team);
                 img.removeAttribute("data-src");
                 const onDone = () => {
                     active--;
@@ -2779,7 +2870,8 @@ function showSeasonStatsModal() {
     // Accumulate per-team stats from official ballot sections only
     const teamTotalPts = {};
     const teamRankSum = {};
-    const teamVoterWeeks = {};  // total voter-ballot appearances (for avg rank)
+    const teamVoterWeeks = {};  // voter-ballot appearances where team was ranked
+    let totalVoterWeekSlots = 0; // total (voter × week) slots across all weeks
     const teamWeeksRanked = {}; // distinct weeks the team appeared in any ballot
     const teamFirstPlaceVotes = {};
     const teamBestRank = {};
@@ -2795,6 +2887,7 @@ function showSeasonStatsModal() {
         if (!officialSection) return;
 
         const seenThisWeek = new Set();
+        let weekVoterCount = 0;
         officialSection.querySelectorAll(".voter-row").forEach(row => {
             const voterName = getVoterName(row);
             const teams = Array.from(row.querySelectorAll(".team-logo")).map(img => img.dataset.team);
@@ -2807,6 +2900,7 @@ function showSeasonStatsModal() {
                 });
                 return;
             }
+            weekVoterCount++;
             teams.slice(0, 25).forEach((team, i) => {
                 const rank = i + 1;
                 teamTotalPts[team] = (teamTotalPts[team] || 0) + (25 - i);
@@ -2817,11 +2911,12 @@ function showSeasonStatsModal() {
                 if (!teamBestRank[team] || rank < teamBestRank[team]) teamBestRank[team] = rank;
             });
         });
+        totalVoterWeekSlots += weekVoterCount;
         seenThisWeek.forEach(team => {
             teamWeeksRanked[team] = (teamWeeksRanked[team] || 0) + 1;
         });
-        // In AP mode, track consensus ranks from the aggregate section (sections[2])
-        if (isApMode && sections[2]) {
+        // Track consensus ranks from the aggregate section (sections[2])
+        if (sections[2]) {
             const aggRow = sections[2].querySelector(".voter-row");
             if (aggRow) {
                 Array.from(aggRow.querySelectorAll(".team-logo")).map(img => img.dataset.team)
@@ -2852,8 +2947,6 @@ function showSeasonStatsModal() {
         <col style="width:60px">
         <col style="width:52px">
         <col style="width:36px">
-        <col style="width:36px">
-        <col style="width:36px">
     </colgroup><thead><tr>
         <th>#</th><th></th>
         <th class="team-col">Team</th>
@@ -2862,26 +2955,21 @@ function showSeasonStatsModal() {
         <th>Avg Rank</th>
         <th>#1 Votes</th>
         <th>Best</th>
-        <th title="Best consensus rank of the week">Hi</th>
-        <th title="Worst consensus rank of the week">Lo</th>
     </tr></thead><tbody>`;
 
     allTeams.forEach((team, i) => {
-        const avgRank = (teamRankSum[team] / teamVoterWeeks[team]).toFixed(2);
+        const unrankedSlots = totalVoterWeekSlots - (teamVoterWeeks[team] || 0);
+        const avgRank = ((teamRankSum[team] + unrankedSlots * 26) / totalVoterWeekSlots).toFixed(2);
         const firstPlace = teamFirstPlaceVotes[team] || 0;
-        const hiRank = teamBestConsensusRank[team] || "—";
-        const loRank = teamWorstConsensusRank[team] || "—";
         html += `<tr>
             <td>${i + 1}</td>
-            <td><img class="logo-sm" src="cbb-logos/${team}.webp"></td>
+            <td><img class="logo-sm" src="${logoSrc(team)}"></td>
             <td class="team-col">${formatTeamName(team)}</td>
             <td>${teamWeeksRanked[team]}/${totalWeeks}</td>
             <td>${teamTotalPts[team]}</td>
             <td>${avgRank}</td>
             <td>${firstPlace || "—"}</td>
-            <td>${teamBestRank[team]}</td>
-            <td>${hiRank}</td>
-            <td>${loRank}</td>
+            <td>${teamBestConsensusRank[team] || "—"}</td>
         </tr>`;
     });
 
@@ -2984,27 +3072,28 @@ function showHeatmapModal(mode = 'grid') {
         const sz = 18;
         _hmHighlightedTeam = null;
 
+        const { axisColor: hmAxis, gridColor: hmGrid, borderColor: hmBorder } = svgColors();
         let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="width:min(1120px,92vw);display:block;margin:0 auto;">`;
 
         // Gridlines + y-axis labels
         [1, 5, 10, 15, 20, 25].forEach(r => {
             const y = yPos(r).toFixed(1);
-            s += `<line x1="${mL}" x2="${mL + cW}" y1="${y}" y2="${y}" stroke="#e8e8e8" stroke-width="1"/>`;
-            s += `<text x="${mL - 6}" y="${(yPos(r) + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="#999">${r}</text>`;
+            s += `<line x1="${mL}" x2="${mL + cW}" y1="${y}" y2="${y}" stroke="${hmGrid}" stroke-width="1"/>`;
+            s += `<text x="${mL - 6}" y="${(yPos(r) + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="${hmAxis}">${r}</text>`;
         });
 
         // Chart border
-        s += `<rect x="${mL}" y="${mT}" width="${cW}" height="${cH}" fill="none" stroke="#ddd" stroke-width="1"/>`;
+        s += `<rect x="${mL}" y="${mT}" width="${cW}" height="${cH}" fill="none" stroke="${hmBorder}" stroke-width="1"/>`;
 
         // Y-axis label
         const yMid = (mT + cH / 2).toFixed(1);
-        s += `<text x="10" y="${yMid}" text-anchor="middle" font-size="11" fill="#999" transform="rotate(-90,10,${yMid})">Rank</text>`;
+        s += `<text x="10" y="${yMid}" text-anchor="middle" font-size="11" fill="${hmAxis}" transform="rotate(-90,10,${yMid})">Rank</text>`;
 
         // X-axis week labels
         weekData.forEach(({ tab }, wi) => {
             const wn = tab.dataset.weeknum;
             const label = wn === "0" ? "Pre" : `W${wn}`;
-            s += `<text x="${xPos(wi).toFixed(1)}" y="${(mT + cH + 14).toFixed(1)}" text-anchor="middle" font-size="10" fill="#999">${label}</text>`;
+            s += `<text x="${xPos(wi).toFixed(1)}" y="${(mT + cH + 14).toFixed(1)}" text-anchor="middle" font-size="10" fill="${hmAxis}">${label}</text>`;
         });
 
         // Per-team rank arrays (ranked weeks only)
@@ -3020,7 +3109,7 @@ function showHeatmapModal(mode = 'grid') {
                 if (!rank) return;
                 const cx = xPos(wi);
                 const cy = yPos(rank);
-                s += `<image class="hm-logo" data-hm-team="${team}" href="cbb-logos/${team}.webp" x="${(cx - sz / 2).toFixed(1)}" y="${(cy - sz / 2).toFixed(1)}" width="${sz}" height="${sz}" style="cursor:pointer" onclick="hmHighlight('${team}')"><title>${name} — #${rank}</title></image>`;
+                s += `<image class="hm-logo" data-hm-team="${team}" href="${logoSrc(team)}" x="${(cx - sz / 2).toFixed(1)}" y="${(cy - sz / 2).toFixed(1)}" width="${sz}" height="${sz}" style="cursor:pointer" onclick="hmHighlight('${team}')"><title>${name} — #${rank}</title></image>`;
             });
         });
 
@@ -3037,13 +3126,12 @@ function showHeatmapModal(mode = 'grid') {
         html += `</tr></thead><tbody>`;
         top25.forEach((team, idx) => {
             html += `<tr><td class="heatmap-rank-col">${idx + 1}</td>
-                <td class="heatmap-team-col"><img class="heatmap-logo" src="cbb-logos/${team}.webp" width="16" height="16" onerror="this.style.display='none'"><span>${formatTeamName(team)}</span></td>`;
+                <td class="heatmap-team-col"><img class="heatmap-logo" src="${logoSrc(team)}" width="16" height="16" onerror="this.style.display='none'"><span>${formatTeamName(team)}</span></td>`;
             weekData.forEach(({ ranks }) => {
                 const rank = ranks[team] || null;
                 const { bg, fg } = rankColor(rank ?? 26);
                 const label = rank ?? 'x';
-                const title = rank ? `#${rank}` : 'NR';
-                html += `<td class="heatmap-cell" style="background:${bg};color:${fg}" title="${title}">${label}</td>`;
+                html += `<td class="heatmap-cell" style="background:${bg};color:${fg}">${label}</td>`;
             });
             html += `</tr>`;
         });
