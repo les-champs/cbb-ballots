@@ -2683,6 +2683,7 @@ const IS_AP_PAGE = true;
 const FRAG_PATH_PREFIX = 'data-appage-';
 const FRAGMENT_YEARS = ["2022", "2023", "2024", "2025"];
 const TENURE_COUNTS = {};
+const AP_TENURE_COUNTS = {"Abby Schnable": 25, "Andrew Quinn": 58, "Andy Greder": 19, "Anthony Kristensen": 34, "Bob Ballou": 97, "Brenden Martin": 19, "Brenna Greene": 77, "Brian Holland": 97, "Brice Cherry": 59, "Bruce Pascoe": 97, "C.J. Moore": 39, "Chris Lea": 19, "Chris Murray": 97, "Chris Nee": 19, "Connor Earegood": 19, "Dave Borges": 97, "Dave Preston": 97, "David Jablonski": 97, "Dick Vitale": 97, "Donna Ditota": 97, "Dylan Sinn": 78, "Eric Crawford": 19, "Geoff Grammer": 97, "Jackson Payne": 19, "Jeff Borzello": 97, "Jeff Neiburg": 56, "Jeff Rabjohns": 52, "Joe Cook": 18, "John Johnson": 19, "John Wustrow": 19, "Johnny Congdon": 37, "Jon Rothstein": 97, "Jon Wilner": 96, "Justin Jackson": 96, "Kate Rogerson": 59, "Kevin McNamara": 97, "Kevin Sjuts": 76, "Kyle Franko": 39, "Mark Berman": 97, "Mark Zeigler": 78, "Matt Young": 19, "Mia O'Brien": 97, "Michael McCleary": 39, "Mick Shaffer": 39, "Owen Siebring": 18, "Parth Upadhyaya": 58, "Pat Rooney": 78, "Percy Allen": 37, "Peter Rauterkus": 39, "Randy Heitz": 39, "Sam Rothman": 19, "Scott Hamilton": 37, "Scott Richey": 94, "Seth Davis": 96, "Shane Mettlen": 59, "Stephen Means": 94, "Tony Paul": 39, "Toyloy Brown": 38, "Trevor Hass": 39, "Victor Flores": 39, "Zach Klein": 96, "Adam Lichtenstein": 20, "Benjamin Rosenberg": 20, "Bob Holt": 61, "Bret Bloomquist": 78, "Darnell Dickson": 39, "Eric Newman": 19, "Ian Kress": 20, "Jay Tust": 73, "Louis Fernandez": 20, "Luca Evans": 31, "Marcus Fuller": 78, "Mike Hlas": 20, "Reece Van Haaften": 20, "Rick Bozich": 78, "Stephen Thompson": 20, "Steve Greenberg": 77, "Mitchell Northam": 19, "Adam Cole": 39, "Ben Steele": 47, "Calum McAndrew": 14, "Chad Leistikow": 58, "Chandler Mack": 18, "Dave Reardon": 20, "David Jones": 20, "JB Ricks": 20, "Jeff Welsch": 58, "Jerry Carino": 58, "Jerry DiPaola": 56, "Justin Martinez": 18, "Kellis Robinett": 20, "Kevin Brockway": 56, "Kyle Austin": 20, "Lauren Walsh": 20, "Luke DeCock": 29, "Michelle Gardner": 39, "Nick Alvarez": 20, "Sheldon Mickles": 58, "Stefan Krajisnik": 39, "Steve Hewitt": 58, "Todd Golden": 34, "Tony Garcia": 18, "Rodd Baxley": 10, "Andrew Kahn": 38, "Aria Gerson": 37, "C.L. Brown": 19, "Clayton Collier": 38, "Dave Matter": 38, "David Cloninger": 38, "David Thompson": 24, "Jeff Call": 38, "Jimmy Watkins": 2, "John Werner": 38, "Jordan Crammer": 19, "Kelly Hines": 38, "Matt Charboneau": 19, "Matt Tait": 19, "Michelle Kaufman": 1, "Mike Carmin": 5, "Mike Rodak": 38, "Sam Connon": 19, "Stephen Tsai": 23, "Wayne Epps": 20, "Greg Madia": 18, "Matt Daniels": 3, "B.J. Rains": 4, "Bennett Conlin": 1, "Bryce Miller": 19, "Chris Basnett": 19, "Donald Hunt": 19, "Ethan Joyce": 12, "James Crepea": 19, "Jesse Newell": 19, "Lauren Brownlow": 19, "Matt Murschel": 19, "Nick Kelly": 19, "Nick Suss": 19, "Paul Klee": 19, "Scott Wolf": 1, "Terry Toohey": 19, "Theo Lawson": 19};
 let _sortedTabsCache = null;
 let _leaderboardDataCache = null;
 let _deltaDataCache = null;
@@ -5809,13 +5810,26 @@ function showPrecisionModal() {
 }
 
 function showTenureModal() {
-    const activeTab = document.querySelector(".week-tab.active");
-    if (!activeTab) return;
-    const currentYear = activeTab.dataset.year;
-    const yearTabs = getSortedTabs().filter(t => t.dataset.year === currentYear).reverse();
+    const isApPage = typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE;
+    const isApToggle = _apCurrentYear !== null;
+    const isAp = isApPage || isApToggle;
+
+    let currentYear, yearTabs;
+    if (isApToggle) {
+        currentYear = String(_apCurrentYear);
+        yearTabs = getSortedApTabs().filter(t => t.dataset.year === currentYear).reverse();
+    } else {
+        const activeTab = document.querySelector(".week-tab.active");
+        if (!activeTab) return;
+        currentYear = activeTab.dataset.year;
+        yearTabs = getSortedTabs().filter(t => t.dataset.year === currentYear).reverse();
+    }
     if (yearTabs.length === 0) return;
 
-    const ballotCount = (typeof TENURE_COUNTS !== 'undefined') ? TENURE_COUNTS : {};
+    const ballotCount = isAp
+        ? ((typeof AP_TENURE_COUNTS !== 'undefined') ? AP_TENURE_COUNTS : {})
+        : ((typeof TENURE_COUNTS !== 'undefined') ? TENURE_COUNTS : {});
+    const skipName = isAp ? "AP Overall" : "Official Overall";
     const lbData = buildLeaderboardData();
 
     // Collect all voters who appeared in any week this year
@@ -5823,7 +5837,7 @@ function showTenureModal() {
     yearTabs.forEach(tab => {
         const weekData = lbData[tab.dataset.week];
         if (!weekData) return;
-        Object.keys(weekData).forEach(u => { if (u !== "Official Overall") voterSet.add(u); });
+        Object.keys(weekData).forEach(u => { if (u !== skipName && u !== "5-Week Weighted") voterSet.add(u); });
     });
 
     const voters = Array.from(voterSet).sort((a, b) => (ballotCount[b] ?? 0) - (ballotCount[a] ?? 0));
@@ -5832,7 +5846,7 @@ function showTenureModal() {
     const title = document.getElementById("tenure-title");
     const table = document.getElementById("tenure-table");
 
-    title.textContent = `${currentYear} Tenure Leaderboard`;
+    title.textContent = isAp ? `${currentYear} AP Tenure Leaderboard` : `${currentYear} Tenure Leaderboard`;
 
     let html = `<colgroup>
         <col style="width:28px">

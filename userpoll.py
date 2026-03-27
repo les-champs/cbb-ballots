@@ -1273,11 +1273,33 @@ def compute_tenure_counts(data_html):
             counts[voter] += 36
     return counts
 
-def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_counts=None, ap_tabs_html="", ap_fragment_years=None):
+def compute_ap_tenure_counts():
+    """Count total AP ballots per voter across all ap25-YEAR.json files."""
+    counts = {}
+    base_dir = BASE_HTML_DIR
+    for fname in os.listdir(base_dir):
+        m = re.match(r'ap25-(\d+)\.json$', fname)
+        if not m:
+            continue
+        json_path = os.path.join(base_dir, fname)
+        try:
+            with open(json_path, 'r') as f:
+                data = json.load(f)
+        except Exception:
+            continue
+        for week_data in data.get('weeks', {}).values():
+            for v in week_data.get('voters', []):
+                username = v.get('username', '')
+                if username and v.get('teams'):
+                    counts[username] = counts.get(username, 0) + 1
+    return counts
+
+def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_counts=None, ap_tabs_html="", ap_fragment_years=None, ap_tenure_counts=None):
     CSS = load_css()
     JS = load_js()
     fragment_years_js = json.dumps(fragment_years or [])
     tenure_counts_js = json.dumps(tenure_counts or {})
+    ap_tenure_counts_js = json.dumps(ap_tenure_counts or {})
     ap_fragment_years_js = json.dumps(ap_fragment_years or [])
     return f"""<!DOCTYPE html>
 <html>
@@ -1407,6 +1429,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
 const AP_FRAGMENT_YEARS = {ap_fragment_years_js};
 const FRAGMENT_YEARS = {fragment_years_js};
 const TENURE_COUNTS = {tenure_counts_js};
+const AP_TENURE_COUNTS = {ap_tenure_counts_js};
 {JS}
 </script>
 
@@ -1480,7 +1503,8 @@ def save_html(week, year, new_week_block, html_path, week_label=None):
     tenure_counts = compute_tenure_counts(data_html)
 
     ap_tabs_html, ap_fragment_years = get_ap_info(html_path)
-    full_html = build_full_html(tabs_html, inline_data, fragment_years, tenure_counts, ap_tabs_html, ap_fragment_years)
+    ap_tenure_counts = compute_ap_tenure_counts()
+    full_html = build_full_html(tabs_html, inline_data, fragment_years, tenure_counts, ap_tabs_html, ap_fragment_years, ap_tenure_counts)
     with open(html_path, "w", encoding="utf-8") as f:
         f.write(full_html)
     print(f"✓ Saved to: {html_path}")
@@ -1537,12 +1561,13 @@ def delete_week(week, year):
     tenure_counts = compute_tenure_counts(data_html)
 
     ap_tabs_html, ap_fragment_years = get_ap_info(HTML_PATH)
-    full_html = build_full_html(tabs_html, inline_data, fragment_years, tenure_counts, ap_tabs_html, ap_fragment_years)
+    ap_tenure_counts = compute_ap_tenure_counts()
+    full_html = build_full_html(tabs_html, inline_data, fragment_years, tenure_counts, ap_tabs_html, ap_fragment_years, ap_tenure_counts)
     with open(HTML_PATH, "w", encoding="utf-8") as f:
         f.write(full_html)
     print(f"✓ Deleted week {week} {year} from HTML.")
 
-def build_ap_html(week_tabs_html, week_data_html, fragment_years=None):
+def build_ap_html(week_tabs_html, week_data_html, fragment_years=None, ap_tenure_counts=None):
     """Build the full ap-ballots.html from the template, with AP weeks as primary content."""
     full_html = build_full_html(
         week_tabs_html=week_tabs_html,
@@ -1551,6 +1576,7 @@ def build_ap_html(week_tabs_html, week_data_html, fragment_years=None):
         tenure_counts={},
         ap_tabs_html="",
         ap_fragment_years=[],
+        ap_tenure_counts=ap_tenure_counts or {},
     )
     # Update title and meta
     full_html = full_html.replace("<title>Userpoll Landscape</title>", "<title>AP Ballots Landscape</title>")
@@ -1663,7 +1689,8 @@ def rebuild_ap_html():
             )
 
     tabs_html = "\n".join(tabs_html_lines)
-    full_html = build_ap_html(tabs_html, inline_data, fragment_years)
+    ap_tenure_counts = compute_ap_tenure_counts()
+    full_html = build_ap_html(tabs_html, inline_data, fragment_years, ap_tenure_counts)
     with open(AP_HTML_PATH, "w", encoding="utf-8") as f:
         f.write(full_html)
     print(f"✓ Rebuilt ap-ballots.html ({current_year} inline, {len(fragment_years)} year fragments).")
@@ -1797,7 +1824,8 @@ def rebuild_html():
                 print(f"  ✓ Patched thead in {fname}")
 
     ap_tabs_html, ap_fragment_years = get_ap_info(HTML_PATH)
-    full_html = build_full_html(tabs_html, inline_data, fragment_years, tenure_counts, ap_tabs_html, ap_fragment_years)
+    ap_tenure_counts = compute_ap_tenure_counts()
+    full_html = build_full_html(tabs_html, inline_data, fragment_years, tenure_counts, ap_tabs_html, ap_fragment_years, ap_tenure_counts)
     with open(HTML_PATH, "w", encoding="utf-8") as f:
         f.write(full_html)
     print(f"✓ Rebuilt HTML with {len(week_ids)} weeks ({current_year} inline, {len(fragment_years)} year fragments).")

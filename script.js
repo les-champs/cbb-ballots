@@ -3124,13 +3124,26 @@ function showPrecisionModal() {
 }
 
 function showTenureModal() {
-    const activeTab = document.querySelector(".week-tab.active");
-    if (!activeTab) return;
-    const currentYear = activeTab.dataset.year;
-    const yearTabs = getSortedTabs().filter(t => t.dataset.year === currentYear).reverse();
+    const isApPage = typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE;
+    const isApToggle = _apCurrentYear !== null;
+    const isAp = isApPage || isApToggle;
+
+    let currentYear, yearTabs;
+    if (isApToggle) {
+        currentYear = String(_apCurrentYear);
+        yearTabs = getSortedApTabs().filter(t => t.dataset.year === currentYear).reverse();
+    } else {
+        const activeTab = document.querySelector(".week-tab.active");
+        if (!activeTab) return;
+        currentYear = activeTab.dataset.year;
+        yearTabs = getSortedTabs().filter(t => t.dataset.year === currentYear).reverse();
+    }
     if (yearTabs.length === 0) return;
 
-    const ballotCount = (typeof TENURE_COUNTS !== 'undefined') ? TENURE_COUNTS : {};
+    const ballotCount = isAp
+        ? ((typeof AP_TENURE_COUNTS !== 'undefined') ? AP_TENURE_COUNTS : {})
+        : ((typeof TENURE_COUNTS !== 'undefined') ? TENURE_COUNTS : {});
+    const skipName = isAp ? "AP Overall" : "Official Overall";
     const lbData = buildLeaderboardData();
 
     // Collect all voters who appeared in any week this year
@@ -3138,7 +3151,7 @@ function showTenureModal() {
     yearTabs.forEach(tab => {
         const weekData = lbData[tab.dataset.week];
         if (!weekData) return;
-        Object.keys(weekData).forEach(u => { if (u !== "Official Overall") voterSet.add(u); });
+        Object.keys(weekData).forEach(u => { if (u !== skipName && u !== "5-Week Weighted") voterSet.add(u); });
     });
 
     const voters = Array.from(voterSet).sort((a, b) => (ballotCount[b] ?? 0) - (ballotCount[a] ?? 0));
@@ -3147,7 +3160,7 @@ function showTenureModal() {
     const title = document.getElementById("tenure-title");
     const table = document.getElementById("tenure-table");
 
-    title.textContent = `${currentYear} Tenure Leaderboard`;
+    title.textContent = isAp ? `${currentYear} AP Tenure Leaderboard` : `${currentYear} Tenure Leaderboard`;
 
     let html = `<colgroup>
         <col style="width:28px">
