@@ -1051,18 +1051,22 @@ def ap25_build_season(our_year):
 
     print(f"\n✓ Built AP HTML for {our_year}.")
 
+def _compute_aggregate_points(voters):
+    """Return top-25 list of (team, pts) from voter tuples using rank 1=25pts … rank 25=1pt."""
+    points = {}
+    for _, _, _, ballot_logos in voters:
+        for i, logo in enumerate(ballot_logos[:25]):
+            team = canonical_logo_name(logo)
+            points[team] = points.get(team, 0) + (25 - i)
+    return sorted(points.items(), key=lambda x: -x[1])[:25]
+
 def build_ap_week_block(week, year, voters):
     """Build the full HTML block for one AP week."""
     week_id = f"week-ap-{year}-{week}"
     official_table = build_table_html(voters)
 
     # Build aggregate row labeled "AP Overall"
-    points = {}
-    for _, _, _, ballot_logos in voters:
-        for i, logo in enumerate(ballot_logos[:25]):
-            team = canonical_logo_name(logo)
-            points[team] = points.get(team, 0) + (25 - i)
-    ranked = sorted(points.items(), key=lambda x: -x[1])[:25]
+    ranked = _compute_aggregate_points(voters)
     ballot_logo_cells = "".join(
         f'<td class="logo-cell"><img class="logo team-logo" data-team="{team}" data-src="{team}"></td>'
         for team, _ in ranked
@@ -1090,12 +1094,7 @@ def build_appage_week_block(week, year, voters):
     official_table = build_table_html(voters)
 
     # Build aggregate row labeled "AP Overall"
-    points = {}
-    for _, _, _, ballot_logos in voters:
-        for i, logo in enumerate(ballot_logos[:25]):
-            team = canonical_logo_name(logo)
-            points[team] = points.get(team, 0) + (25 - i)
-    ranked = sorted(points.items(), key=lambda x: -x[1])[:25]
+    ranked = _compute_aggregate_points(voters)
     ballot_logo_cells = "".join(
         f'<td class="logo-cell"><img class="logo team-logo" data-team="{team}" data-src="{team}"></td>'
         for team, _ in ranked
@@ -1210,12 +1209,7 @@ def build_table_rows(voters_with_ballots):
 
 def build_aggregate_row(official):
     """Build a single aggregate row from official ballots using points system (rank 1=25pts ... rank 25=1pt)."""
-    points = {}
-    for _, _, _, ballot_logos in official:
-        for i, logo in enumerate(ballot_logos[:25]):
-            team = canonical_logo_name(logo)
-            points[team] = points.get(team, 0) + (25 - i)
-    ranked = sorted(points.items(), key=lambda x: -x[1])[:25]
+    ranked = _compute_aggregate_points(official)
     ballot_logo_cells = "".join(
         f'<td class="logo-cell"><img class="logo team-logo" data-team="{team}" data-src="{team}"></td>'
         for team, _ in ranked
@@ -1244,6 +1238,7 @@ THEAD_HTML = (
     f"<span class='sort-option' data-action='heatmap'>Heatmap</span>"
     f"<span class='picker-category'>Actions</span>"
     f"<span class='sort-option' data-action='expandDeltas'>Deltas</span>"
+    f"<span class='sort-option' data-action='toggleOutliers'>Outliers</span>"
     f"<span class='sort-option dark-mode-toggle' data-action='darkMode'>Dark Mode</span>"
     f"</span></th>"
     f"{RANK_HEADERS}</tr></thead>"
@@ -1481,6 +1476,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
     </div>
     <div class="keybind-section">
       <div class="keybind-section-title">Views</div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>O</kbd></span><span>Toggle Outlier Highlighting</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>E</kbd></span><span>Expand / Collapse All Deltas</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>J</kbd></span><span>Toggle Delta Sub-label (Consensus Diff / Recency)</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>1</kbd> – <kbd>9</kbd></span><span>Adjust Delta Lookback Window</span></div>

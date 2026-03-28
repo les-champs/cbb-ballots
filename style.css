@@ -263,11 +263,7 @@ body.hide-veteran-tags .veteran-tag,
     color: rgba(235, 183, 33, 0.63);
 }
 
-.voter-name:has(.veteran-elite) {
-    -webkit-text-stroke-width: 0.3px;
-    -webkit-text-stroke-color: var(--color-veteran-stroke);
-}
-
+.voter-name:has(.veteran-elite),
 .voter-name:has(.veteran-tag:not(.veteran-elite)) {
     -webkit-text-stroke-width: 0.3px;
     -webkit-text-stroke-color: var(--color-veteran-stroke);
@@ -278,7 +274,7 @@ body.hide-veteran-tags .veteran-tag,
 }
 
 
-.pin-btn {
+.pin-btn, .history-btn {
     display: none;
     cursor: pointer;
     font-size: 11px;
@@ -289,7 +285,7 @@ body.hide-veteran-tags .veteran-tag,
     transition: opacity 0.1s, filter 0.1s;
 }
 
-.pin-btn:hover {
+.pin-btn:hover, .history-btn:hover {
     opacity: 0.6;
 }
 
@@ -298,7 +294,8 @@ body.hide-veteran-tags .veteran-tag,
     filter: grayscale(100%) brightness(0.2);
 }
 
-.voter-row.voter-cell-hover .pin-btn {
+.voter-row.voter-cell-hover .pin-btn,
+.voter-row.voter-cell-hover .history-btn {
     display: inline;
 }
 
@@ -308,25 +305,6 @@ body.hide-veteran-tags .veteran-tag,
 
 .row-pinned-agg {
     border-top: 1px solid var(--color-border-pinned);
-}
-
-.history-btn {
-    display: none;
-    cursor: pointer;
-    font-size: 11px;
-    flex-shrink: 0;
-    opacity: 0.3;
-    filter: grayscale(100%);
-    user-select: none;
-    transition: opacity 0.1s, filter 0.1s;
-}
-
-.history-btn:hover {
-    opacity: 0.6;
-}
-
-.voter-row.voter-cell-hover .history-btn {
-    display: inline;
 }
 
 .ballot-link-btn {
@@ -815,6 +793,25 @@ body.year-loading::after {
     background: var(--color-bg-spread-hover);
 }
 
+.modal-mode-tab {
+    cursor: pointer;
+    font-size: 1.1rem;
+    color: var(--color-modal-h2);
+    opacity: 0.35;
+    margin-left: 0.55em;
+    user-select: none;
+}
+.modal-mode-tab:first-of-type {
+    margin-left: 0;
+}
+.modal-mode-tab.active {
+    opacity: 1;
+    cursor: default;
+}
+.modal-mode-tab:not(.active):hover {
+    opacity: 0.65;
+}
+
 .ap-back-link {
     font-size: 13px;
     color: var(--color-ap-link);
@@ -951,6 +948,41 @@ body.year-loading::after {
     }
 }
 
+
+/* ─── Outlier highlighting ───────────────────────────────── */
+.logo-cell.outlier-high .team-logo {
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px rgb(40, 167, 69);
+}
+.logo-cell.outlier-low .team-logo {
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px rgb(220, 53, 69);
+}
+.voter-omission-badge {
+    display: inline-block;
+    font-size: 10px;
+    color: var(--color-avg-label);
+    margin-left: 4px;
+    opacity: 0.85;
+    cursor: default;
+}
+#omission-tooltip {
+    position: fixed;
+    background: var(--color-bg-modal);
+    border: 1px solid var(--color-border-tab);
+    border-radius: 6px;
+    padding: 5px 9px;
+    font-size: 12px;
+    color: var(--color-keybind-row);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    z-index: 9999;
+    display: none;
+    white-space: nowrap;
+    pointer-events: none;
+}
+#omission-tooltip.visible {
+    display: block;
+}
 
 /* ─── Dark mode ──────────────────────────────────────────── */
 body.dark {

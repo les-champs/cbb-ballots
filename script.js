@@ -1,3 +1,6 @@
+const isDarkMode = () => document.body.classList.contains('dark');
+const SVG_NS = "http://www.w3.org/2000/svg";
+
 let _sortedTabsCache = null;
 let _leaderboardDataCache = null;
 let _deltaDataCache = null;
@@ -9,8 +12,11 @@ const _loadedYears = new Set();
 const _loadingYears = {};
 const HIDDEN_YEARS = new Set(["2024"]);
 
+const OUTLIER_OMISSION_TOP_N = 15;
+let _outliersMode = false;
+
 function svgColors() {
-    const dark = document.body.classList.contains('dark');
+    const dark = isDarkMode();
     return {
         axisColor:   dark ? "#888" : "#999",
         gridColor:   dark ? "#383838" : "#e8e8e8",
@@ -23,14 +29,14 @@ function svgColors() {
 }
 
 function updateDarkModeLabel() {
-    const dark = document.body.classList.contains('dark');
+    const dark = isDarkMode();
     document.querySelectorAll('.dark-mode-toggle').forEach(el => {
         el.textContent = dark ? 'Light Mode' : 'Dark Mode';
     });
 }
 
 function logoSrc(team) {
-    const dark = document.body.classList.contains('dark');
+    const dark = isDarkMode();
     const suffix = (dark && DARK_LOGO_TEAMS.has(team)) ? '-dark' : '';
     return `cbb-logos/${team}${suffix}.webp`;
 }
@@ -41,7 +47,7 @@ function logoSrc(team) {
 function setLogoSrc(img, team) {
     const src = logoSrc(team);
     img.src = src;
-    const dark = document.body.classList.contains('dark');
+    const dark = isDarkMode();
     if (dark && DARK_LOGO_TEAMS.has(team)) {
         img.addEventListener('error', () => {
             img.src = `cbb-logos/${team}.webp`;
@@ -72,9 +78,11 @@ function refreshLogos() {
 
 function toggleDarkMode() {
     document.body.classList.toggle('dark');
-    localStorage.setItem('darkMode', document.body.classList.contains('dark') ? '1' : '0');
+    localStorage.setItem('darkMode', isDarkMode() ? '1' : '0');
     updateDarkModeLabel();
     refreshLogos();
+    applyHighlightStyles();
+    updateAvgRankLines();
 }
 
 (function() {
@@ -175,13 +183,25 @@ const highlightClasses = [
     "team-highlight-1","team-highlight-2","team-highlight-3",
     "team-highlight-4","team-highlight-5"
 ];
-const highlightColors = {
-    "team-highlight-1": "#ffcc00",
-    "team-highlight-2": "#0077cc",
-    "team-highlight-3": "#ff6666",
-    "team-highlight-4": "#33cc33",
-    "team-highlight-5": "#cc66ff"
+const highlightColorSets = {
+    light: {
+        "team-highlight-1": "#ffcc00",
+        "team-highlight-2": "#0077cc",
+        "team-highlight-3": "#ff6666",
+        "team-highlight-4": "#33cc33",
+        "team-highlight-5": "#cc66ff"
+    },
+    dark: {
+        "team-highlight-1": "#ffffff",
+        "team-highlight-2": "#0099ff",
+        "team-highlight-3": "#ff6666",
+        "team-highlight-4": "#33cc33",
+        "team-highlight-5": "#ffcc00"
+    }
 };
+function getHighlightColors() {
+    return isDarkMode() ? highlightColorSets.dark : highlightColorSets.light;
+}
 
 const highlightedTeams = {}; // "team-highlight-1" → team name, etc.
 
@@ -196,7 +216,7 @@ function applyHighlightStyles() {
     highlightClasses.forEach(cls => {
         const team = highlightedTeams[cls];
         if (!team) return;
-        const color = highlightColors[cls];
+        const color = getHighlightColors()[cls];
         rules.push(`.team-logo[data-team="${team}"] { outline: 2px solid ${color}; border-radius: 4px; box-shadow: 0 0 20px 6px ${color}; }`);
         rules.push(`.row-delta .team-logo[data-team="${team}"] { box-shadow: none; }`);
     });
@@ -243,7 +263,7 @@ function updateAvgRankLines() {
     highlightClasses.forEach(cls => {
         const team = highlightedTeams[cls];
         if (!team) return;
-        const color = highlightColors[cls];
+        const color = getHighlightColors()[cls];
         const ranks = [];
         voterRows.forEach(row => {
             let found = false;
@@ -444,6 +464,121 @@ function expandAllDeltas() {
     });
 }
 
+// ── Outlier highlighting ──────────────────────────────────────────────────────
+
+function getConsensusOrder(weekBlock) {
+    const sections = weekBlock.querySelectorAll(".ballot-section");
+    const aggRow = sections[2]?.querySelector(".voter-row:not(.row-weighted-ranking)");
+    return aggRow
+        ? Array.from(aggRow.querySelectorAll(".team-logo")).map(img => img.dataset.team)
+        : null;
+}
+
+// Compute per-team mean rank and standard deviation across all voter rows in a section.
+function computeTeamStats(section) {
+    const teamRanks = {};
+    section.querySelectorAll(".voter-row").forEach(row => {
+        if (row.classList.contains("row-weighted-ranking")) return;
+        row.querySelectorAll(".logo-cell .team-logo").forEach((logo, idx) => {
+            const team = logo.dataset.team;
+            if (!teamRanks[team]) teamRanks[team] = [];
+            teamRanks[team].push(idx + 1);
+        });
+    });
+    const stats = {};
+    for (const [team, ranks] of Object.entries(teamRanks)) {
+        const n = ranks.length;
+        const avg = ranks.reduce((s, r) => s + r, 0) / n;
+        const sd = n >= 2
+            ? Math.sqrt(ranks.reduce((s, r) => s + (r - avg) ** 2, 0) / n)
+            : 0;
+        stats[team] = { avg, sd };
+    }
+    return stats;
+}
+
+function applyOutliers(weekBlock) {
+    const consensus = getConsensusOrder(weekBlock);
+    if (!consensus || consensus.length === 0) return;
+
+    const consensusRankMap = {};
+    consensus.forEach((team, i) => { consensusRankMap[team] = i + 1; });
+
+    const sections = weekBlock.querySelectorAll(".ballot-section");
+    // Target the visible voter section (Official or Provisional), not Aggregate
+    const targetSection = Array.from(sections).find((s, i) => i < 2 && s.style.display !== "none")
+        ?? (sections.length === 1 ? sections[0] : null);
+    if (!targetSection) return;
+
+    const teamStats = computeTeamStats(targetSection);
+
+    targetSection.querySelectorAll(".voter-row").forEach(row => {
+        if (row.classList.contains("row-weighted-ranking")) return;
+        const logos = row.querySelectorAll(".logo-cell .team-logo");
+        const voterTeams = new Set(Array.from(logos).map(img => img.dataset.team));
+        let omitCount = 0;
+
+        logos.forEach((logo, idx) => {
+            const team = logo.dataset.team;
+            const cell = logo.closest(".logo-cell");
+            if (!cell) return;
+            const voterRank = idx + 1;
+            const cRank = consensusRankMap[team] ?? 26;
+            const deviation = cRank - voterRank;
+            const stat = teamStats[team];
+            cell.classList.remove("outlier-high", "outlier-low");
+            if (stat && stat.sd > 0 && Math.abs(voterRank - stat.avg) >= 2 * stat.sd && Math.abs(deviation) >= 2) {
+                cell.classList.add(deviation > 0 ? "outlier-high" : "outlier-low");
+            }
+        });
+
+        const omittedTeams = [];
+        for (let i = 0; i < Math.min(OUTLIER_OMISSION_TOP_N, consensus.length); i++) {
+            if (consensus[i] && !voterTeams.has(consensus[i])) omittedTeams.push(consensus[i]);
+        }
+        omitCount = omittedTeams.length;
+
+        let badge = row.querySelector(".voter-omission-badge");
+        if (omitCount > 0) {
+            if (!badge) {
+                badge = document.createElement("span");
+                badge.className = "voter-omission-badge";
+                const nameEl = row.querySelector(".voter-name");
+                if (nameEl) nameEl.after(badge);
+            }
+            badge.textContent = `⚠${omitCount}`;
+            badge.title = omittedTeams.join(", ");
+        } else if (badge) {
+            badge.remove();
+        }
+    });
+}
+
+function clearOutliers(weekBlock) {
+    weekBlock.querySelectorAll(".outlier-high, .outlier-low").forEach(el => {
+        el.classList.remove("outlier-high", "outlier-low");
+    });
+    weekBlock.querySelectorAll(".voter-omission-badge").forEach(el => el.remove());
+}
+
+function toggleOutliers() {
+    _outliersMode = !_outliersMode;
+    document.querySelectorAll("[data-action='toggleOutliers']").forEach(el => {
+        el.classList.toggle("active", _outliersMode);
+    });
+    const activeTab = document.querySelector(".week-tab.active");
+    let block = null;
+    if (_apCurrentYear && _apCurrentWeekNum) {
+        block = document.getElementById(`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`);
+    } else if (activeTab) {
+        block = document.getElementById(activeTab.dataset.week);
+    }
+    if (block) {
+        if (_outliersMode) applyOutliers(block);
+        else clearOutliers(block);
+    }
+}
+
 function hideRankHeaders(block) {
     if (!block) return;
     block.querySelectorAll("table thead th:not(:first-child)").forEach(th => { th.style.color = "transparent"; th.style.borderRight = "none"; });
@@ -548,6 +683,9 @@ function handlePickerAction(action) {
             break;
         case "expandDeltas":
             toggleAllDeltas();
+            break;
+        case "toggleOutliers":
+            toggleOutliers();
             break;
         case "darkMode":
             toggleDarkMode();
@@ -1015,7 +1153,7 @@ function showTeamRankChart(team, username) {
     table.style.cssText = "display:block; white-space:normal; width:100%;";
 
     // SVG chart
-    const svgNS = "http://www.w3.org/2000/svg";
+    const svgNS = SVG_NS;
     const W = 900, H = 500;
     const mL = 44, mR = 20, mT = 28, mB = 40;
     const cW = W - mL - mR, cH = H - mT - mB;
@@ -1213,7 +1351,7 @@ function showTeamSeasonDotPlot(team, mode = "dots") {
                 onclick="showTeamSeasonDotPlot('${escapedTeam}', 'count')">Vote Count</button>`;
     table.appendChild(toggleDiv);
 
-    const svgNS = "http://www.w3.org/2000/svg";
+    const svgNS = SVG_NS;
     const W = 900, H = 460;
     const mL = 44, mR = 16, mT = 28, mB = 52;
     const cW = W - mL - mR, cH = H - mT - mB;
@@ -1536,28 +1674,24 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
     const weekNum = titleTab?.dataset.weeknum || "";
     const year = titleTab?.dataset.year || "";
     const weekLabel = titleTab?.dataset.weeklabel;
-    const spreadLabel = mode === "weighted" ? "Weighted Recency Spread" : "Rank Spread";
-    title.textContent = weekLabel
-        ? `${year} ${weekLabel} — ${spreadLabel}`
-        : `${year} Week ${String(weekNum).padStart(2, "0")} — ${spreadLabel}`;
+    const weekLabelText = weekLabel
+        ? `${year} ${weekLabel}`
+        : `${year} Week ${String(weekNum).padStart(2, "0")}`;
+    const escapedId = weekId.replace(/'/g, "\\'");
+    const modeTabs = [
+        { key: 'highlow', label: 'Range' },
+        { key: 'dots', label: 'Spread' },
+        { key: 'weighted', label: 'Recency' },
+    ].map(m =>
+        `<span class="modal-mode-tab${mode === m.key ? ' active' : ''}"
+               onclick="showWeekHighLowChart('${escapedId}', '${m.key}')">${m.label}</span>`
+    ).join('');
+    title.innerHTML = `${weekLabelText} Graphs — ${modeTabs}`;
 
     table.innerHTML = "";
     table.style.cssText = "display:block; white-space:normal; width:100%;";
 
-    // Toggle buttons
-    const toggleDiv = document.createElement("div");
-    toggleDiv.style.cssText = "text-align:center;margin-bottom:10px;";
-    const escapedId = weekId.replace(/'/g, "\\'");
-    toggleDiv.innerHTML = `
-        <button class="spread-toggle${mode === 'highlow' ? ' active' : ''}"
-                onclick="showWeekHighLowChart('${escapedId}', 'highlow')">High-Low</button>
-        <button class="spread-toggle${mode === 'dots' ? ' active' : ''}"
-                onclick="showWeekHighLowChart('${escapedId}', 'dots')">Dot Plot</button>
-        <button class="spread-toggle${mode === 'weighted' ? ' active' : ''}"
-                onclick="showWeekHighLowChart('${escapedId}', 'weighted')">Weighted Recency</button>`;
-    table.appendChild(toggleDiv);
-
-    const svgNS = "http://www.w3.org/2000/svg";
+    const svgNS = SVG_NS;
     const W = 900, H = 460;
     const mL = 44, mR = 16, mT = 28, mB = 52;
     const cW = W - mL - mR, cH = H - mT - mB;
@@ -1822,7 +1956,7 @@ function updateFavicon(n) {
     canvas.height = size;
     const ctx = canvas.getContext('2d');
 
-    const dark = document.body.classList.contains('dark');
+    const dark = isDarkMode();
 
     const label = String(n);
     let fontSize = size;
@@ -2032,6 +2166,7 @@ async function showWeek(weekId) {
     bindVotersToggle();
     applyTableSort(currentSort);
     updateAvgRankLines();
+    if (block) { if (_outliersMode) applyOutliers(block); else clearOutliers(block); }
 }
 
 // Show a specific AP week — the AP-mode equivalent of showWeek().
@@ -2084,6 +2219,7 @@ async function showApWeek(year, weekNum) {
     bindVotersToggle();
     applyTableSort(currentSort);
     updateAvgRankLines();
+    if (apBlock && _outliersMode) applyOutliers(apBlock);
 }
 
 // Enter AP Ballots mode from whatever userpoll week is currently active.
@@ -2151,6 +2287,10 @@ function exitApBallots() {
     _deltaDataCache = null;
     applyTableSort(currentSort);
     updateAvgRankLines();
+    if (_outliersMode) {
+        const curTab = document.querySelector(".week-tab.active");
+        if (curTab) { const b = document.getElementById(curTab.dataset.week); if (b) applyOutliers(b); }
+    }
 }
 
 // Toggle Official → Provisional → Official (no-op when in AP Ballots mode)
@@ -2179,6 +2319,7 @@ document.getElementById("toggle-text").addEventListener("click", async () => {
     _deltaDataCache = null;
     applyTableSort(currentSort);
     updateAvgRankLines();
+    if (_outliersMode) applyOutliers(activeBlock);
 });
 
 
@@ -3274,14 +3415,10 @@ function showTenureModal() {
     modal.classList.add("open");
 }
 
-document.getElementById("precision-modal").addEventListener("click", e => {
-    if (e.target === document.getElementById("precision-modal"))
-        document.getElementById("precision-modal").classList.remove("open");
-});
-
-document.getElementById("tenure-modal").addEventListener("click", e => {
-    if (e.target === document.getElementById("tenure-modal"))
-        document.getElementById("tenure-modal").classList.remove("open");
+["precision-modal", "tenure-modal"].forEach(id => {
+    document.getElementById(id).addEventListener("click", e => {
+        if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
+    });
 });
 
 // Keyboard shortcuts
@@ -3421,24 +3558,10 @@ function computeVoterAvg(yearTabs, lbData) {
     return voterAvg;
 }
 
-document.getElementById("keybind-legend-modal").addEventListener("click", e => {
-    if (e.target === document.getElementById("keybind-legend-modal"))
-        document.getElementById("keybind-legend-modal").classList.remove("open");
-});
-
-document.getElementById("avg-rank-modal").addEventListener("click", e => {
-    if (e.target === document.getElementById("avg-rank-modal"))
-        document.getElementById("avg-rank-modal").classList.remove("open");
-});
-
-document.getElementById("season-stats-modal").addEventListener("click", e => {
-    if (e.target === document.getElementById("season-stats-modal"))
-        document.getElementById("season-stats-modal").classList.remove("open");
-});
-
-document.getElementById("heatmap-modal").addEventListener("click", e => {
-    if (e.target === document.getElementById("heatmap-modal"))
-        document.getElementById("heatmap-modal").classList.remove("open");
+["keybind-legend-modal", "avg-rank-modal", "season-stats-modal", "heatmap-modal"].forEach(id => {
+    document.getElementById(id).addEventListener("click", e => {
+        if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
+    });
 });
 
 
@@ -3550,6 +3673,11 @@ document.addEventListener("keydown", e => {
     if (e.key === "B" || e.key === "b") {
         e.preventDefault();
         showBumpChartModal();
+        return;
+    }
+    if (e.key === "O" || e.key === "o") {
+        e.preventDefault();
+        toggleOutliers();
         return;
     }
 
@@ -3692,6 +3820,34 @@ document.addEventListener("keydown", e => {
         document.getElementById("keybind-legend-modal").classList.toggle("open");
     }
 });
+
+// Omission badge tooltip
+const _omissionTip = document.createElement("div");
+_omissionTip.id = "omission-tooltip";
+document.body.appendChild(_omissionTip);
+
+document.addEventListener("click", e => {
+    const badge = e.target.closest(".voter-omission-badge");
+    if (badge) {
+        e.stopPropagation();
+        if (_omissionTip.classList.contains("visible") && _omissionTip._source === badge) {
+            _omissionTip.classList.remove("visible");
+            return;
+        }
+        _omissionTip.textContent = badge.title;
+        _omissionTip._source = badge;
+        _omissionTip.classList.add("visible");
+        const r = badge.getBoundingClientRect();
+        const tipW = _omissionTip.offsetWidth;
+        let left = r.left + r.width / 2 - tipW / 2;
+        left = Math.max(6, Math.min(left, window.innerWidth - tipW - 6));
+        const top = r.bottom + 5;
+        _omissionTip.style.left = left + "px";
+        _omissionTip.style.top = top + "px";
+    } else {
+        _omissionTip.classList.remove("visible");
+    }
+}, true);
 
 // Init
 rebuildYearPicker();
