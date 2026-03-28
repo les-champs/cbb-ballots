@@ -361,10 +361,6 @@ body.hide-veteran-tags .veteran-tag,
     white-space: nowrap;
 }
 
-.voter-weighted-name {
-    color: var(--color-voter-weighted);
-}
-
 .rank-score-label {
     display: none;
     font-size: 11px;
@@ -1032,4 +1028,8 @@ body.dark {
     --color-border-kbd:      #555;
     --color-border-kbd-bot:  #444;
     --color-border-spread:   #626262;
+}
+
+body.dark .pin-btn.pinned {
+    filter: grayscale(100%) brightness(5);
 }

@@ -5,6 +5,7 @@ let _sortedTabsCache = null;
 let _leaderboardDataCache = null;
 let _deltaDataCache = null;
 let _deltaDataCacheIsProvisional = null;
+let _apDeltaDataCache = {};
 let _apCurrentYear = null;
 let _apCurrentWeekNum = null;
 
@@ -242,7 +243,10 @@ function updateAvgRankLines() {
     });
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab) return;
-    const block = document.getElementById(activeTab.dataset.week);
+    const blockId = (_apCurrentYear && _apCurrentWeekNum)
+        ? `week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`
+        : activeTab.dataset.week;
+    const block = document.getElementById(blockId);
     if (!block) return;
     const officialSection = block.querySelectorAll(".ballot-section")[0];
     if (!officialSection || officialSection.style.display === "none") return;
@@ -527,7 +531,7 @@ function applyOutliers(weekBlock) {
             const deviation = cRank - voterRank;
             const stat = teamStats[team];
             cell.classList.remove("outlier-high", "outlier-low");
-            if (stat && stat.sd > 0 && Math.abs(voterRank - stat.avg) >= 2 * stat.sd && Math.abs(deviation) >= 2) {
+            if (stat && stat.sd > 0 && Math.abs(voterRank - stat.avg) >= 2 * stat.sd && Math.abs(deviation) >= 3) {
                 cell.classList.add(deviation > 0 ? "outlier-high" : "outlier-low");
             }
         });
@@ -740,7 +744,14 @@ function applyTableSort(sort) {
     const tbody = visibleSection?.querySelector("tbody");
     if (!tbody) return;
 
-    const rows = Array.from(tbody.querySelectorAll(".voter-row"));
+    const allRows = Array.from(tbody.querySelectorAll(".voter-row"));
+
+    // Separate fixed-position rows (always shown first) from sortable voter rows
+    const pinnedFirst = allRows.filter(r => {
+        const n = getVoterName(r);
+        return n === "Official Overall" || n === "AP Overall" || n === "Recency" || r.classList.contains("row-weighted-ranking");
+    });
+    const rows = allRows.filter(r => !pinnedFirst.includes(r));
 
     // Clear any existing consensus distance labels
     document.querySelectorAll(".consensus-dist").forEach(el => el.remove());
@@ -757,13 +768,13 @@ function applyTableSort(sort) {
 
     if (sort === "alphabetic") {
         rows.sort((a, b) => getVoterName(a).localeCompare(getVoterName(b)));
-        rows.forEach(r => tbody.appendChild(r));
+        [...pinnedFirst, ...rows].forEach(r => tbody.appendChild(r));
         return;
     }
 
     if (sort === "zetabetique") {
         rows.sort((a, b) => getVoterName(b).localeCompare(getVoterName(a)));
-        rows.forEach(r => tbody.appendChild(r));
+        [...pinnedFirst, ...rows].forEach(r => tbody.appendChild(r));
         return;
     }
 
@@ -807,6 +818,7 @@ function applyTableSort(sort) {
             const sa = scoreFn(voterTeams[ua]), sb = scoreFn(voterTeams[ub]);
             return sa !== sb ? sa - sb : tiebreakFn(voterTeams[ua], voterTeams[ub]);
         });
+        pinnedFirst.forEach(r => tbody.appendChild(r));
         rows.forEach(r => {
             tbody.appendChild(r);
             const dist = scoreFn(voterTeams[getVoterName(r)]);
@@ -874,7 +886,7 @@ function bindVoterCells(root) {
         cell.addEventListener("click", e => {
             const row = cell.closest("tr");
 
-            // Special handling for the 5-Week Weighted aggregate row
+            // Special handling for the Recency aggregate row
             if (row.classList.contains("row-weighted-ranking")) {
                 row.classList.toggle("row-delta");
                 return;
@@ -901,7 +913,7 @@ function bindVoterCells(root) {
     });
 }
 
-// Compute the 5-Week Weighted top-25 teams for a given week.
+// Compute the Recency top-25 teams for a given week.
 // Accepts pre-built deltaData and the year's tabs (sorted oldest-last, i.e. getSortedTabs() order).
 // Returns { ranked, teamAvgRankSum, totalVoters } or null if no data.
 function compute5WeekWeighted(weekId, deltaData, yearTabs) {
@@ -940,12 +952,12 @@ function compute5WeekWeighted(weekId, deltaData, yearTabs) {
 }
 
 // Build a map of { weekId -> teams[] | null } for the given username across all loaded weeks.
-// Works for regular voters, "Official Overall" (aggregate row), and "5-Week Weighted" (computed).
+// Works for regular voters, "Official Overall" (aggregate row), and "Recency" (computed).
 // Pass `tabs` to override which tabs (and their blocks) are scanned — used for AP mode.
 function buildSeasonDataForUser(username, tabs) {
     const result = {};
     const allTabsSorted = tabs || getSortedTabs();
-    if (username === "5-Week Weighted") {
+    if (username === "Recency") {
         const deltaData = buildDeltaData();
         const yearGroups = {};
         allTabsSorted.forEach(tab => {
@@ -2156,7 +2168,13 @@ async function showWeek(weekId) {
         refreshBlockLogos(block);
         if (isAggregate) {
             const newActiveTab = document.querySelector(".week-tab.active");
-            if (newActiveTab) injectWeightedRankingRow(newActiveTab, block);
+            if (newActiveTab) {
+                if (typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE) {
+                    injectApWeightedRankingRow(block, newActiveTab.dataset.week, newActiveTab.dataset.year);
+                } else {
+                    injectWeightedRankingRow(newActiveTab, block);
+                }
+            }
         }
     }
 
@@ -2190,9 +2208,16 @@ async function showApWeek(year, weekNum) {
         apBlock.style.display = "";
         apBlock.querySelectorAll(".ballot-section").forEach(s => s.style.display = "none");
         const apSections = apBlock.querySelectorAll(".ballot-section");
-        if (apSections[0]) apSections[0].style.display = "block";
+        const apToggleText = document.getElementById("toggle-text").innerText;
+        const showApAggregate = !isMobile() && apToggleText === "Associated Press Data";
+        if (showApAggregate && apSections[2]) {
+            apSections[2].style.display = "block";
+        } else if (apSections[0]) {
+            apSections[0].style.display = "block";
+        }
         lazyLoadWeek(apBlock);
         refreshBlockLogos(apBlock);
+        if (showApAggregate) injectApWeightedRankingRow(apBlock, `week-ap-${year}-${weekNum}`, year);
     }
 
     if (!isMobile()) {
@@ -2222,14 +2247,14 @@ async function showApWeek(year, weekNum) {
     if (apBlock && _outliersMode) applyOutliers(apBlock);
 }
 
-// Enter AP Ballots mode from whatever userpoll week is currently active.
+// Enter Associated Press mode from whatever userpoll week is currently active.
 async function switchToApBallots() {
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab || activeTab.dataset.poll === "ap") return;
     const year = activeTab.dataset.year;
     const weekNum = activeTab.dataset.weeknum;
 
-    document.getElementById("toggle-text").innerText = "AP Ballots";
+    document.getElementById("toggle-text").innerText = "Associated Press";
 
     // Hide userpoll block
     const activeBlock = document.getElementById(activeTab.dataset.week);
@@ -2252,7 +2277,7 @@ async function switchToApBallots() {
     await showApWeek(year, targetWeekNum);
 }
 
-// Exit AP Ballots mode and restore the userpoll view.
+// Exit Associated Press mode and restore the userpoll view.
 function exitApBallots() {
     if (!_apCurrentYear || !_apCurrentWeekNum) return;
 
@@ -2293,14 +2318,53 @@ function exitApBallots() {
     }
 }
 
-// Toggle Official → Provisional → Official (no-op when in AP Ballots mode)
+// Toggle: Official ↔ Provisional (userpoll), Associated Press ↔ Associated Press Data (AP index mode), Associated Press ↔ Data Ballots (ap-ballots.html)
 document.getElementById("toggle-text").addEventListener("click", async () => {
     const current = document.getElementById("toggle-text").innerText;
+    const isApPage = typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE;
 
-    if (current === "AP Ballots") {
+    // AP mode on index.html: cycle Associated Press ↔ Associated Press Data
+    if (_apCurrentYear && _apCurrentWeekNum) {
+        if (current === "Associated Press") {
+            showAggregateSection();
+        } else if (current === "Associated Press Data") {
+            const apBlock = document.getElementById(`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`);
+            if (!apBlock) return;
+            const sections = apBlock.querySelectorAll(".ballot-section");
+            sections.forEach(s => s.style.display = "none");
+            if (sections[0]) sections[0].style.display = "block";
+            document.getElementById("toggle-text").innerText = "Associated Press";
+            _deltaDataCache = null;
+            applyTableSort(currentSort);
+            updateAvgRankLines();
+            if (_outliersMode) applyOutliers(apBlock);
+        }
         return;
     }
 
+    // ap-ballots.html: cycle Associated Press ↔ Data Ballots
+    if (isApPage) {
+        if (current === "Associated Press") {
+            showAggregateSection();
+        } else {
+            // Data Ballots → Associated Press
+            const activeTab = document.querySelector(".week-tab.active");
+            if (!activeTab) return;
+            const activeBlock = document.getElementById(activeTab.dataset.week);
+            if (!activeBlock) return;
+            const sections = activeBlock.querySelectorAll(".ballot-section");
+            sections.forEach(s => s.style.display = "none");
+            if (sections[0]) sections[0].style.display = "block";
+            document.getElementById("toggle-text").innerText = "Associated Press";
+            _deltaDataCache = null;
+            applyTableSort(currentSort);
+            updateAvgRankLines();
+            if (_outliersMode) applyOutliers(activeBlock);
+        }
+        return;
+    }
+
+    // Normal userpoll toggle: Official ↔ Provisional
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab) return;
     const activeBlock = document.getElementById(activeTab.dataset.week);
@@ -2324,7 +2388,7 @@ document.getElementById("toggle-text").addEventListener("click", async () => {
 
 
 function injectWeightedRankingRow(activeTab, activeBlock) {
-    // Build a "5-Week Weighted" ranking row in the aggregate table.
+    // Build a "Recency" ranking row in the aggregate table.
     const sections = activeBlock.querySelectorAll(".ballot-section");
     const aggTbody = sections[2]?.querySelector("tbody");
     if (!aggTbody) return;
@@ -2356,12 +2420,26 @@ function injectWeightedRankingRow(activeTab, activeBlock) {
     const prevRankOf = {};
     if (prevResult) prevResult.ranked.forEach((team, i) => { prevRankOf[team] = i + 1; });
 
-    // Build the row
+    const tr = _buildRecencyRow(ranked, teamDisplayAvg, prevRankOf);
+
+    // Insert after the Official Overall row, restoring expanded state if it was active
+    const overallRow = aggTbody.querySelector(".voter-row:not(.row-weighted-ranking)");
+    if (overallRow) {
+        overallRow.after(tr);
+    } else {
+        aggTbody.appendChild(tr);
+    }
+    if (wasExpanded) tr.classList.add("row-delta");
+
+    bindTeamLogos();
+}
+
+function _buildRecencyRow(ranked, teamDisplayAvg, prevRankOf) {
     const tr = document.createElement("tr");
     tr.className = "voter-row row-weighted-ranking";
 
     const voterTd = document.createElement("td");
-    voterTd.innerHTML = `<div class="voter-cell"><span class="voter-name voter-weighted-name">5-Week Weighted</span></div>`;
+    voterTd.innerHTML = `<div class="voter-cell"><span class="voter-name">Recency</span></div>`;
     tr.appendChild(voterTd);
 
     ranked.forEach((team, idx) => {
@@ -2369,7 +2447,6 @@ function injectWeightedRankingRow(activeTab, activeBlock) {
         const td = document.createElement("td");
         td.className = "logo-cell";
 
-        // Delta label above logo
         const deltaLabel = document.createElement("span");
         deltaLabel.className = "delta-label";
         const prev = prevRankOf[team];
@@ -2403,13 +2480,65 @@ function injectWeightedRankingRow(activeTab, activeBlock) {
         tr.appendChild(td);
     });
 
-    // Insert after the Official Overall row, restoring expanded state if it was active
+    return tr;
+}
+
+function buildApDeltaData(year) {
+    if (_apDeltaDataCache[year]) return _apDeltaDataCache[year];
+    const data = {};
+    const isApPage = typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE;
+    const apTabs = isApPage
+        ? getSortedTabs().filter(t => t.dataset.year === String(year))
+        : getSortedApTabs().filter(t => t.dataset.year === String(year));
+    apTabs.forEach(tab => {
+        const weekId = tab.dataset.week;
+        const block = document.getElementById(weekId);
+        if (!block) return;
+        data[weekId] = {};
+        const section = block.querySelectorAll(".ballot-section")[0];
+        if (!section) return;
+        section.querySelectorAll(".voter-row").forEach(row => {
+            const username = getVoterName(row);
+            if (!username) return;
+            data[weekId][username] = Array.from(row.querySelectorAll(".team-logo")).map(img => img.dataset.team);
+        });
+    });
+    _apDeltaDataCache[year] = data;
+    return data;
+}
+
+function injectApWeightedRankingRow(apBlock, apWeekId, year) {
+    const sections = apBlock.querySelectorAll(".ballot-section");
+    const aggTbody = sections[2]?.querySelector("tbody");
+    if (!aggTbody) return;
+
+    const existingRow = aggTbody.querySelector(".row-weighted-ranking");
+    const wasExpanded = existingRow?.classList.contains("row-delta") ?? false;
+    existingRow?.remove();
+
+    const isApPage = typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE;
+    const apYearTabs = isApPage
+        ? getSortedTabs().filter(t => t.dataset.year === String(year))
+        : getSortedApTabs().filter(t => t.dataset.year === String(year));
+    const apDeltaData = buildApDeltaData(year);
+
+    const result = compute5WeekWeighted(apWeekId, apDeltaData, apYearTabs);
+    if (!result) return;
+    const { ranked, teamAvgRankSum, totalVoters } = result;
+
+    const teamDisplayAvg = {};
+    ranked.forEach(team => { teamDisplayAvg[team] = teamAvgRankSum[team] / totalVoters; });
+
+    const currIdx = apYearTabs.findIndex(t => t.dataset.week === apWeekId);
+    const prevWeekId = currIdx + 1 < apYearTabs.length ? apYearTabs[currIdx + 1].dataset.week : null;
+    const prevResult = prevWeekId ? compute5WeekWeighted(prevWeekId, apDeltaData, apYearTabs) : null;
+    const prevRankOf = {};
+    if (prevResult) prevResult.ranked.forEach((team, i) => { prevRankOf[team] = i + 1; });
+
+    const tr = _buildRecencyRow(ranked, teamDisplayAvg, prevRankOf);
+
     const overallRow = aggTbody.querySelector(".voter-row:not(.row-weighted-ranking)");
-    if (overallRow) {
-        overallRow.after(tr);
-    } else {
-        aggTbody.appendChild(tr);
-    }
+    if (overallRow) { overallRow.after(tr); } else { aggTbody.appendChild(tr); }
     if (wasExpanded) tr.classList.add("row-delta");
 
     bindTeamLogos();
@@ -2607,6 +2736,23 @@ function showAvgRankModal(weekId) {
 }
 
 function showAggregateSection() {
+    // AP mode on index.html: operate on the current AP block
+    if (_apCurrentYear && _apCurrentWeekNum) {
+        const apBlock = document.getElementById(`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`);
+        if (!apBlock) return;
+        const sections = apBlock.querySelectorAll(".ballot-section");
+        if (!sections[2]) return;
+        sections.forEach(s => s.style.display = "none");
+        sections[2].style.display = "block";
+        document.getElementById("toggle-text").innerText = "Associated Press Data";
+        _deltaDataCache = null;
+        injectApWeightedRankingRow(apBlock, `week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`, _apCurrentYear);
+        bindVoterCells();
+        bindTeamLogos();
+        applyTableSort(currentSort);
+        if (_outliersMode) applyOutliers(apBlock); else clearOutliers(apBlock);
+        return;
+    }
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab) return;
     const activeBlock = document.getElementById(activeTab.dataset.week);
@@ -2617,9 +2763,15 @@ function showAggregateSection() {
     sections[2].style.display = "block";
     document.getElementById("toggle-text").innerText = "Data Ballots";
     _deltaDataCache = null;
-    injectWeightedRankingRow(activeTab, activeBlock);
+    if (typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE) {
+        injectApWeightedRankingRow(activeBlock, activeTab.dataset.week, activeTab.dataset.year);
+    } else {
+        injectWeightedRankingRow(activeTab, activeBlock);
+    }
     bindVoterCells();
     bindTeamLogos();
+    applyTableSort(currentSort);
+    if (_outliersMode) applyOutliers(activeBlock); else clearOutliers(activeBlock);
 }
 
 // Year picker toggle — hide year text, show all years inline
@@ -3380,7 +3532,7 @@ function showTenureModal() {
     yearTabs.forEach(tab => {
         const weekData = lbData[tab.dataset.week];
         if (!weekData) return;
-        Object.keys(weekData).forEach(u => { if (u !== skipName && u !== "5-Week Weighted") voterSet.add(u); });
+        Object.keys(weekData).forEach(u => { if (u !== skipName && u !== "Recency") voterSet.add(u); });
     });
 
     const voters = Array.from(voterSet).sort((a, b) => (ballotCount[b] ?? 0) - (ballotCount[a] ?? 0));

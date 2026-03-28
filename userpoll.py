@@ -1362,7 +1362,7 @@ def write_year_fragments(data_by_year, current_year, base_dir):
 def compute_tenure_counts(data_html):
     """Count total ballots per voter across all week/year data (all loaded HTML).
     Adds 36 to voters present in both 2022 and 2025 to account for missing 2023/2024 seasons."""
-    SKIP_NAMES = {"Official Overall", "5-Week Weighted"}
+    SKIP_NAMES = {"Official Overall", "Recency"}
     name_re = re.compile(r'<span class="voter-name"[^>]*>([^<]+)<')
     counts = {}
     for m in name_re.finditer(data_html):
@@ -1696,20 +1696,20 @@ def build_ap_html(week_tabs_html, week_data_html, fragment_years=None, ap_tenure
         ap_tenure_counts=ap_tenure_counts or {},
     )
     # Update title and meta
-    full_html = full_html.replace("<title>Userpoll Landscape</title>", "<title>AP Ballots Landscape</title>")
-    full_html = full_html.replace('content="Userpoll Landscape"', 'content="AP Ballots Landscape"')
+    full_html = full_html.replace("<title>Userpoll Landscape</title>", "<title>Associated Press Landscape</title>")
+    full_html = full_html.replace('content="Userpoll Landscape"', 'content="Associated Press Landscape"')
     full_html = full_html.replace(
         'content="Landscape view of r/collegebasketball userpoll ballots."',
         'content="Landscape view of AP Top 25 individual voter ballots."'
     )
-    # Set toggle-text to "AP Ballots" (click will be a no-op; exitApBallots returns early when _apCurrentYear is null)
+    # Set toggle-text to "Associated Press" (clicking cycles Associated Press ↔ Data Ballots)
     full_html = full_html.replace(
         '<span id="toggle-text">Official Ballots</span>',
-        '<span id="toggle-text" style="cursor:default;">AP Ballots</span>'
+        '<span id="toggle-text">Associated Press</span>'
     )
     # Replace the userpoll forward link with a back link to index.html
     full_html = full_html.replace(
-        '<a href="ap-ballots.html" class="ap-forward-link">AP Ballots →</a>',
+        '<a href="ap-ballots.html" class="ap-forward-link">Associated Press →</a>',
         '<a href="index.html" class="ap-back-link">← Userpoll</a>'
     )
     # Inject IS_AP_PAGE and FRAG_PATH_PREFIX constants before the inlined JS
@@ -1888,7 +1888,7 @@ def rebuild_html():
         rows = re.findall(r'<tr class="voter-row">.*?</tr>', official_html, re.DOTALL)
         official = []
         for row in rows:
-            teams = re.findall(r'data-team="([^"]+)"', row)
+            teams = re.findall(r'<td class="logo-cell">.*?data-team="([^"]+)"', row)
             if teams:
                 official.append(("", "", None, [t + ".png" for t in teams]))
         if not official:
@@ -1952,9 +1952,9 @@ def parse_voter_tuples_from_section_html(section_html):
     """
     Parse voter tuples from an HTML official/provisional section for aggregate recomputation.
     Returns list of (flair, username, ballot_url, teams) tuples.
-    Skips synthetic rows (Official Overall, 5-Week Weighted).
+    Skips synthetic rows (Official Overall, Recency).
     """
-    SKIP_NAMES = {"Official Overall", "5-Week Weighted"}
+    SKIP_NAMES = {"Official Overall", "Recency"}
     tuples = []
     row_re      = re.compile(r'<tr class="voter-row">.*?</tr>', re.DOTALL)
     name_re     = re.compile(r'voter-name[^>]*>([^<]+)<')
