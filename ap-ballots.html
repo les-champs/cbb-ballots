@@ -3042,8 +3042,10 @@ function applyHighlightStyles() {
         const team = highlightedTeams[cls];
         if (!team) return;
         const color = getHighlightColors()[cls];
-        rules.push(`.team-logo[data-team="${team}"] { outline: 2px solid ${color}; border-radius: 4px; box-shadow: 0 0 20px 6px ${color}; }`);
+        rules.push(`.team-logo[data-team="${team}"] { border-radius: 4px; box-shadow: 0 0 0 2px ${color}, 0 0 20px 6px ${color}; }`);
         rules.push(`.row-delta .team-logo[data-team="${team}"] { box-shadow: none; }`);
+        rules.push(`.logo-cell.outlier-high .team-logo[data-team="${team}"] { border-radius: 50% !important; box-shadow: 0 0 0 3px rgb(40, 167, 69), 0 0 20px 6px ${color} !important; }`);
+        rules.push(`.logo-cell.outlier-low .team-logo[data-team="${team}"] { border-radius: 50% !important; box-shadow: 0 0 0 3px rgb(220, 53, 69), 0 0 20px 6px ${color} !important; }`);
     });
     el.textContent = rules.join(" ");
 }
