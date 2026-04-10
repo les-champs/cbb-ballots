@@ -3748,7 +3748,7 @@ document.addEventListener("keydown", e => {
         _chordTimer = setTimeout(() => { _chordPending = null; }, 2000);
         return;
     }
-    if (!e.shiftKey && (e.key === "x" || e.key === "X") && _chordPending === "v") {
+    if ((e.key === "x" || e.key === "X") && _chordPending === "v") {
         e.preventDefault();
         _chordPending = null;
         clearTimeout(_chordTimer);
