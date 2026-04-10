@@ -909,7 +909,6 @@ body.year-loading::after {
     vertical-align: middle;
     cursor: default;
 }
-.heatmap-table tbody tr:hover .heatmap-cell { filter: brightness(1.1); }
 .heatmap-legend {
     margin-top: 10px;
     display: flex;

@@ -929,7 +929,6 @@ body.year-loading::after {
     vertical-align: middle;
     cursor: default;
 }
-.heatmap-table tbody tr:hover .heatmap-cell { filter: brightness(1.1); }
 .heatmap-legend {
     margin-top: 10px;
     display: flex;
@@ -2832,6 +2831,9 @@ let _deltaDataCacheIsProvisional = null;
 let _apDeltaDataCache = {};
 let _apCurrentYear = null;
 let _apCurrentWeekNum = null;
+let _hideVeteranTagsOverride = false;
+let _chordPending = null;
+let _chordTimer = null;
 
 const _loadedYears = new Set();
 const _loadingYears = {};
@@ -3043,7 +3045,7 @@ function applyHighlightStyles() {
         if (!team) return;
         const color = getHighlightColors()[cls];
         rules.push(`.team-logo[data-team="${team}"] { border-radius: 4px; box-shadow: 0 0 0 2px ${color}, 0 0 20px 6px ${color}; }`);
-        rules.push(`.row-delta .team-logo[data-team="${team}"] { box-shadow: none; }`);
+        rules.push(`.row-delta .team-logo[data-team="${team}"] { box-shadow: 0 0 0 2px ${color}; }`);
         rules.push(`.logo-cell.outlier-high .team-logo[data-team="${team}"] { border-radius: 50% !important; box-shadow: 0 0 0 3px rgb(40, 167, 69), 0 0 20px 6px ${color} !important; }`);
         rules.push(`.logo-cell.outlier-low .team-logo[data-team="${team}"] { border-radius: 50% !important; box-shadow: 0 0 0 3px rgb(220, 53, 69), 0 0 20px 6px ${color} !important; }`);
     });
@@ -3539,7 +3541,7 @@ function setGlobalSort(sort) {
     document.querySelectorAll(".sort-option").forEach(o => {
         o.classList.toggle("active", o.dataset.sort === sort);
     });
-    document.body.classList.toggle("hide-veteran-tags", sort !== "alphabetic" && sort !== "zetabetique");
+    document.body.classList.toggle("hide-veteran-tags", (sort !== "alphabetic" && sort !== "zetabetique") || _hideVeteranTagsOverride);
 }
 
 
@@ -6542,6 +6544,14 @@ function computeVoterAvg(yearTabs, lbData) {
     });
 });
 
+(function() {
+    let _resizeTimer;
+    window.addEventListener("resize", () => {
+        clearTimeout(_resizeTimer);
+        _resizeTimer = setTimeout(updateAvgRankLines, 50);
+    });
+})();
+
 
 document.addEventListener("keydown", e => {
     if (e.key === "Escape") {
@@ -6553,6 +6563,24 @@ document.addEventListener("keydown", e => {
         document.getElementById("tenure-modal").classList.remove("open");
         document.getElementById("heatmap-modal").classList.remove("open");
     }
+    // Chord: Shift+V then X → toggle veteran tags
+    if (e.shiftKey && (e.key === "V" || e.key === "v")) {
+        e.preventDefault();
+        clearTimeout(_chordTimer);
+        _chordPending = "v";
+        _chordTimer = setTimeout(() => { _chordPending = null; }, 2000);
+        return;
+    }
+    if (!e.shiftKey && (e.key === "x" || e.key === "X") && _chordPending === "v") {
+        e.preventDefault();
+        _chordPending = null;
+        clearTimeout(_chordTimer);
+        _hideVeteranTagsOverride = !_hideVeteranTagsOverride;
+        const isAlpha = currentSort === "alphabetic" || currentSort === "zetabetique";
+        document.body.classList.toggle("hide-veteran-tags", !isAlpha || _hideVeteranTagsOverride);
+        return;
+    }
+
     if (!e.shiftKey) return;
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab) return;
