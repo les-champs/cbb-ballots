@@ -2,7 +2,7 @@
 
 ## What this project is
 
-A scraper + static site generator for college basketball poll data from `cbbpoll.net`. `userpoll.py` scrapes voter ballots, downloads team logos, and generates `index.html` and `ap-ballots.html` (inlining `style.css` and `script.js` at build time) for interactive visualization. Deployed at **https://les-champs.github.io/cbb-ballots/**.
+A scraper + static site generator for college basketball poll data from `cbbpoll.net`. `userpoll.py` scrapes voter ballots, downloads team logos, and generates `index.html` and `ap-ballots.html` (inlining `style.css` and `script.js` at build time) for interactive visualization. Deployed at **https://www.userpoll-landscape.com/** (custom domain via `CNAME`; `les-champs.github.io/cbb-ballots/` redirects there).
 
 ## Repository structure
 
@@ -220,7 +220,7 @@ python3 userpoll.py --cbbpoll-build --year 2022     # Generate HTML from cached 
 - **Formatting:** Minor UI/layout improvements
 - **Analysis features:** Additional functions, graphs, and data analysis capabilities
 - **cbbpoll.com legacy import:** Complete — all 7 seasons (2015-16 through 2021-22) scraped and built
-- **AP25 standalone page:** Complete — `ap-ballots.html` generated at `https://les-champs.github.io/cbb-ballots/ap-ballots.html`
+- **AP25 standalone page:** Complete — `ap-ballots.html` generated at `https://www.userpoll-landscape.com/ap-ballots.html`
 
 ## Working with this codebase
 
