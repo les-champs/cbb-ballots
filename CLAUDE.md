@@ -86,7 +86,7 @@ Mirrors the JS Précision equation in pure Python for testing. Features:
 
 ### Background
 
-`collegepolltracker.com` hosts AP Top 25 individual voter ballots. Data is scraped separately from the userpoll data and displayed via the toggle cycle (Official → Provisional → AP Ballots). Seasons 2022–2026 are available.
+`collegepolltracker.com` hosts AP Top 25 individual voter ballots. Data is scraped separately from the userpoll data and displayed via the toggle cycle (Official → Provisional → AP Ballots). Seasons 2022–2027 are available. Each new season needs a `site_year: our_year` entry added to `AP25_SITE_YEARS` in `userpoll.py`.
 
 ### Site structure
 
@@ -104,7 +104,8 @@ Mirrors the JS Précision equation in pure Python for testing. Features:
 | 2023     | 2022      | Weeks 2–18, final-rankings   |
 | 2024     | 2023      | Weeks 2–19, final-rankings   |
 | 2025     | 2024      | Weeks 2–18, final-rankings   |
-| 2026     | 2025      | Pre-season, weeks 2–19       |
+| 2026     | 2025      | Pre-season, weeks 2–19, final-rankings |
+| 2027     | 2026      | Pre-season (in progress)     |
 
 ### Storage and build
 

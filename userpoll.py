@@ -834,8 +834,8 @@ def _cbbpoll_voters_to_tuples(voters):
 AP25_BASE = "https://collegepolltracker.com/basketball/grid"
 
 # Site year → our year: site's 2025 = 2025-26 season = our 2026
-# Available site years: 2021-2025 → our 2022-2026
-AP25_SITE_YEARS = {2021: 2022, 2022: 2023, 2023: 2024, 2024: 2025, 2025: 2026}
+# Available site years: 2021-2026 → our 2022-2027
+AP25_SITE_YEARS = {2021: 2022, 2022: 2023, 2023: 2024, 2024: 2025, 2025: 2026, 2026: 2027}
 
 # AP-specific name overrides (title attributes from collegepolltracker.com)
 # Most names match cbbpoll overrides already; add AP-specific ones here.
@@ -885,8 +885,13 @@ def ap25_fetch_grid(site_year, week_slug):
         aff_match = re.search(r'gridPollsterAffiliation">([^<]+)', part)
         affiliation = html_mod.unescape(aff_match.group(1).strip()) if aff_match else ""
 
-        # Teams from title attributes
-        teams_raw = re.findall(r'title="([^"]+)"', part)
+        # Teams from title attributes (only on team icons — the last row's chunk
+        # runs to end of page, where ad-rail close buttons also carry titles)
+        teams_raw = [
+            m.group(1)
+            for img in re.findall(r'<img[^>]*class="gridTeamIcon"[^>]*>', part)
+            if (m := re.search(r'title="([^"]+)"', img))
+        ]
         teams = [html_mod.unescape(t) for t in teams_raw[:25]]
 
         voters.append({
