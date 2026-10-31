@@ -225,8 +225,44 @@ function applyHighlightStyles() {
         rules.push(`.row-delta .team-logo[data-team="${team}"] { box-shadow: 0 0 0 2px ${color}; }`);
         rules.push(`.logo-cell.outlier-high .team-logo[data-team="${team}"] { border-radius: 50% !important; box-shadow: 0 0 0 3px rgb(40, 167, 69), 0 0 20px 6px ${color} !important; }`);
         rules.push(`.logo-cell.outlier-low .team-logo[data-team="${team}"] { border-radius: 50% !important; box-shadow: 0 0 0 3px rgb(220, 53, 69), 0 0 20px 6px ${color} !important; }`);
+        rules.push(`.chart-logo-ring[data-team="${team}"] { display: inline; stroke: ${color}; fill: ${color}; filter: url(#chart-glow-${cls}); }`);
+        rules.push(`.chart-stroke[data-team="${team}"] { stroke: ${color}; filter: url(#chart-glow-${cls}); }`);
+        rules.push(`.chart-fill[data-team="${team}"] { fill: ${color}; filter: url(#chart-glow-${cls}); }`);
     });
     el.textContent = rules.join(" ");
+    updateChartGlowFilters();
+}
+
+// SVG glow filters for highlighted week graph data. CSS drop-shadow() isn't rendered on
+// SVG child elements in Safari, so use real <filter>s. userSpaceOnUse keeps zero-width
+// bars and zero-height caps from getting an empty filter region.
+function updateChartGlowFilters() {
+    let defs = document.getElementById("chart-glow-defs");
+    if (!defs) {
+        defs = document.createElementNS(SVG_NS, "svg");
+        defs.id = "chart-glow-defs";
+        defs.setAttribute("width", "0"); defs.setAttribute("height", "0");
+        defs.style.cssText = "position:absolute;width:0;height:0;overflow:hidden;";
+        document.body.appendChild(defs);
+    }
+    defs.innerHTML = highlightClasses.map(cls => {
+        const color = getHighlightColors()[cls];
+        return `<filter id="chart-glow-${cls}" filterUnits="userSpaceOnUse" x="-1000" y="-1000" width="4000" height="4000">` +
+            `<feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="${color}" flood-opacity="1"/></filter>`;
+    }).join("");
+}
+
+// Shared toggle used by ballot logos, rank headers, and week graph logos
+function toggleTeamHighlight(team) {
+    const isHighlighted = highlightClasses.some(c => highlightedTeams[c] === team);
+    if (isHighlighted) {
+        highlightClasses.forEach(c => { if (highlightedTeams[c] === team) delete highlightedTeams[c]; });
+    } else {
+        const availableColor = highlightClasses.find(c => !highlightedTeams[c]);
+        if (availableColor) highlightedTeams[availableColor] = team;
+    }
+    applyHighlightStyles();
+    updateAvgRankLines();
 }
 
 function getOffsetLeftInContainer(el, container) {
@@ -1090,15 +1126,7 @@ function bindTeamLogos(root) {
                 return;
             }
             const team = logo.dataset.team;
-            const isHighlighted = highlightClasses.some(c => highlightedTeams[c] === team);
-            if (isHighlighted) {
-                highlightClasses.forEach(c => { if (highlightedTeams[c] === team) delete highlightedTeams[c]; });
-            } else {
-                const availableColor = highlightClasses.find(c => !highlightedTeams[c]);
-                if (availableColor) highlightedTeams[availableColor] = team;
-            }
-            applyHighlightStyles();
-            updateAvgRankLines();
+            toggleTeamHighlight(team);
         });
     });
 }
@@ -1122,15 +1150,7 @@ function bindRankHeaders() {
             const logo = aggRow.querySelectorAll("td.logo-cell")[rank - 1]?.querySelector(".team-logo");
             if (!logo) return;
             const team = logo.dataset.team;
-            const isHighlighted = highlightClasses.some(c => highlightedTeams[c] === team);
-            if (isHighlighted) {
-                highlightClasses.forEach(c => { if (highlightedTeams[c] === team) delete highlightedTeams[c]; });
-            } else {
-                const availableColor = highlightClasses.find(c => !highlightedTeams[c]);
-                if (availableColor) highlightedTeams[availableColor] = team;
-            }
-            applyHighlightStyles();
-            updateAvgRankLines();
+            toggleTeamHighlight(team);
         });
     });
 }
@@ -1622,62 +1642,32 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
         });
     }
 
-    // Tier detection: find natural breaks in average ranks.
-    // Gray is always the last color; inner colors are assigned in order based on break count.
-    const innerColors = [
-        { fill: "#cc3333", stroke: "#aa1111" },  // red
-        { fill: "#e88c1a", stroke: "#c06a00" },  // orange
-        { fill: "#2ea043", stroke: "#1a7f37" },  // green
-        { fill: "#4488cc", stroke: "#2266aa" },  // blue
-        { fill: "#8b5cf6", stroke: "#6d38e0" },  // purple
-        { fill: "#e85c9a", stroke: "#c0307a" },  // pink
-        { fill: "#0d9488", stroke: "#0a7070" },  // teal
-        { fill: "#d4a017", stroke: "#a87800" },  // gold
-        { fill: "#e05252", stroke: "#b83030" },  // coral
+    // Tier coloring: fixed rank zones so a color means roughly the same area week to week.
+    // Nominal zones: 1-4, 5-8, 9-14, 15-20, 21-25. Only the edge teams of each boundary can
+    // change color, by one position, when separated by a large jump (>= TIER_JUMP) in avg rank.
+    const tierColors = [
+        { fill: "#cc3333", stroke: "#aa1111" },  // red    (1-4)
+        { fill: "#e88c1a", stroke: "#c06a00" },  // orange (5-8)
+        { fill: "#2ea043", stroke: "#1a7f37" },  // green  (9-14)
+        { fill: "#4488cc", stroke: "#2266aa" },  // blue   (15-20)
+        { fill: "#999",    stroke: "#777"    },  // gray   (21-25)
     ];
-    const grayColor = { fill: "#999", stroke: "#777" };
+    const TIER_JUMP = 1.5;
+    const nominalBreaks = [4, 8, 14, 20];  // 0-based index of first team in the next zone
     const avgs = chartData.map(d => d.avg);
-    const gaps = [];
-    for (let i = 1; i < avgs.length; i++) gaps.push({ idx: i, gap: avgs[i] - avgs[i - 1] });
-    const medianGap = gaps.length > 0
-        ? [...gaps].sort((a, b) => a.gap - b.gap)[Math.floor(gaps.length / 2)].gap
-        : 1;
-    const threshold = Math.max(medianGap * 1.5, 0.8);
-    // Find all qualifying breaks (at most innerColors.length, so gray is always reachable)
-    let breakIdxs = gaps.filter(g => g.gap >= threshold).map(g => g.idx)
-        .sort((a, b) => a - b).slice(0, innerColors.length);
-    // Max tier size: force-split any tier with more than 6 teams at its largest internal gap
-    const maxTierSize = 6;
-    let changed = true;
-    while (changed && breakIdxs.length < innerColors.length) {
-        changed = false;
-        const boundaries = [0, ...breakIdxs, chartData.length];
-        for (let t = 0; t < boundaries.length - 1; t++) {
-            const start = boundaries[t], end = boundaries[t + 1];
-            if (end - start > maxTierSize) {
-                let bestIdx = -1, bestGap = -1;
-                for (let i = start + 1; i < end; i++) {
-                    const g = avgs[i] - avgs[i - 1];
-                    if (g > bestGap) { bestGap = g; bestIdx = i; }
-                }
-                if (bestIdx !== -1) {
-                    breakIdxs.push(bestIdx);
-                    breakIdxs.sort((a, b) => a - b);
-                    changed = true;
-                    break;
-                }
-            }
-        }
-    }
-    // Gray must not be the only tier: if all teams fall in one group, no breaks needed
-    // Build the palette for this week: innerColors[0..numTiers-2] + gray
-    const numTiers = breakIdxs.length + 1;
-    const tierColors = innerColors.slice(0, numTiers - 1).concat([grayColor]);
+    // True if there's a large jump between team idx-1 and team idx (epsilon absorbs float error)
+    const isJump = idx => idx >= 1 && idx < avgs.length && avgs[idx] - avgs[idx - 1] >= TIER_JUMP - 1e-9;
+    const breakIdxs = nominalBreaks.map(b => {
+        if (isJump(b)) return b;          // boundary already sits on a large jump: no change
+        if (isJump(b - 1)) return b - 1;  // upper edge team drops to the lower color
+        if (isJump(b + 1)) return b + 1;  // lower edge team moves up to the higher color
+        return b;
+    });
     // Assign tier index to each team
     chartData.forEach((d, i) => {
         let tier = 0;
         for (const bi of breakIdxs) { if (i >= bi) tier++; }
-        d.tier = Math.min(tier, tierColors.length - 1);
+        d.tier = tier;
         d.color = tierColors[d.tier];
     });
 
@@ -1761,6 +1751,30 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
 
     const logoSize = Math.min(20, slotW - 4);
 
+    // Clickable team logo below the x-axis; the ring behind it lights up via the
+    // same highlight rules as ballot logos, so state stays in sync both ways.
+    const appendChartLogo = (team, x) => {
+        const lx = x - logoSize / 2, ly = mT + cH + 6;
+        const ring = document.createElementNS(svgNS, "rect");
+        ring.setAttribute("class", "chart-logo-ring");
+        ring.dataset.team = team;
+        ring.setAttribute("x", lx - 2); ring.setAttribute("y", ly - 2);
+        ring.setAttribute("width", logoSize + 4); ring.setAttribute("height", logoSize + 4);
+        ring.setAttribute("rx", "4"); ring.setAttribute("ry", "4");
+        svg.appendChild(ring);
+
+        const img = document.createElementNS(svgNS, "image");
+        img.setAttribute("class", "chart-logo");
+        img.dataset.team = team;
+        img.setAttribute("href", logoSrc(team));
+        img.setAttribute("x", lx);
+        img.setAttribute("y", ly);
+        img.setAttribute("width", logoSize); img.setAttribute("height", logoSize);
+        img.style.cursor = "pointer";
+        img.addEventListener("click", () => toggleTeamHighlight(team));
+        svg.appendChild(img);
+    };
+
     if (mode === "highlow" || mode === "weighted") {
         const capW = Math.min(7, slotW * 0.28);
 
@@ -1788,6 +1802,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
             vLine.setAttribute("stroke", color.fill);
             vLine.setAttribute("stroke-width", "2.5");
             vLine.setAttribute("stroke-linecap", "round");
+            vLine.setAttribute("class", "chart-stroke"); vLine.dataset.team = team;
             svg.insertBefore(vLine, tipG);
 
             // Top cap (P90+)
@@ -1795,6 +1810,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
             topCap.setAttribute("x1", x - capW); topCap.setAttribute("x2", x + capW);
             topCap.setAttribute("y1", yHi); topCap.setAttribute("y2", yHi);
             topCap.setAttribute("stroke", color.fill); topCap.setAttribute("stroke-width", "2");
+            topCap.setAttribute("class", "chart-stroke"); topCap.dataset.team = team;
             svg.insertBefore(topCap, tipG);
 
             // Bottom cap (P10-)
@@ -1802,6 +1818,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
             botCap.setAttribute("x1", x - capW); botCap.setAttribute("x2", x + capW);
             botCap.setAttribute("y1", yLo); botCap.setAttribute("y2", yLo);
             botCap.setAttribute("stroke", color.fill); botCap.setAttribute("stroke-width", "2");
+            botCap.setAttribute("class", "chart-stroke"); botCap.dataset.team = team;
             svg.insertBefore(botCap, tipG);
 
             // Mean circle
@@ -1810,6 +1827,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
             circle.setAttribute("r", "4");
             circle.setAttribute("fill", circleStroke);
             circle.setAttribute("stroke", color.stroke); circle.setAttribute("stroke-width", "2.5");
+            circle.setAttribute("class", "chart-stroke"); circle.dataset.team = team;
             circle.style.cursor = "default";
 
             circle.addEventListener("mouseenter", () => {
@@ -1841,13 +1859,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
 
             svg.insertBefore(circle, tipG);
 
-            // Team logo
-            const img = document.createElementNS(svgNS, "image");
-            img.setAttribute("href", logoSrc(team));
-            img.setAttribute("x", x - logoSize / 2);
-            img.setAttribute("y", mT + cH + 6);
-            img.setAttribute("width", logoSize); img.setAttribute("height", logoSize);
-            svg.appendChild(img);
+            appendChartLogo(team, x);
 
             // Consensus rank number below logo
             const rankTxt = document.createElementNS(svgNS, "text");
@@ -1887,6 +1899,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
                 circle.setAttribute("r", radius);
                 circle.setAttribute("fill", color.fill);
                 circle.setAttribute("fill-opacity", "0.7");
+                circle.setAttribute("class", "chart-fill"); circle.dataset.team = team;
                 circle.style.cursor = "default";
 
                 circle.addEventListener("mouseenter", (e) => {
@@ -1933,13 +1946,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
                 svg.insertBefore(circle, tipG);
             });
 
-            // Team logo
-            const img = document.createElementNS(svgNS, "image");
-            img.setAttribute("href", logoSrc(team));
-            img.setAttribute("x", x - logoSize / 2);
-            img.setAttribute("y", mT + cH + 6);
-            img.setAttribute("width", logoSize); img.setAttribute("height", logoSize);
-            svg.appendChild(img);
+            appendChartLogo(team, x);
 
             // Consensus rank number below logo
             const rankTxt = document.createElementNS(svgNS, "text");
