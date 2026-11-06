@@ -127,18 +127,23 @@ h1 span:hover {
 .picker-btn {
     cursor: pointer;
     color: var(--color-heading);
-    font-size: 1.5rem;
+    font-size: var(--picker-font, 1.5rem);
     font-weight: bold;
     background: none;
     border: none;
     padding: 0;
-    margin-right: 0.4em;
+    margin-right: var(--picker-gap, 0.4em);
     font-family: inherit;
     transition: transform 0.1s ease;
 }
 
 .picker-btn:hover {
     transform: scale(1.05);
+}
+
+/* "…" buttons shown when a picker is collapsed to fit the table width */
+.picker-btn.picker-ellipsis {
+    opacity: 0.55;
 }
 
 .week-tabs {
@@ -5608,6 +5613,25 @@ function rebuildYearPicker() {
     });
 }
 
+// Number shown for a week in the picker/header. Pre-Season (stored as week 0) shows
+// as 1; Final (stored as week 20) shows as one past the season's last regular week,
+// so the numbers run in order (e.g. 02 … 18 19 for an 18-week season).
+function displayWeekNum(tab) {
+    const label = (tab.dataset.weeklabel || "").toLowerCase();
+    const wn = parseInt(tab.dataset.weeknum);
+    if (label.includes("pre")) return 1;
+    if (label.includes("final")) {
+        const pollSel = tab.dataset.poll === "ap" ? '[data-poll="ap"]' : ':not([data-poll="ap"])';
+        const regular = Array.from(document.querySelectorAll(`.week-tab[data-year="${tab.dataset.year}"]${pollSel}`))
+            .filter(t => !/final/i.test(t.dataset.weeklabel || ""))
+            .map(t => parseInt(t.dataset.weeknum));
+        return regular.length ? Math.max(...regular) + 1 : wn;
+    }
+    return wn;
+}
+
+const padWeekNum = n => (n < 10 ? "0" : "") + n;
+
 function rebuildWeekPicker() {
     const isAp = _apCurrentYear !== null;
     const currentYear = isAp ? _apCurrentYear : document.getElementById("year-text").innerText;
@@ -5621,15 +5645,7 @@ function rebuildWeekPicker() {
         tabs.forEach(t => {
             const btn = document.createElement("button");
             btn.className = "picker-btn";
-            const wnum = parseInt(t.dataset.weeknum);
-            const label = t.dataset.weeklabel;
-            if (label) {
-                if (label.toLowerCase().includes("final")) btn.textContent = "Final";
-                else if (label.toLowerCase().includes("pre")) btn.textContent = "Pre";
-                else btn.textContent = label;
-            } else {
-                btn.textContent = wnum < 10 ? "0" + wnum : String(wnum);
-            }
+            btn.textContent = padWeekNum(displayWeekNum(t));
             if (t.dataset.weeknum === _apCurrentWeekNum) btn.style.textDecoration = "underline";
             btn.addEventListener("click", async e => {
                 e.stopPropagation();
@@ -5657,8 +5673,7 @@ function rebuildWeekPicker() {
         tabs.forEach(t => {
             const btn = document.createElement("button");
             btn.className = "picker-btn";
-            const wnum = parseInt(t.dataset.weeknum);
-            btn.textContent = wnum < 10 ? "0" + wnum : String(wnum);
+            btn.textContent = padWeekNum(displayWeekNum(t));
             btn.dataset.week = t.dataset.week;
             if (activeTab && t.dataset.week === activeTab.dataset.week) btn.style.textDecoration = "underline";
             btn.addEventListener("click", e => {
@@ -5692,7 +5707,7 @@ async function showWeek(weekId) {
     if (tab) {
         const wn = parseInt(tab.dataset.weeknum);
         if (!isMobile()) {
-            document.getElementById("week-text").innerText = "#" + (wn < 10 ? "0" + wn : wn);
+            document.getElementById("week-text").innerText = "#" + padWeekNum(displayWeekNum(tab));
             document.getElementById("year-text").innerText = tab.dataset.year;
             rebuildWeekPicker();
         }
@@ -5769,16 +5784,8 @@ async function showApWeek(year, weekNum) {
 
     if (!isMobile()) {
         const apTab = document.querySelector(`.week-tab[data-poll="ap"][data-year="${year}"][data-weeknum="${weekNum}"]`);
-        const label = apTab?.dataset.weeklabel;
         const wn = parseInt(weekNum);
-        let weekDisplay;
-        if (label) {
-            if (label.toLowerCase().includes("final")) weekDisplay = "Final";
-            else if (label.toLowerCase().includes("pre")) weekDisplay = "Pre";
-            else weekDisplay = label;
-        } else {
-            weekDisplay = "#" + (wn < 10 ? "0" + wn : wn);
-        }
+        const weekDisplay = "#" + padWeekNum(apTab ? displayWeekNum(apTab) : wn);
         document.getElementById("week-text").innerText = weekDisplay;
         document.getElementById("year-text").innerText = year;
         rebuildYearPicker();
@@ -5848,8 +5855,7 @@ function exitApBallots() {
             if (sections[0]) sections[0].style.display = "block";
         }
         if (!isMobile()) {
-            const wn = parseInt(activeTab.dataset.weeknum);
-            document.getElementById("week-text").innerText = "#" + (wn < 10 ? "0" + wn : wn);
+            document.getElementById("week-text").innerText = "#" + padWeekNum(displayWeekNum(activeTab));
             document.getElementById("year-text").innerText = activeTab.dataset.year;
             rebuildYearPicker();
             rebuildWeekPicker();
@@ -6359,6 +6365,134 @@ document.getElementById("week-text").addEventListener("click", e => {
             weekText.style.display = "none";
         }
     }
+});
+
+// ─── Picker fitting ─────────────────────────────────────────
+// Keeps the inline year/week pickers from extending past the right edge of the
+// visible ballot table. Spacing and font shrink together, continuously, by just
+// enough to fit — so the picker tracks the table edge smoothly as the window
+// narrows. Past the floor it collapses to a window around the active item with "…".
+const PICKER_FONT_MAX = 1.5, PICKER_FONT_MIN = 1.1;   // rem
+const PICKER_GAP_MAX = 0.4, PICKER_GAP_MIN = 0.15;    // em
+
+// t = 0 → full size, t = 1 → most condensed
+function setPickerCondense(picker, t) {
+    const font = PICKER_FONT_MAX - (PICKER_FONT_MAX - PICKER_FONT_MIN) * t;
+    const gap = PICKER_GAP_MAX - (PICKER_GAP_MAX - PICKER_GAP_MIN) * t;
+    picker.style.setProperty("--picker-font", font.toFixed(4) + "rem");
+    picker.style.setProperty("--picker-gap", gap.toFixed(4) + "em");
+}
+
+function pickerLimitRight() {
+    let right = 0;
+    document.querySelectorAll(".week-block .table-container table").forEach(t => {
+        if (t.offsetParent === null) return;
+        right = Math.max(right, t.getBoundingClientRect().right);
+    });
+    return right;
+}
+
+function headerContentRight() {
+    let right = 0;
+    document.querySelectorAll(".header h1 #toggle-text, .header h1 #year-text, .header h1 #week-text, .header h1 .picker-btn")
+        .forEach(el => { right = Math.max(right, el.getBoundingClientRect().right); });
+    return right;
+}
+
+function pickerButtons(picker) {
+    return Array.from(picker.querySelectorAll(".picker-btn:not(.picker-ellipsis)"));
+}
+
+function renderPickerWindow(picker, center, r) {
+    picker.querySelectorAll(".picker-ellipsis").forEach(b => b.remove());
+    const btns = pickerButtons(picker);
+    const n = btns.length;
+    const w = 2 * r + 1;
+    if (n <= w + 2) { btns.forEach(b => b.style.display = ""); return; }
+    let start = Math.max(1, Math.min(center - r, n - 1 - w));
+    let end = start + w - 1;
+    // An ellipsis standing in for a single item is pointless — show the item instead
+    if (start === 2) start = 1;
+    if (end === n - 3) end = n - 2;
+    btns.forEach((b, i) => {
+        b.style.display = (i === 0 || i === n - 1 || (i >= start && i <= end)) ? "" : "none";
+    });
+    const makeEllipsis = dir => {
+        const el = document.createElement("button");
+        el.className = "picker-btn picker-ellipsis";
+        el.textContent = "…";
+        el.title = dir < 0 ? "Earlier" : "Later";
+        el.addEventListener("click", e => {
+            e.stopPropagation();
+            picker._center = Math.max(0, Math.min(n - 1, picker._center + dir * w));
+            renderPickerWindow(picker, picker._center, picker._radius);
+            _pickerObserver.takeRecords();
+        });
+        return el;
+    };
+    if (start > 1) picker.insertBefore(makeEllipsis(-1), btns[start]);
+    if (end < n - 2) picker.insertBefore(makeEllipsis(1), btns[n - 1]);
+}
+
+function fitPicker(picker) {
+    picker.querySelectorAll(".picker-ellipsis").forEach(b => b.remove());
+    const btns = pickerButtons(picker);
+    btns.forEach(b => b.style.display = "");
+    picker.style.removeProperty("--picker-font");
+    picker.style.removeProperty("--picker-gap");
+    if (!picker.classList.contains("open") || !btns.length) return;
+
+    const limit = pickerLimitRight();
+    if (!limit) return;
+    const fits = () => headerContentRight() <= limit + 0.5;
+    if (fits()) return;
+
+    // 1. Condense continuously: binary-search the smallest amount that fits
+    setPickerCondense(picker, 1);
+    if (fits()) {
+        let lo = 0, hi = 1;
+        for (let i = 0; i < 12; i++) {
+            const mid = (lo + hi) / 2;
+            setPickerCondense(picker, mid);
+            if (fits()) hi = mid; else lo = mid;
+        }
+        setPickerCondense(picker, hi);
+        return;
+    }
+
+    // 2. Still too wide at the floor — collapse to a window around the active item
+    const active = btns.findIndex(b => b.style.textDecoration === "underline");
+    picker._center = active >= 0 ? active : btns.length - 1;
+    for (let r = Math.ceil(btns.length / 2); r >= 0; r--) {
+        picker._radius = r;
+        renderPickerWindow(picker, picker._center, r);
+        if (fits()) return;
+    }
+}
+
+function refitOpenPickers() {
+    ["year-picker", "week-picker"].forEach(id => {
+        const picker = document.getElementById(id);
+        if (picker) fitPicker(picker);
+    });
+    _pickerObserver.takeRecords(); // discard mutations made by fitting itself
+}
+
+// Refit whenever a picker opens/closes or is rebuilt, or the header text changes
+// (week/year switch, Official/Provisional/AP toggle).
+const _pickerObserver = new MutationObserver(refitOpenPickers);
+["year-picker", "week-picker"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) _pickerObserver.observe(el, { attributes: true, attributeFilter: ["class"], childList: true });
+});
+["toggle-text", "year-text", "week-text"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) _pickerObserver.observe(el, { childList: true, characterData: true, subtree: true });
+});
+let _pickerResizeRaf = 0;
+window.addEventListener("resize", () => {
+    cancelAnimationFrame(_pickerResizeRaf);
+    _pickerResizeRaf = requestAnimationFrame(refitOpenPickers);
 });
 
 // Close sort pickers on scroll
