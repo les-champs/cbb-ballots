@@ -3677,6 +3677,8 @@ async function loadApYear(year) {
             const container = document.getElementById('year-data-container');
             container.insertAdjacentHTML('beforeend', html);
             _loadedYears.add(key);
+            _deltaDataCache = null;
+            _apDeltaDataCache = {};
         } catch (e) {
             console.error(`Failed to load AP year ${year}:`, e);
         } finally {
@@ -3869,9 +3871,12 @@ function getSortedTabs() {
     return _sortedTabsCache;
 }
 
+let _sortedApTabsCache = null;
 function getSortedApTabs() {
-    return Array.from(document.querySelectorAll(".week-tab[data-poll='ap']"))
+    if (_sortedApTabsCache) return _sortedApTabsCache;
+    _sortedApTabsCache = Array.from(document.querySelectorAll(".week-tab[data-poll='ap']"))
         .sort((a, b) => parseInt(b.dataset.year) - parseInt(a.dataset.year) || parseInt(b.dataset.weeknum) - parseInt(a.dataset.weeknum));
+    return _sortedApTabsCache;
 }
 
 function getVoterName(row) {
@@ -6704,6 +6709,8 @@ let deltaSubMode = "consensus-diff"; // "consensus-diff" | "recency"
 function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
     const username = getVoterName(row);
     if (!username) return;
+    // AP blocks on index.html (week-ap-*) live outside the userpoll tab list
+    if (weekId.startsWith("week-ap-")) allTabsSorted = getSortedApTabs();
     const currIdx = allTabsSorted.findIndex(t => t.dataset.week === weekId);
     const currYear = allTabsSorted[currIdx]?.dataset.year;
 
