@@ -434,17 +434,27 @@ function syncPinnedToAggregate(username, isPinning) {
     requestAnimationFrame(() => processChunk(0));
 }
 
+// Pinned usernames, in pin order. Source of truth for pin state so rows in
+// lazily-loaded weeks/years pick up the pin when they are sorted.
+const pinnedUsers = new Set();
+
 function pinRow(row, tbody) {
     const username = getVoterName(row);
-    const allRows = getRowsByUsername(username);
-    const isPinned = row.classList.contains("row-pinned");
+    // Skip aggregate-section clones: syncPinnedToAggregate adds/removes those.
+    // Moving them here can push a clone above the Official Overall row.
+    const allRows = getRowsByUsername(username).filter(r => !r.classList.contains("row-pinned-agg"));
+    const isPinned = pinnedUsers.has(username) || row.classList.contains("row-pinned");
+
+    if (isPinned) pinnedUsers.delete(username);
+    else pinnedUsers.add(username);
 
     allRows.forEach(r => {
         const rTbody = r.closest("tbody");
         if (isPinned) {
             r.classList.remove("row-pinned");
             r.querySelector(".pin-btn")?.classList.remove("pinned");
-            // Return to alphabetical position
+            // Return to alphabetical position (non-visible weeks are re-sorted
+            // with the current sort when they are shown)
             const siblings = Array.from(rTbody.querySelectorAll("tr"));
             const uname = username.toLowerCase();
             let insertBefore = null;
@@ -468,6 +478,9 @@ function pinRow(row, tbody) {
     if (isPinned) {
         allRows.forEach(r => r.classList.remove("voter-cell-hover"));
     }
+    // Re-apply the active sort so an unpinned voter returns to their sorted
+    // spot (e.g. consensus order) and pinned voters stay on top.
+    applyTableSort(currentSort);
 }
 function toggleAllDeltas() {
     const allRows = Array.from(document.querySelectorAll(".voter-row"));
@@ -792,6 +805,17 @@ function applyTableSort(sort) {
         const n = getVoterName(r);
         return n === "Official Overall" || n === "AP Overall" || n === "Recency" || r.classList.contains("row-weighted-ranking");
     });
+    // User-pinned voters stay directly below the fixed rows, in pin order
+    const pinOrder = Array.from(pinnedUsers);
+    const userPinned = allRows
+        .filter(r => !pinnedFirst.includes(r) && pinnedUsers.has(getVoterName(r)))
+        .sort((a, b) => pinOrder.indexOf(getVoterName(a)) - pinOrder.indexOf(getVoterName(b)));
+    userPinned.forEach(r => {
+        if (r.classList.contains("row-pinned-agg")) return;
+        r.classList.add("row-pinned");
+        r.querySelector(".pin-btn")?.classList.add("pinned");
+    });
+    pinnedFirst.push(...userPinned);
     const rows = allRows.filter(r => !pinnedFirst.includes(r));
 
     // Clear any existing consensus distance labels
@@ -823,7 +847,7 @@ function applyTableSort(sort) {
         // Sort by deviation from official consensus (most conformist first)
         // Read consensus directly from the rendered aggregate row so it always
         // matches the Official Overall row exactly (avoids recompute divergence).
-        const aggRow = sections[2]?.querySelector(".voter-row:not(.row-weighted-ranking)");
+        const aggRow = sections[2]?.querySelector(".voter-row:not(.row-weighted-ranking):not(.row-pinned-agg)");
         const consensus = aggRow
             ? Array.from(aggRow.querySelectorAll(".team-logo")).map(img => img.dataset.team)
             : null;
@@ -859,7 +883,13 @@ function applyTableSort(sort) {
             const sa = scoreFn(voterTeams[ua]), sb = scoreFn(voterTeams[ub]);
             return sa !== sb ? sa - sb : tiebreakFn(voterTeams[ua], voterTeams[ub]);
         });
-        pinnedFirst.forEach(r => tbody.appendChild(r));
+        pinnedFirst.forEach(r => {
+            tbody.appendChild(r);
+            if (userPinned.includes(r)) {
+                const dist = scoreFn(Array.from(r.querySelectorAll(".team-logo")).map(img => img.dataset.team));
+                if (dist !== Infinity) addVoterLabel(r, "+" + dist);
+            }
+        });
         rows.forEach(r => {
             tbody.appendChild(r);
             const dist = scoreFn(voterTeams[getVoterName(r)]);
