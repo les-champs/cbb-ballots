@@ -475,9 +475,9 @@ function pinRow(row, tbody) {
         }
     });
     syncPinnedToAggregate(username, !isPinned);
-    if (isPinned) {
-        allRows.forEach(r => r.classList.remove("voter-cell-hover"));
-    }
+    // Hide the pin/calendar/ballot-link menu immediately on both pin and unpin.
+    // The row is moved in the DOM, so mouseleave never fires to clear it.
+    allRows.forEach(r => r.classList.remove("voter-cell-hover"));
     // Re-apply the active sort so an unpinned voter returns to their sorted
     // spot (e.g. consensus order) and pinned voters stay on top.
     applyTableSort(currentSort);

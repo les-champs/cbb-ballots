@@ -255,7 +255,9 @@ td.logo-cell .logo {
 }
 
 body.hide-veteran-tags .veteran-tag,
-.voter-row.voter-cell-hover .veteran-tag {
+.voter-row.voter-cell-hover .veteran-tag,
+.voter-row.row-pinned .veteran-tag,
+.row-pinned-agg .veteran-tag {
     display: none;
 }
 
