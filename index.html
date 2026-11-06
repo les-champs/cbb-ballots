@@ -3514,6 +3514,7 @@ const _loadingYears = {};
 const HIDDEN_YEARS = new Set(["2024"]);
 
 const OUTLIER_OMISSION_TOP_N = 15;
+const OUTLIER_HIGH_MAX_RANK = 20;
 let _outliersMode = false;
 
 function svgColors() {
@@ -4030,10 +4031,14 @@ function getConsensusOrder(weekBlock) {
 }
 
 // Compute per-team mean rank and standard deviation across all voter rows in a section.
+// Voters who left a team unranked count as rank 26, so omissions widen the spread
+// instead of being ignored (matches the consensus side, which also treats missing as 26).
 function computeTeamStats(section) {
     const teamRanks = {};
+    let voterCount = 0;
     section.querySelectorAll(".voter-row").forEach(row => {
         if (row.classList.contains("row-weighted-ranking")) return;
+        voterCount++;
         row.querySelectorAll(".logo-cell .team-logo").forEach((logo, idx) => {
             const team = logo.dataset.team;
             if (!teamRanks[team]) teamRanks[team] = [];
@@ -4041,7 +4046,8 @@ function computeTeamStats(section) {
         });
     });
     const stats = {};
-    for (const [team, ranks] of Object.entries(teamRanks)) {
+    for (const [team, rankedOnly] of Object.entries(teamRanks)) {
+        const ranks = rankedOnly.concat(Array(Math.max(0, voterCount - rankedOnly.length)).fill(26));
         const n = ranks.length;
         const avg = ranks.reduce((s, r) => s + r, 0) / n;
         const sd = n >= 2
@@ -4083,7 +4089,9 @@ function applyOutliers(weekBlock) {
             const stat = teamStats[team];
             cell.classList.remove("outlier-high", "outlier-low");
             if (stat && stat.sd > 0 && Math.abs(voterRank - stat.avg) >= 2 * stat.sd && Math.abs(deviation) >= 3) {
-                cell.classList.add(deviation > 0 ? "outlier-high" : "outlier-low");
+                // High outliers only count in the top 20; #21-25 is ordinary ballot filler.
+                if (deviation > 0 && voterRank <= OUTLIER_HIGH_MAX_RANK) cell.classList.add("outlier-high");
+                else if (deviation < 0) cell.classList.add("outlier-low");
             }
         });
 
