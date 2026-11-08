@@ -1242,6 +1242,7 @@ THEAD_HTML = (
     f"<span class='sort-option' data-action='dotPlot'>Spread</span>"
     f"<span class='sort-option' data-action='heatmap'>Heatmap</span>"
     f"<span class='picker-category'>Actions</span>"
+    f"<span class='sort-option' data-action='toggleOverall'>Overall</span>"
     f"<span class='sort-option' data-action='expandDeltas'>Deltas</span>"
     f"<span class='sort-option' data-action='toggleOutliers'>Outliers</span>"
     f"<span class='sort-option dark-mode-toggle' data-action='darkMode'>Dark Mode</span>"
@@ -1482,6 +1483,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
     <div class="keybind-section">
       <div class="keybind-section-title">Views</div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>O</kbd></span><span>Toggle Outlier Highlighting</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>L</kbd></span><span>Show / Hide Overall Row</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>E</kbd></span><span>Expand / Collapse All Deltas</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>J</kbd></span><span>Toggle Delta Sub-label (Consensus Diff / Recency)</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>1</kbd> – <kbd>9</kbd></span><span>Adjust Delta Lookback Window</span></div>

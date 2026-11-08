@@ -378,6 +378,8 @@ function getSortedApTabs() {
 }
 
 function getVoterName(row) {
+    // The injected "Overall" row stands in for the aggregate row (Official/AP Overall)
+    if (row?.dataset?.voterAlias) return row.dataset.voterAlias;
     // Read from text nodes only to avoid label contamination
     const el = row?.querySelector(".voter-name");
     if (!el) return null;
@@ -466,7 +468,7 @@ function pinRow(row, tbody) {
             let insertBefore = null;
             for (const s of siblings) {
                 if (s === r) continue;
-                if (s.classList.contains("row-pinned")) continue;
+                if (s.classList.contains("row-pinned") || s.classList.contains("overall-row")) continue;
                 const sName = (getVoterName(s) || "").toLowerCase();
                 if (sName > uname) { insertBefore = s; break; }
             }
@@ -476,7 +478,9 @@ function pinRow(row, tbody) {
             r.querySelector(".pin-btn")?.classList.add("pinned");
             const siblings = Array.from(rTbody.querySelectorAll("tr"));
             const lastPinned = siblings.filter(s => s !== r && s.classList.contains("row-pinned")).pop();
+            const overallRow = rTbody.querySelector(".overall-row");
             if (lastPinned) lastPinned.after(r);
+            else if (overallRow) overallRow.after(r);
             else rTbody.prepend(r);
         }
     });
@@ -489,7 +493,7 @@ function pinRow(row, tbody) {
     applyTableSort(currentSort);
 }
 function toggleAllDeltas() {
-    const allRows = Array.from(document.querySelectorAll(".voter-row"));
+    const allRows = Array.from(document.querySelectorAll(".voter-row, .overall-row"));
     const allExpanded = allRows.every(r => r.classList.contains("row-delta"));
     const deltaData = buildDeltaData();
     const sortedTabs = getSortedTabs();
@@ -515,7 +519,7 @@ function toggleAllDeltas() {
 }
 
 function expandAllDeltas() {
-    const allRows = Array.from(document.querySelectorAll(".voter-row"));
+    const allRows = Array.from(document.querySelectorAll(".voter-row, .overall-row"));
     const deltaData = buildDeltaData();
     const sortedTabs = getSortedTabs();
     allRows.forEach(r => {
@@ -751,6 +755,9 @@ function handlePickerAction(action) {
             break;
         case "precisionLeaderboard":
             showPrecisionModal();
+            break;
+        case "toggleOverall":
+            toggleOverallRow();
             break;
         case "expandDeltas":
             toggleAllDeltas();
@@ -1163,7 +1170,7 @@ function bindTeamLogos(root) {
             if (e.shiftKey) {
                 e.stopPropagation();
                 const team = logo.dataset.team;
-                const row = logo.closest(".voter-row");
+                const row = logo.closest(".voter-row, .overall-row");
                 const username = row ? getVoterName(row) : null;
                 showTeamRankChart(team, username);
                 return;
@@ -2199,6 +2206,61 @@ function rebuildWeekPicker() {
     }
 }
 
+// ── "Overall" row ────────────────────────────────────────────────────────────
+// A copy of the week's aggregate row (Official Overall / AP Overall) shown at
+// the top of the Official and Provisional tables, above pinned voters. It has
+// no .voter-row class so voter scans (stats, sorting, caches) ignore it.
+// Hidden by default; the viewer's choice is remembered in localStorage.
+let _showOverallRow = false;
+try { _showOverallRow = localStorage.getItem("showOverallRow") === "1"; } catch (e) {}
+document.body.classList.toggle("show-overall-row", _showOverallRow);
+
+function syncOverallMenu() {
+    document.querySelectorAll("[data-action='toggleOverall']").forEach(el => {
+        el.classList.toggle("active", _showOverallRow);
+    });
+}
+
+function toggleOverallRow() {
+    _showOverallRow = !_showOverallRow;
+    document.body.classList.toggle("show-overall-row", _showOverallRow);
+    syncOverallMenu();
+    try { localStorage.setItem("showOverallRow", _showOverallRow ? "1" : "0"); } catch (e) {}
+}
+
+function injectOverallRows(block) {
+    if (!block) return;
+    const sections = block.querySelectorAll(".ballot-section");
+    const aggRow = sections[2]?.querySelector(".voter-row:not(.row-weighted-ranking):not(.row-pinned-agg)");
+    if (!aggRow) return;
+    const aggName = getVoterName(aggRow);
+    [sections[0], sections[1]].forEach(section => {
+        const tbody = section?.querySelector("tbody");
+        if (!tbody || tbody.querySelector(".overall-row")) return;
+        if (!tbody.querySelector(".voter-row")) return; // no ballots in this section
+        const row = aggRow.cloneNode(true);
+        row.className = "overall-row";
+        row.dataset.voterAlias = aggName;
+        row.querySelectorAll(".pin-btn, .history-btn, .ballot-link-btn, .delta-label, .avg-label, .consensus-dist")
+            .forEach(el => el.remove());
+        row.querySelectorAll(".team-logo").forEach(img => { img.dataset.bound = ""; });
+        const nameEl = row.querySelector(".voter-name");
+        if (nameEl) nameEl.textContent = "Overall";
+        const cell = row.querySelector(".voter-cell");
+        if (cell) {
+            cell.dataset.bound = "1"; // skip bindVoterCells (no pin/history buttons)
+            cell.addEventListener("click", () => {
+                if (row.classList.toggle("row-delta")) {
+                    applyDeltaToRow(row, block.id, buildDeltaData(), getSortedTabs());
+                } else {
+                    row.querySelectorAll(".delta-label, .avg-label").forEach(el => el.remove());
+                }
+            });
+        }
+        tbody.prepend(row);
+    });
+}
+
 async function showWeek(weekId) {
     document.querySelectorAll(".week-block").forEach(b => b.style.display = "none");
     document.querySelectorAll(".week-tab").forEach(t => t.classList.remove("active"));
@@ -2229,6 +2291,8 @@ async function showWeek(weekId) {
         else targetSection = sections[0];
         if (targetSection) targetSection.style.display = "block";
         else if (sections[0]) sections[0].style.display = "block";
+        injectOverallRows(block);
+        syncOverallMenu();
         lazyLoadWeek(block);
         refreshBlockLogos(block);
         if (isAggregate) {
@@ -2280,6 +2344,8 @@ async function showApWeek(year, weekNum) {
         } else if (apSections[0]) {
             apSections[0].style.display = "block";
         }
+        injectOverallRows(apBlock);
+        syncOverallMenu();
         lazyLoadWeek(apBlock);
         refreshBlockLogos(apBlock);
         if (showApAggregate) injectApWeightedRankingRow(apBlock, `week-ap-${year}-${weekNum}`, year);
@@ -2773,11 +2839,11 @@ function showAvgRankModal(weekId) {
         <th>#</th><th></th>
         <th class="team-col">Team</th>
         <th title="Rank change from previous week">Δ</th>
-        <th title="10th percentile rank across all voters (unranked = 26)">P<sub>90+</sub></th>
+        <th title="10th percentile rank across all voters">P<sub>90+</sub></th>
         <th>Avg</th>
-        <th title="90th percentile rank across all voters (unranked = 26)">P<sub>10−</sub></th>
+        <th title="90th percentile rank across all voters">P<sub>10−</sub></th>
         <th title="Standard deviation of ranks given by voters this week">Dev</th>
-        <th title="5-week weighted average rank (change from previous week in parentheses)">μ̄<sub>5</sub><sup>w</sup></th>
+        <th title="5-week weighted average rank (change from previous week in parentheses)">5 Week</th>
         <th>Voters</th>
         <th>Pts</th>
     </tr></thead><tbody>`;
@@ -3205,7 +3271,8 @@ let deltaWeeksBack = 1;
 let deltaSubMode = "consensus-diff"; // "consensus-diff" | "recency"
 
 function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
-    const username = getVoterName(row);
+    // buildDeltaData() indexes every block's aggregate row as "Official Overall"
+    const username = row.classList.contains("overall-row") ? "Official Overall" : getVoterName(row);
     if (!username) return;
     // AP blocks on index.html (week-ap-*) live outside the userpoll tab list
     if (weekId.startsWith("week-ap-")) allTabsSorted = getSortedApTabs();
@@ -3283,7 +3350,7 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
         }
 
         // Below-logo label — skipped for aggregate section rows
-        const isAggSection = row.closest('.ballot-section')?.id?.endsWith('-aggregate');
+        const isAggSection = row.closest('.ballot-section')?.id?.endsWith('-aggregate') || row.classList.contains("overall-row");
         if (!isAggSection) {
             if (deltaSubMode === "recency") {
                 // Weighted avg label (linear weights: most recent=5, oldest=1, missing weeks skipped)
@@ -4042,6 +4109,11 @@ document.addEventListener("keydown", e => {
     if (e.key === "O" || e.key === "o") {
         e.preventDefault();
         toggleOutliers();
+        return;
+    }
+    if (e.key === "L" || e.key === "l") {
+        e.preventDefault();
+        toggleOverallRow();
         return;
     }
 

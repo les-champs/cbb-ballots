@@ -314,6 +314,23 @@ body.hide-veteran-tags .veteran-tag,
     border-top: 1px solid var(--color-border-pinned);
 }
 
+.overall-row .voter-name {
+    font-weight: bold;
+}
+
+.overall-row .voter-cell {
+    cursor: pointer;
+    justify-content: center;
+}
+
+.overall-row {
+    display: none;
+}
+
+body.show-overall-row .overall-row {
+    display: table-row;
+}
+
 .ballot-link-btn {
     display: none;
     cursor: pointer;
@@ -336,7 +353,8 @@ body.hide-veteran-tags .veteran-tag,
 
 
 .voter-row.row-delta .delta-label,
-.voter-row.row-delta .avg-label {
+.voter-row.row-delta .avg-label,
+.overall-row.row-delta .delta-label {
     display: block;
     text-align: center;
 }
@@ -465,6 +483,10 @@ thead th {
 #voter-history-table thead th,
 .heatmap-table thead th {
     background: transparent;
+}
+#avg-rank-table thead th,
+#season-stats-table thead th {
+    position: static;
 }
 
 .rank-header-num {
