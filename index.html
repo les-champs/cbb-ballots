@@ -3530,6 +3530,7 @@ let _sortedTabsCache = null;
 let _leaderboardDataCache = null;
 let _deltaDataCache = null;
 let _deltaDataCacheIsProvisional = null;
+let _officialDeltaDataCache = null;  // official ballots only, regardless of toggle
 let _apDeltaDataCache = {};
 let _apCurrentYear = null;
 let _apCurrentWeekNum = null;
@@ -3672,6 +3673,7 @@ async function loadYear(year) {
             _sortedTabsCache = null;
             _leaderboardDataCache = null;
             _deltaDataCache = null;
+            _officialDeltaDataCache = null;
         } catch (e) {
             console.error(`Failed to load year ${year}:`, e);
             throw e;
@@ -3701,6 +3703,7 @@ async function loadApYear(year) {
             container.insertAdjacentHTML('beforeend', html);
             _loadedYears.add(key);
             _deltaDataCache = null;
+            _officialDeltaDataCache = null;
             _apDeltaDataCache = {};
         } catch (e) {
             console.error(`Failed to load AP year ${year}:`, e);
@@ -4574,7 +4577,7 @@ function buildSeasonDataForUser(username, tabs) {
     const result = {};
     const allTabsSorted = tabs || getSortedTabs();
     if (username === "Recency") {
-        const deltaData = buildDeltaData();
+        const deltaData = buildDeltaData(true);
         const yearGroups = {};
         allTabsSorted.forEach(tab => {
             if (!yearGroups[tab.dataset.year]) yearGroups[tab.dataset.year] = [];
@@ -5181,38 +5184,52 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
         return { team, avg, hi, lo, allRanks, rankVoters };
     });
 
-    // Weighted Recency mode: circle = 5-week recency-weighted voter avg (compute5WeekWeighted);
-    // hi/lo bars = best and worst per-week voter avg rank across the last 3 weeks.
-    // Both use the same voter pool so the circle always falls within the bar range.
+    // 5 Week mode (official ballots only, never provisional):
+    //   circle = 5-week recency-weighted avg voter rank (compute5WeekWeighted, weights 5..1);
+    //   bar    = best and worst single-week avg voter rank over the same 5 weeks.
+    // Bar and circle both use this week's voters with unranked = 26, so the circle (a weighted
+    // average of the weekly values) sits inside the bar, except in rare cases where a voter
+    // skipped some of the weeks.
     if (mode === "weighted") {
-        const wDelta = buildDeltaData();
+        const wDelta = buildDeltaData(true);
         const wTab = document.querySelector(`.week-tab[data-week="${weekId}"]`);
         const wYear = wTab?.dataset.year || "";
         const isApWeek = weekId.startsWith("week-ap-");
         const wAllTabs = isApWeek ? getSortedApTabs() : getSortedTabs();
         const wYearTabs = wAllTabs.filter(t => t.dataset.year === wYear);
         const wCurrIdx = wYearTabs.findIndex(t => t.dataset.week === weekId);
-        const wLast3 = [];
-        for (let i = wCurrIdx; i < wYearTabs.length && wLast3.length < 5; i++) {
-            wLast3.push(wYearTabs[i].dataset.week);
+        const wLast5 = [];
+        for (let i = wCurrIdx; i < wYearTabs.length && wLast5.length < 5; i++) {
+            wLast5.push(wYearTabs[i].dataset.week);
         }
-        if (wLast3.length === 0) return;
-        // Circle: 5-week weighted avg per compute5WeekWeighted (same as weekly stats table)
+        if (wLast5.length === 0) return;
         const w5Result = compute5WeekWeighted(weekId, wDelta, wYearTabs);
         if (!w5Result) return;
         const wTop25 = w5Result.ranked;
         if (wTop25.length === 0) return;
-        // Hi/Lo: best and worst Official Overall rank across the last 3 weeks (integer ranks)
-        chartData = wTop25.map(team => {
-            const officialRanks = wLast3.map(wid => {
-                const overall = wDelta[wid]?.["Official Overall"];
-                if (!overall) return null;
-                const pos = overall.indexOf(team);
-                return pos === -1 ? 26 : pos + 1;
-            }).filter(r => r !== null);
-            const hi = officialRanks.length > 0 ? Math.min(...officialRanks) : 26;
-            const lo = officialRanks.length > 0 ? Math.max(...officialRanks) : 26;
-            const avg = w5Result.teamAvgRankSum[team] / w5Result.totalVoters;
+        const wVoters = Object.keys(wDelta[weekId] || {}).filter(u => u !== "Official Overall");
+        // Teams: 5-week top 25 plus any of this week's overall top 25 not already in it,
+        // sorted by 5-week avg so tier colors follow 5-week standing.
+        const w5Avg = t => (w5Result.teamAvgRankSum[t] ?? 26 * w5Result.totalVoters) / w5Result.totalVoters;
+        const wTeams = [...wTop25, ...top25.filter(t => !wTop25.includes(t))]
+            .sort((a, b) => w5Avg(a) - w5Avg(b));
+        // Avg rank among this week's voters who submitted a ballot in week wid (null if none did)
+        const weekAvgRank = (wid, team) => {
+            let sum = 0, cnt = 0;
+            wVoters.forEach(u => {
+                const ballot = wDelta[wid]?.[u];
+                if (!ballot?.length) return;
+                const pos = ballot.indexOf(team);
+                sum += pos === -1 ? 26 : pos + 1;
+                cnt++;
+            });
+            return cnt > 0 ? sum / cnt : null;
+        };
+        chartData = wTeams.map(team => {
+            const weeklyAvgs = wLast5.map(wid => weekAvgRank(wid, team)).filter(r => r !== null);
+            const hi = weeklyAvgs.length > 0 ? Math.min(...weeklyAvgs) : 26;
+            const lo = weeklyAvgs.length > 0 ? Math.max(...weeklyAvgs) : 26;
+            const avg = w5Avg(team);
             return { team, avg, hi, lo, allRanks: [], rankVoters: {} };
         });
     }
@@ -5246,6 +5263,16 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
         d.color = tierColors[d.tier];
     });
 
+    // 5 Week graph: order by this week's overall rank (colors stay with each team's
+    // 5-week tier). Teams outside the week's top 25 keep 5-week order at the end.
+    if (mode === "weighted") {
+        const overallPos = t => { const p = top25.indexOf(t); return p === -1 ? Infinity : p; };
+        chartData = chartData
+            .map((d, i) => ({ d, i }))
+            .sort((a, b) => (overallPos(a.d.team) - overallPos(b.d.team)) || (a.i - b.i))
+            .map(x => x.d);
+    }
+
     const modal = document.getElementById("voter-history-modal");
     const title = document.getElementById("voter-history-title");
     const table = document.getElementById("voter-history-table");
@@ -5263,7 +5290,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
     const modeTabs = [
         { key: 'highlow', label: 'Range' },
         { key: 'dots', label: 'Spread' },
-        { key: 'weighted', label: 'Recency' },
+        { key: 'weighted', label: '5 Week' },
     ].map(m =>
         `<span class="modal-mode-tab${mode === m.key ? ' active' : ''}"
                onclick="showWeekHighLowChart('${escapedId}', '${m.key}')">${m.label}</span>`
@@ -5396,23 +5423,14 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
             botCap.setAttribute("class", "chart-stroke"); botCap.dataset.team = team;
             svg.insertBefore(botCap, tipG);
 
-            // Mean circle
-            const circle = document.createElementNS(svgNS, "circle");
-            circle.setAttribute("cx", x); circle.setAttribute("cy", yAvg);
-            circle.setAttribute("r", "4");
-            circle.setAttribute("fill", circleStroke);
-            circle.setAttribute("stroke", color.stroke); circle.setAttribute("stroke-width", "2.5");
-            circle.setAttribute("class", "chart-stroke"); circle.dataset.team = team;
-            circle.style.cursor = "default";
-
-            circle.addEventListener("mouseenter", () => {
-                const label = avg.toFixed(1);
+            // Tooltip anchored above (or below, if near the top) a point; r = marker half-height
+            const showTip = (label, ax, ay, r) => {
                 const pad = 8, fontSize = 11;
                 const boxW = label.length * fontSize * 0.6 + pad * 2;
                 const boxH = fontSize + pad * 1.5;
-                let tx = x - boxW / 2;
-                let ty = yAvg - 4 - boxH - 4;
-                if (ty < mT) ty = yAvg + 4 + 4;
+                let tx = ax - boxW / 2;
+                let ty = ay - r - boxH - 4;
+                if (ty < mT) ty = ay + r + 4;
                 tx = Math.max(2, Math.min(tx, W - boxW - 2));
 
                 tipRect.setAttribute("x", tx); tipRect.setAttribute("y", ty);
@@ -5429,8 +5447,39 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
                 t.textContent = label;
                 tipG.appendChild(t);
                 tipG.style.display = "";
-            });
-            circle.addEventListener("mouseleave", () => { tipG.style.display = "none"; });
+            };
+            const hideTip = () => { tipG.style.display = "none"; };
+
+            if (mode === "weighted") {
+                const rankStr = r => (r >= 26 ? "NR" : r.toFixed(1));
+                // Invisible, wider hover target along a horizontal segment
+                const addHoverTarget = (y, halfW, label) => {
+                    const hit = document.createElementNS(svgNS, "line");
+                    hit.setAttribute("x1", x - halfW); hit.setAttribute("x2", x + halfW);
+                    hit.setAttribute("y1", y); hit.setAttribute("y2", y);
+                    hit.setAttribute("stroke", "transparent"); hit.setAttribute("stroke-width", "8");
+                    hit.setAttribute("pointer-events", "stroke");
+                    hit.addEventListener("mouseenter", () => showTip(label, x, y, 4));
+                    hit.addEventListener("mouseleave", hideTip);
+                    svg.insertBefore(hit, tipG);
+                };
+
+                // Hover: best (top) and worst (bottom) weekly average
+                addHoverTarget(yHi, capW + 2, rankStr(hi));
+                if (lo !== hi) addHoverTarget(yLo, capW + 2, rankStr(lo));
+            }
+
+            // Mean circle
+            const circle = document.createElementNS(svgNS, "circle");
+            circle.setAttribute("cx", x); circle.setAttribute("cy", yAvg);
+            circle.setAttribute("r", "4");
+            circle.setAttribute("fill", circleStroke);
+            circle.setAttribute("stroke", color.stroke); circle.setAttribute("stroke-width", "2.5");
+            circle.setAttribute("class", "chart-stroke"); circle.dataset.team = team;
+            circle.style.cursor = "default";
+
+            circle.addEventListener("mouseenter", () => showTip(avg.toFixed(1), x, yAvg, 4));
+            circle.addEventListener("mouseleave", hideTip);
 
             svg.insertBefore(circle, tipG);
 
@@ -5441,7 +5490,12 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
             rankTxt.setAttribute("x", x); rankTxt.setAttribute("y", mT + cH + logoSize + 18);
             rankTxt.setAttribute("text-anchor", "middle"); rankTxt.setAttribute("font-size", "9");
             rankTxt.setAttribute("fill", axisColor);
-            rankTxt.textContent = i + 1;
+            if (mode === "weighted") {
+                const op = top25.indexOf(team);
+                rankTxt.textContent = op === -1 ? "NR" : op + 1;
+            } else {
+                rankTxt.textContent = i + 1;
+            }
             svg.appendChild(rankTxt);
         });
     } else {
@@ -6048,7 +6102,7 @@ function injectWeightedRankingRow(activeTab, activeBlock) {
     const activeYear = activeTab.dataset.year;
     const weekId = activeTab.dataset.week;
     const allTabsSorted = getSortedTabs().filter(t => t.dataset.year === activeYear);
-    const deltaData = buildDeltaData();
+    const deltaData = buildDeltaData(true);
 
     const result = compute5WeekWeighted(weekId, deltaData, allTabsSorted);
     if (!result) return;
@@ -6239,7 +6293,7 @@ function showAvgRankModal(weekId) {
     const currYear = allTabsSorted[currTabIdx]?.dataset.year;
     const prevTab = allTabsSorted[currTabIdx + 1];
     const prevTeamRank = {};
-    const deltaDataForNew = buildDeltaData();
+    const deltaDataForNew = buildDeltaData(true);
     if (prevTab && prevTab.dataset.year === currYear) {
         const prevTeams = deltaDataForNew[prevTab.dataset.week]?.["Official Overall"];
         if (prevTeams) prevTeams.forEach((t, i) => { prevTeamRank[t] = i + 1; });
@@ -6760,9 +6814,22 @@ function buildLeaderboardData() {
     return data;
 }
 
-function buildDeltaData() {
+// officialOnly = true always reads official ballots (for aggregate calculations, which
+// provisional ballots must never affect); otherwise follows the Official/Provisional toggle
+// (for per-voter deltas, so provisional voters' rows can show their own changes).
+function buildDeltaData(officialOnly = false) {
+    if (officialOnly) {
+        if (_officialDeltaDataCache === null) _officialDeltaDataCache = _readDeltaData(false);
+        return _officialDeltaDataCache;
+    }
     const isProvisional = document.getElementById("toggle-text")?.innerText === "Provisional Ballots";
     if (_deltaDataCache !== null && _deltaDataCacheIsProvisional === isProvisional) return _deltaDataCache;
+    _deltaDataCache = _readDeltaData(isProvisional);
+    _deltaDataCacheIsProvisional = isProvisional;
+    return _deltaDataCache;
+}
+
+function _readDeltaData(isProvisional) {
     const data = {};
     document.querySelectorAll(".week-tab").forEach(tab => {
         const weekId = tab.dataset.week;
@@ -6787,8 +6854,6 @@ function buildDeltaData() {
             }
         }
     });
-    _deltaDataCache = data;
-    _deltaDataCacheIsProvisional = isProvisional;
     return data;
 }
 
