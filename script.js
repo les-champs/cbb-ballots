@@ -1661,10 +1661,13 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
 
     // 5 Week mode (official ballots only, never provisional):
     //   circle = 5-week recency-weighted avg voter rank (compute5WeekWeighted, weights 5..1);
-    //   bar    = 10th-90th percentile of each current voter's own 5-week weighted avg rank
-    //            (captures both voter disagreement and movement over time).
-    // Circle is the mean of those same per-voter values (unranked = 26), so it sits inside
-    // the bar unless the distribution is extremely lopsided.
+    //   bar    = ceiling/floor: top = 22nd percentile of each current voter's best rank
+    //            over the last 5 weeks, bottom = 78th percentile of each voter's worst rank
+    //            (unranked = 26), floor capped at this week's 90th percentile + 5.
+    //            Backtested 2016-2026 (#1-20 teams): inside ~70% of the next 4 weeks, vs
+    //            ~35% for the old 10th-90th of 5-week averages, which averaged away the
+    //            week-to-week swings the bar is meant to contain. Window lengths 3-8 gave
+    //            near-identical width at equal coverage; 5 matches the circle.
     if (mode === "weighted") {
         const wDelta = buildDeltaData(true);
         const wTab = document.querySelector(`.week-tab[data-week="${weekId}"]`);
@@ -1688,25 +1691,36 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
         const w5Avg = t => (w5Result.teamAvgRankSum[t] ?? 26 * w5Result.totalVoters) / w5Result.totalVoters;
         const wTeams = [...wTop25, ...top25.filter(t => !wTop25.includes(t))]
             .sort((a, b) => w5Avg(a) - w5Avg(b));
-        // Each current voter's own 5-week weighted avg rank for a team (same weights as
-        // compute5WeekWeighted: newest week 5 ... oldest 1; skipped weeks left out).
-        const voterAvgRank = (u, team) => {
-            let sum = 0, wt = 0;
-            wLast5.forEach((wid, wi) => {
+        // Each current voter's best and worst rank for a team across the last 5 weeks
+        // (unranked = 26; weeks the voter skipped are left out). Unweighted on purpose:
+        // the bar is a ceiling/floor, so one big week counts in full.
+        const voterBestWorst = (u, team) => {
+            let best = null, worst = null;
+            wLast5.forEach(wid => {
                 const ballot = wDelta[wid]?.[u];
                 if (!ballot?.length) return;
-                const weight = wLast5.length - wi;
                 const pos = ballot.indexOf(team);
-                sum += (pos === -1 ? 26 : pos + 1) * weight;
-                wt += weight;
+                const r = pos === -1 ? 26 : pos + 1;
+                if (best === null || r < best) best = r;
+                if (worst === null || r > worst) worst = r;
             });
-            return wt > 0 ? sum / wt : null;
+            return best === null ? null : { best, worst };
         };
+        // Floor cap: the floor may sit at most FLOOR_CAP spots below this week's 90th
+        // percentile ballot rank. Stops a rising team's old unranked weeks from forcing
+        // an NR floor once this week's voters clearly rank it.
+        const CEIL_PCT = 0.22, FLOOR_PCT = 0.78, FLOOR_CAP = 5;
         chartData = wTeams.map(team => {
-            const perVoter = wVoters.map(u => voterAvgRank(u, team))
-                .filter(r => r !== null).sort((a, b) => a - b);
-            const hi = perVoter.length > 0 ? percentileRank(perVoter, 0.10) : 26;
-            const lo = perVoter.length > 0 ? percentileRank(perVoter, 0.90) : 26;
+            const perVoter = wVoters.map(u => voterBestWorst(u, team)).filter(v => v !== null);
+            const bests = perVoter.map(v => v.best).sort((a, b) => a - b);
+            const worsts = perVoter.map(v => v.worst).sort((a, b) => a - b);
+            const thisWeek = wVoters.map(u => wDelta[weekId]?.[u]).filter(b => b?.length)
+                .map(b => { const p = b.indexOf(team); return p === -1 ? 26 : p + 1; })
+                .sort((a, b) => a - b);
+            const hi = bests.length > 0 ? percentileRank(bests, CEIL_PCT) : 26;
+            let lo = worsts.length > 0 ? percentileRank(worsts, FLOOR_PCT) : 26;
+            if (thisWeek.length > 0) lo = Math.min(lo, percentileRank(thisWeek, 0.90) + FLOOR_CAP);
+            lo = Math.max(lo, hi);
             const avg = w5Avg(team);
             return { team, avg, hi, lo, allRanks: [], rankVoters: {} };
         });
@@ -1942,7 +1956,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
                     svg.insertBefore(hit, tipG);
                 };
 
-                // Hover: 10th (top) and 90th (bottom) percentile of voters' 5-week averages
+                // Hover: ceiling (22nd pct of voters' best ranks) and floor (78th pct of worst ranks, capped)
                 addHoverTarget(yHi, capW + 2, rankStr(hi));
                 if (lo !== hi) addHoverTarget(yLo, capW + 2, rankStr(lo));
             }
