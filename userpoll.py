@@ -1365,20 +1365,27 @@ def write_year_fragments(data_by_year, current_year, base_dir):
         with open(frag_path, "w", encoding="utf-8") as f:
             f.write(year_html)
 
+# Userpoll seasons kept in the data but left out of all analysis (2024 is an incomplete Wayback recovery)
+TENURE_EXCLUDED_YEARS = {"2023", "2024"}
+
 def compute_tenure_counts(data_html):
     """Count total ballots per voter across all week/year data (all loaded HTML).
     Adds 36 to voters present in both 2022 and 2025 to account for missing 2023/2024 seasons."""
     SKIP_NAMES = {"Official Overall", "Recency"}
     name_re = re.compile(r'<span class="voter-name"[^>]*>([^<]+)<')
     counts = {}
-    for m in name_re.finditer(data_html):
-        username = m.group(1).strip()
-        if username in SKIP_NAMES:
+    by_year = split_data_by_year(data_html)
+    for year_str, year_html in by_year.items():
+        # Incomplete seasons are kept on disk but never counted; the +36 bonus below covers them
+        if year_str in TENURE_EXCLUDED_YEARS:
             continue
-        counts[username] = counts.get(username, 0) + 1
+        for m in name_re.finditer(year_html):
+            username = m.group(1).strip()
+            if username in SKIP_NAMES:
+                continue
+            counts[username] = counts.get(username, 0) + 1
 
     # Voters active in both 2022 and 2025 likely also voted in missing 2023/2024 seasons
-    by_year = split_data_by_year(data_html)
     def voters_in_year(year_str):
         html = by_year.get(year_str, "")
         return {m.group(1).strip() for m in name_re.finditer(html) if m.group(1).strip() not in SKIP_NAMES}

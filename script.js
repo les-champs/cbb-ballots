@@ -15,7 +15,8 @@ let _chordTimer = null;
 
 const _loadedYears = new Set();
 const _loadingYears = {};
-const HIDDEN_YEARS = new Set(["2024"]);
+// Userpoll seasons kept in the data but hidden from navigation and analysis (2024 is incomplete)
+const HIDDEN_YEARS = new Set(["2023", "2024"]);
 
 const OUTLIER_OMISSION_TOP_N = 15;
 const OUTLIER_HIGH_MAX_RANK = 20;
@@ -3513,6 +3514,7 @@ function showSeasonStatsModal() {
     const teamBestRank = {};
     const teamBestConsensusRank = {};  // best (lowest #) consensus rank across weeks
     const teamWorstConsensusRank = {}; // worst (highest #) consensus rank across weeks
+    const weekBallots = []; // per week: [{voter, ranks: {team: rank}}] for supporter/hater calc
 
     yearTabs.forEach(tab => {
         const weekId = tab.dataset.week;
@@ -3524,9 +3526,16 @@ function showSeasonStatsModal() {
 
         const seenThisWeek = new Set();
         let weekVoterCount = 0;
+        const ballotsThisWeek = [];
         officialSection.querySelectorAll(".voter-row").forEach(row => {
             const voterName = getVoterName(row);
             const teams = Array.from(row.querySelectorAll(".team-logo")).map(img => img.dataset.team);
+            if (voterName && voterName !== "Official Overall" && voterName !== "AP Overall" && voterName !== "Recency"
+                && !row.classList.contains("row-weighted-ranking")) {
+                const ranks = {};
+                teams.slice(0, 25).forEach((team, i) => { if (team) ranks[team] = i + 1; });
+                ballotsThisWeek.push({ voter: voterName, ranks });
+            }
             if (voterName === "Official Overall") {
                 // Track best/worst consensus rank from the weekly aggregate (userpoll mode)
                 teams.slice(0, 25).forEach((team, i) => {
@@ -3548,6 +3557,7 @@ function showSeasonStatsModal() {
             });
         });
         totalVoterWeekSlots += weekVoterCount;
+        weekBallots.push({ ballots: ballotsThisWeek, teams: seenThisWeek });
         seenThisWeek.forEach(team => {
             teamWeeksRanked[team] = (teamWeeksRanked[team] || 0) + 1;
         });
@@ -3568,6 +3578,80 @@ function showSeasonStatsModal() {
     // Sort by total season points descending
     const allTeams = Object.keys(teamTotalPts).sort((a, b) => teamTotalPts[b] - teamTotalPts[a]);
 
+    // #1 supporter / hater: voter whose rank of a team deviates most from that week's
+    // consensus average (unranked = 26), averaged over the weeks the voter voted and the team
+    // appeared on any ballot. Voters must have voted in at least 16 weeks
+    // (capped at the weeks played so far, so in-progress seasons still qualify someone).
+    const voterWeeksVoted = {};
+    const devSum = {};   // devSum[team][voter] = Σ (consensusAvg − voterRank); positive = supporter
+    const devCount = {};
+    weekBallots.forEach(({ ballots, teams }) => {
+        const n = ballots.length;
+        if (n === 0) return;
+        ballots.forEach(b => { voterWeeksVoted[b.voter] = (voterWeeksVoted[b.voter] || 0) + 1; });
+        teams.forEach(team => {
+            let sum = 0;
+            ballots.forEach(b => { sum += b.ranks[team] || 26; });
+            const avg = sum / n;
+            const ds = devSum[team] || (devSum[team] = {});
+            const dc = devCount[team] || (devCount[team] = {});
+            ballots.forEach(b => {
+                ds[b.voter] = (ds[b.voter] || 0) + (avg - (b.ranks[team] || 26));
+                dc[b.voter] = (dc[b.voter] || 0) + 1;
+            });
+        });
+    });
+    const MIN_FAN_WEEKS = 16;
+    const minWeeksVoted = Math.max(1, Math.min(MIN_FAN_WEEKS, weekBallots.filter(w => w.ballots.length).length));
+    const teamSupporter = {};
+    const teamHater = {};
+    const TIE_EPS = 1e-9;
+    const byName = (a, b) => a.localeCompare(b, undefined, { sensitivity: "base" });
+    allTeams.forEach(team => {
+        const ds = devSum[team] || {};
+        // Collect every voter tied for the extreme (float epsilon), alphabetized.
+        // Prefer voters meeting the participation minimum; if none of them deviate in the
+        // needed direction (e.g. only low-participation voters ever ranked the team),
+        // fall back to all voters and flag the result as low-sample.
+        const pick = (qualifiedOnly) => {
+            let best = null, worst = null;
+            Object.keys(ds).forEach(voter => {
+                if (qualifiedOnly && voterWeeksVoted[voter] < minWeeksVoted) return;
+                const d = ds[voter] / devCount[team][voter];
+                if (!best || d > best.d + TIE_EPS) best = { d, voters: [voter] };
+                else if (Math.abs(d - best.d) <= TIE_EPS) best.voters.push(voter);
+                if (!worst || d < worst.d - TIE_EPS) worst = { d, voters: [voter] };
+                else if (Math.abs(d - worst.d) <= TIE_EPS) worst.voters.push(voter);
+            });
+            return { best, worst };
+        };
+        const finish = (f, lowSample) => {
+            f.voters.sort(byName);
+            f.lowSample = lowSample;
+            return f;
+        };
+        const q = pick(true);
+        let all = null;
+        if (q.best && q.best.d > 0) teamSupporter[team] = finish(q.best, false);
+        else if ((all = all || pick(false)).best && all.best.d > 0) teamSupporter[team] = finish(all.best, true);
+        if (q.worst && q.worst.d < 0) teamHater[team] = finish(q.worst, false);
+        else if ((all = all || pick(false)).worst && all.worst.d < 0) teamHater[team] = finish(all.worst, true);
+    });
+    const esc = str => String(str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const FAN_TIE_MAX = 5; // more tied voters than this → "Too Many"
+    const fmtFan = f => {
+        if (!f) return "—";
+        const dev = `<span class="fan-dev">${f.d > 0 ? "+" : "−"}${Math.abs(f.d).toFixed(1)}</span>`;
+        const n = f.voters.length;
+        const tips = [];
+        if (n > FAN_TIE_MAX) tips.push(`${n} voters tied`);
+        else if (n > 1) tips.push(`Tied:&#10;${f.voters.slice(1).map(esc).join("&#10;")}`);
+        const label = n > FAN_TIE_MAX ? "Too Many" : esc(f.voters[0]);
+        const cls = "fan-name" + (tips.length ? " fan-tie" : "") + (f.lowSample ? " fan-low-sample" : "");
+        const title = tips.length ? ` title="${tips.join("&#10;&#10;")}"` : "";
+        return `<span class="${cls}"${title}>${label}</span> ${dev}`;
+    };
+
     const modal = document.getElementById("season-stats-modal");
     const title = document.getElementById("season-stats-title");
     const table = document.getElementById("season-stats-table");
@@ -3583,6 +3667,8 @@ function showSeasonStatsModal() {
         <col style="width:60px">
         <col style="width:52px">
         <col style="width:36px">
+        <col>
+        <col>
     </colgroup><thead><tr>
         <th>#</th><th></th>
         <th class="team-col">Team</th>
@@ -3591,6 +3677,8 @@ function showSeasonStatsModal() {
         <th>Avg Rank</th>
         <th>#1 Votes</th>
         <th>Best</th>
+        <th class="fan-col">#1 Supporter</th>
+        <th class="fan-col">#1 Hater</th>
     </tr></thead><tbody>`;
 
     allTeams.forEach((team, i) => {
@@ -3606,6 +3694,8 @@ function showSeasonStatsModal() {
             <td>${avgRank}</td>
             <td>${firstPlace || "—"}</td>
             <td>${teamBestConsensusRank[team] || "—"}</td>
+            <td class="fan-col">${fmtFan(teamSupporter[team])}</td>
+            <td class="fan-col">${i < 50 ? fmtFan(teamHater[team]) : "—"}</td>
         </tr>`;
     });
 
@@ -4270,7 +4360,8 @@ document.addEventListener("keydown", e => {
                 }).catch(() => {});
             }
         } else {
-            const sortedAll = getSortedTabs().filter(t => parseInt(t.dataset.weeknum) !== 0).slice().reverse();
+            const sortedAll = getSortedTabs().filter(t => parseInt(t.dataset.weeknum) !== 0
+                && ((typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE) || !HIDDEN_YEARS.has(t.dataset.year))).slice().reverse();
             let idx = sortedAll.findIndex(t => t.dataset.week === activeTab.dataset.week);
             if (idx === -1 && currentWeekNum === 0) {
                 // Currently on pre-season; treat as just before week 1 of this year
