@@ -81,6 +81,49 @@ h1 span:hover {
 }
 
 
+/* Optional prev/next week arrows, right-aligned in the header.
+   Hidden unless enabled in Settings (body.show-week-arrows). */
+#week-arrows {
+    display: none;
+    margin-left: auto;
+    align-self: center;
+    gap: 6px;
+    /* Nudge up to the visual center of the heading's capitals, which sits
+       above the center of h1's 1.4em line box. */
+    position: relative;
+    top: -4px;
+}
+body.show-week-arrows #week-arrows {
+    display: flex;
+}
+.modal-week-arrows {
+    display: none;
+    float: right;
+    gap: 2px;
+    margin-left: 16px;
+}
+body.show-week-arrows .modal-week-arrows {
+    display: flex;
+}
+.modal-week-arrows .week-arrow {
+    color: var(--color-modal-h2);
+}
+.week-arrow {
+    display: flex;
+    padding: 2px;
+    border: none;
+    background: none;
+    color: var(--color-heading);
+    cursor: pointer;
+    transition: transform 0.1s ease;
+}
+.week-arrow:hover {
+    transform: scale(1.15);
+}
+.week-arrow:focus:not(:focus-visible) {
+    outline: none;
+}
+
 .dropdown-wrapper {
     position: relative;
     display: inline-block;
@@ -498,7 +541,7 @@ thead th:first-child {
     white-space: nowrap;
 }
 
-#voter-history-modal, #keybind-legend-modal {
+#voter-history-modal, #keybind-legend-modal, #settings-modal {
     display: none;
     position: fixed;
     inset: 0;
@@ -507,10 +550,10 @@ thead th:first-child {
     justify-content: center;
     align-items: center;
 }
-#voter-history-modal.open, #keybind-legend-modal.open {
+#voter-history-modal.open, #keybind-legend-modal.open, #settings-modal.open {
     display: flex;
 }
-#keybind-legend-box {
+#keybind-legend-box, #settings-box {
     background: var(--color-bg-modal);
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.25);
@@ -520,7 +563,7 @@ thead th:first-child {
     overflow: auto;
     padding: 20px 24px 20px;
 }
-#keybind-legend-box h2 {
+#keybind-legend-box h2, #settings-box h2 {
     margin: 0 0 14px;
     font-size: 1.05rem;
     color: var(--color-modal-h2);
@@ -549,6 +592,69 @@ thead th:first-child {
     flex-shrink: 0;
     min-width: 130px;
     justify-content: flex-end;
+}
+#settings-box {
+    max-width: 340px;
+}
+.settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 5px 0;
+    font-size: 13px;
+    color: var(--color-keybind-row);
+}
+label.settings-row {
+    cursor: pointer;
+}
+.settings-row kbd {
+    margin-left: 2px;
+}
+.settings-switch {
+    appearance: none;
+    -webkit-appearance: none;
+    position: relative;
+    flex-shrink: 0;
+    width: 34px;
+    height: 20px;
+    margin: 0;
+    border-radius: 10px;
+    background: var(--color-border-kbd);
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+.settings-switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--color-bg-modal);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    transition: transform 0.15s ease;
+}
+.settings-switch:checked {
+    background: var(--color-bg-tab-active);
+}
+.settings-switch:checked::after {
+    transform: translateX(14px);
+}
+.settings-btn {
+    flex-shrink: 0;
+    font: inherit;
+    font-size: 12px;
+    padding: 3px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--color-border-kbd);
+    background: var(--color-bg-kbd);
+    color: var(--color-kbd);
+    cursor: pointer;
+}
+.settings-btn:hover {
+    background: var(--color-bg-tab-hover);
 }
 kbd {
     display: inline-block;

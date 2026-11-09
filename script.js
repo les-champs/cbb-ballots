@@ -37,10 +37,8 @@ function svgColors() {
 }
 
 function updateDarkModeLabel() {
-    const dark = isDarkMode();
-    document.querySelectorAll('.dark-mode-toggle').forEach(el => {
-        el.textContent = dark ? 'Light Mode' : 'Dark Mode';
-    });
+    const toggle = document.getElementById('settings-dark-toggle');
+    if (toggle) toggle.checked = isDarkMode();
 }
 
 function logoSrc(team) {
@@ -719,14 +717,12 @@ document.addEventListener("mousedown", e => {
     const sort = opt.dataset.sort;
     const action = opt.dataset.action;
     const picker = opt.closest(".sort-picker");
-    if (action !== "darkMode") {
-        // Show the toggle again
-        if (picker._toggle) picker._toggle.style.display = "";
-        picker.classList.remove("open");
-        // Restore rank headers when picker closes
-        const block = picker._sourceBlock || picker.closest(".week-block");
-        showRankHeaders(block);
-    }
+    // Show the toggle again
+    if (picker._toggle) picker._toggle.style.display = "";
+    picker.classList.remove("open");
+    // Restore rank headers when picker closes
+    const block = picker._sourceBlock || picker.closest(".week-block");
+    showRankHeaders(block);
     if (sort) {
         applyTableSort(sort);
     } else if (action) {
@@ -767,8 +763,9 @@ function handlePickerAction(action) {
         case "toggleOutliers":
             toggleOutliers();
             break;
-        case "darkMode":
-            toggleDarkMode();
+        case "settings":
+            updateDarkModeLabel();
+            document.getElementById("settings-modal").classList.add("open");
             break;
         case "legend":
             document.getElementById("keybind-legend-modal").classList.toggle("open");
@@ -1810,7 +1807,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
         `<span class="modal-mode-tab${mode === m.key ? ' active' : ''}"
                onclick="showWeekHighLowChart('${escapedId}', '${m.key}')">${m.label}</span>`
     ).join('');
-    title.innerHTML = `${weekLabelText} Graphs — ${modeTabs}`;
+    title.innerHTML = `${modalWeekArrowsHtml()}${weekLabelText} Graphs — ${modeTabs}`;
 
     table.innerHTML = "";
     table.style.cssText = "display:block; white-space:normal; width:100%;";
@@ -2841,7 +2838,7 @@ function showAvgRankModal(weekId) {
     const table = document.getElementById("avg-rank-table");
 
     const weekPad = String(weekNum).padStart(2, "0");
-    title.textContent = weekLabel ? `${year} ${weekLabel} Statistics` : `${year} #${weekPad} Statistics`;
+    title.innerHTML = modalWeekArrowsHtml() + (weekLabel ? `${year} ${weekLabel} Statistics` : `${year} #${weekPad} Statistics`);
 
     const percentileRank = (sortedArr, p) => {
         if (sortedArr.length === 1) return sortedArr[0];
@@ -3241,18 +3238,28 @@ function backgroundLoad() {
 
 // Save table as PNG (Shift+P)
 function saveTableAsPng() {
-    const activeTab = document.querySelector(".week-tab.active");
-    if (!activeTab) return;
-    const block = document.getElementById(activeTab.dataset.week);
+    // In AP mode on index.html the visible table lives in the AP block, not the
+    // active userpoll tab's block (which is hidden while AP mode is on).
+    const inApMode = _apCurrentYear !== null;
+    const tab = inApMode
+        ? document.querySelector(`.week-tab[data-poll="ap"][data-year="${_apCurrentYear}"][data-weeknum="${_apCurrentWeekNum}"]`)
+        : document.querySelector(".week-tab.active");
+    const blockId = inApMode ? `week-ap-${_apCurrentYear}-${_apCurrentWeekNum}` : tab?.dataset.week;
+    const block = blockId ? document.getElementById(blockId) : null;
+    if (!block) return;
     const section = block.querySelector(".ballot-section[style*='block'], .ballot-section:not([style])");
     const table = section ? section.querySelector("table") : null;
     if (!table) return;
     html2canvas(table, { useCORS: true, scale: 2 }).then(canvas => {
         const link = document.createElement("a");
-        const week = activeTab.dataset.weeklabel || activeTab.dataset.weeknum;
-        const year = activeTab.dataset.year;
-        const label = document.getElementById("toggle-text").innerText.includes("Provisional") ? "provisional" : "official";
-        link.download = `cbb-poll-${year}-week${week}-${label}.png`;
+        const week = tab ? (tab.dataset.weeklabel || tab.dataset.weeknum) : _apCurrentWeekNum;
+        const year = tab ? tab.dataset.year : _apCurrentYear;
+        const toggleText = document.getElementById("toggle-text").innerText;
+        const isAp = inApMode || (typeof IS_AP_PAGE !== "undefined" && IS_AP_PAGE);
+        const label = isAp
+            ? (toggleText.includes("Data") ? "data" : "ballots")
+            : (toggleText.includes("Provisional") ? "provisional" : "official");
+        link.download = `${isAp ? "ap" : "cbb-poll"}-${year}-week${week}-${label}.png`;
         link.href = canvas.toDataURL("image/png");
         link.click();
     });
@@ -4141,10 +4148,18 @@ function computeVoterAvg(yearTabs, lbData) {
     return voterAvg;
 }
 
-["keybind-legend-modal", "avg-rank-modal", "season-stats-modal", "heatmap-modal"].forEach(id => {
+["keybind-legend-modal", "settings-modal", "avg-rank-modal", "season-stats-modal", "heatmap-modal"].forEach(id => {
     document.getElementById(id).addEventListener("click", e => {
         if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
     });
+});
+
+document.getElementById("settings-dark-toggle").addEventListener("change", e => {
+    if (e.target.checked !== isDarkMode()) toggleDarkMode();
+});
+document.getElementById("settings-save-png").addEventListener("click", () => {
+    document.getElementById("settings-modal").classList.remove("open");
+    saveTableAsPng();
 });
 
 (function() {
@@ -4156,10 +4171,90 @@ function computeVoterAvg(yearTabs, lbData) {
 })();
 
 
+// Prev/next week arrows floated into the week Statistics and Graphs modal
+// titles. Same chevrons as the header's #week-arrows and shown under the same
+// Settings toggle (body.show-week-arrows); navigateWeek() re-renders whichever
+// of those modals is open.
+function modalWeekArrowsHtml() {
+    const chev = d => `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
+    return `<span class="modal-week-arrows">`
+        + `<button type="button" class="week-arrow" aria-label="Previous week" title="Previous week" onclick="navigateWeek(-1)">${chev("M15 5l-7 7 7 7")}</button>`
+        + `<button type="button" class="week-arrow" aria-label="Next week" title="Next week" onclick="navigateWeek(1)">${chev("M9 5l7 7-7 7")}</button>`
+        + `</span>`;
+}
+
+// Step one week forward (dir = 1) or back (dir = -1). Shared by Shift+←/→
+// and the optional header arrows (#week-arrows).
+function navigateWeek(dir) {
+    const activeTab = document.querySelector(".week-tab.active");
+    if (!activeTab) return;
+    const currentWeekNum = parseInt(activeTab.dataset.weeknum);
+    const currentYear = activeTab.dataset.year;
+    if (_apCurrentYear !== null) {
+        // AP mode: navigate AP weeks
+        const sortedApAll = getSortedApTabs().slice().reverse(); // ascending
+        const idx = sortedApAll.findIndex(t => t.dataset.year === _apCurrentYear && t.dataset.weeknum === _apCurrentWeekNum);
+        const target = dir > 0 ? sortedApAll[idx + 1] : sortedApAll[idx - 1];
+        if (target) {
+            loadApYear(target.dataset.year).then(async () => {
+                await showApWeek(target.dataset.year, target.dataset.weeknum);
+                if (weekPickerPinned) rebuildWeekPicker();
+                const apWeekId = `week-ap-${target.dataset.year}-${target.dataset.weeknum}`;
+                if (document.getElementById("avg-rank-modal").classList.contains("open"))
+                    showAvgRankModal(apWeekId);
+                const vhm = document.getElementById("voter-history-modal");
+                if (vhm.classList.contains("open") && vhm.dataset.chartType === "highlow")
+                    showWeekHighLowChart(apWeekId, vhm.dataset.chartMode || "highlow");
+            }).catch(() => {});
+        }
+    } else {
+        const sortedAll = getSortedTabs().filter(t => parseInt(t.dataset.weeknum) !== 0
+            && ((typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE) || !HIDDEN_YEARS.has(t.dataset.year))).slice().reverse();
+        let idx = sortedAll.findIndex(t => t.dataset.week === activeTab.dataset.week);
+        if (idx === -1 && currentWeekNum === 0) {
+            // Currently on pre-season; treat as just before week 1 of this year
+            const firstOfYear = sortedAll.findIndex(t => t.dataset.year === currentYear);
+            idx = firstOfYear - 1;
+        }
+        const target = dir > 0 ? sortedAll[idx + 1] : sortedAll[idx - 1];
+        if (target) {
+            loadYear(target.dataset.year).then(async () => {
+                await showWeek(target.dataset.week);
+                if (weekPickerPinned) rebuildWeekPicker();
+                if (document.getElementById("avg-rank-modal").classList.contains("open"))
+                    showAvgRankModal(target.dataset.week);
+                const vhm = document.getElementById("voter-history-modal");
+                if (vhm.classList.contains("open") && vhm.dataset.chartType === "highlow")
+                    showWeekHighLowChart(target.dataset.week, vhm.dataset.chartMode || "highlow");
+                backgroundLoad();
+            }).catch(() => {});
+        }
+    }
+}
+
+// ── Header week arrows ──────────────────────────────────────────────────────
+// Hidden by default; toggled in Settings and remembered in localStorage.
+let _showWeekArrows = false;
+try { _showWeekArrows = localStorage.getItem("showWeekArrows") === "1"; } catch (e) {}
+function setWeekArrowsVisible(on) {
+    _showWeekArrows = on;
+    document.body.classList.toggle("show-week-arrows", on);
+    const t = document.getElementById("settings-week-arrows-toggle");
+    if (t) t.checked = on;
+    try { localStorage.setItem("showWeekArrows", on ? "1" : "0"); } catch (e) {}
+}
+setWeekArrowsVisible(_showWeekArrows);
+document.getElementById("settings-week-arrows-toggle").addEventListener("change", e => {
+    setWeekArrowsVisible(e.target.checked);
+});
+document.getElementById("week-arrow-prev").addEventListener("click", () => navigateWeek(-1));
+document.getElementById("week-arrow-next").addEventListener("click", () => navigateWeek(1));
+
 document.addEventListener("keydown", e => {
     if (e.key === "Escape") {
         document.getElementById("voter-history-modal").classList.remove("open");
         document.getElementById("keybind-legend-modal").classList.remove("open");
+        document.getElementById("settings-modal").classList.remove("open");
         document.getElementById("avg-rank-modal").classList.remove("open");
         document.getElementById("season-stats-modal").classList.remove("open");
         document.getElementById("precision-modal").classList.remove("open");
@@ -4340,46 +4435,7 @@ document.addEventListener("keydown", e => {
 
     if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
         e.preventDefault();
-        if (_apCurrentYear !== null) {
-            // AP mode: navigate AP weeks
-            const sortedApAll = getSortedApTabs().slice().reverse(); // ascending
-            const idx = sortedApAll.findIndex(t => t.dataset.year === _apCurrentYear && t.dataset.weeknum === _apCurrentWeekNum);
-            const target = e.key === "ArrowRight" ? sortedApAll[idx + 1] : sortedApAll[idx - 1];
-            if (target) {
-                loadApYear(target.dataset.year).then(async () => {
-                    await showApWeek(target.dataset.year, target.dataset.weeknum);
-                    if (weekPickerPinned) rebuildWeekPicker();
-                    const apWeekId = `week-ap-${target.dataset.year}-${target.dataset.weeknum}`;
-                    if (document.getElementById("avg-rank-modal").classList.contains("open"))
-                        showAvgRankModal(apWeekId);
-                    const vhm = document.getElementById("voter-history-modal");
-                    if (vhm.classList.contains("open") && vhm.dataset.chartType === "highlow")
-                        showWeekHighLowChart(apWeekId, vhm.dataset.chartMode || "highlow");
-                }).catch(() => {});
-            }
-        } else {
-            const sortedAll = getSortedTabs().filter(t => parseInt(t.dataset.weeknum) !== 0
-                && ((typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE) || !HIDDEN_YEARS.has(t.dataset.year))).slice().reverse();
-            let idx = sortedAll.findIndex(t => t.dataset.week === activeTab.dataset.week);
-            if (idx === -1 && currentWeekNum === 0) {
-                // Currently on pre-season; treat as just before week 1 of this year
-                const firstOfYear = sortedAll.findIndex(t => t.dataset.year === currentYear);
-                idx = firstOfYear - 1;
-            }
-            const target = e.key === "ArrowRight" ? sortedAll[idx + 1] : sortedAll[idx - 1];
-            if (target) {
-                loadYear(target.dataset.year).then(async () => {
-                    await showWeek(target.dataset.week);
-                    if (weekPickerPinned) rebuildWeekPicker();
-                    if (document.getElementById("avg-rank-modal").classList.contains("open"))
-                        showAvgRankModal(target.dataset.week);
-                    const vhm = document.getElementById("voter-history-modal");
-                    if (vhm.classList.contains("open") && vhm.dataset.chartType === "highlow")
-                        showWeekHighLowChart(target.dataset.week, vhm.dataset.chartMode || "highlow");
-                    backgroundLoad();
-                }).catch(() => {});
-            }
-        }
+        navigateWeek(e.key === "ArrowRight" ? 1 : -1);
     }
 
     if (e.key === "ArrowUp" || e.key === "ArrowDown") {
