@@ -11,7 +11,7 @@ Scraper + static site generator for college basketball poll ballots. `userpoll.p
 1. **Edit only source files:** `script.js`, `style.css`, `userpoll.py` (and `poll_simulator.py`). Everything else at the root is generated.
 2. **After any change to `script.js`, `style.css`, or HTML templates in `userpoll.py`, run `python3 userpoll.py --rebuild`.** This regenerates `index.html`, `ap-ballots.html`, and all fragment files. Commit source + regenerated output together.
 3. **Never read generated or data files whole.** They are huge (`index.html` ≈ 5 MB, each `data-*.html` 3–7 MB, `cbbpoll-*.json`/`ap25-*.json` ~1–2 MB, `ballots.json` 2 MB). Use `grep -n`/`grep -c`, `head`, or `python3 -c` with `json` to inspect specific pieces. Do not open `ballots.json` at all.
-4. **`script.js` is ~4,300 lines and `userpoll.py` ~2,300.** Locate code with `grep -n "function name"` and read targeted ranges rather than the whole file.
+4. **`script.js` is ~4,700 lines and `userpoll.py` ~2,000.** Locate code with `grep -n "function name"` and read targeted ranges rather than the whole file.
 5. Features automatically appear on both `index.html` and `ap-ballots.html` (same inlined CSS/JS). Always consider both pages, and AP mode on `index.html`, when changing JS.
 6. When changing the Précision formula in `computeVoterAvg()` (JS), keep `score_voters()` in `poll_simulator.py` in sync.
 
@@ -22,14 +22,15 @@ userpoll.py            # Scrapers + HTML generator + CLI (source)
 script.js              # All client-side JS (source, inlined at build)
 style.css              # All CSS (source, inlined at build)
 poll_simulator.py      # Python mirror of the Précision formula for tuning
-recover_2024.py        # One-off: recovered missing 2024 ballots via Wayback → cbbpoll-2024-recovery.json
 index.html             # GENERATED — main site; only the current year's weeks are inline
 ap-ballots.html        # GENERATED — standalone AP page
 data-YEAR.html         # GENERATED — userpoll fragments for prior years
 data-ap-YEAR.html      # GENERATED — AP fragments for index.html (IDs week-ap-YEAR-N, data-poll="ap")
 data-appage-YEAR.html  # GENERATED — AP fragments for ap-ballots.html (IDs week-YEAR-N, no data-poll)
+data-2026.html etc.    # (userpoll fragments exist for 2016–2022, 2024–2026; index.html holds 2027 inline)
 cbbpoll-YEAR.json      # Cached legacy cbbpoll.com scrapes (2016–2022)
 ap25-YEAR.json         # Cached AP25 scrapes (2022–2027)
+cbbpoll-2024-recovery.json  # Output of the removed one-off 2024 Wayback recovery (in git history)
 ballots.json           # Browser-exported poll data for poll_simulator.py --from-json (do not read)
 cbb-logos/             # Team logos: Team.webp + Team-dark.webp (dark-mode variants from ESPN)
 logos voters(png)/     # Untracked, not used by the build
@@ -42,6 +43,7 @@ thumbnail.png          # OG/Twitter card image
 python3 userpoll.py --rebuild                          # Regenerate all HTML from existing data (use after code changes)
 python3 userpoll.py --week 18 --year 2026              # Scrape a cbbpoll.net week and add/replace it
 python3 userpoll.py --week Pre-Season --year 2027 --store-week 0 --label Pre-Season   # Week slug ≠ stored number
+python3 userpoll.py --week Pre-Season --year 2027 --store-week 0 --label Pre-Season --official-only   # Skip the Provisional section
 python3 userpoll.py --delete --week 18 --year 2026     # Remove a week
 python3 userpoll.py --ap25 --year 2027                 # Scrape AP25 season → ap25-YEAR.json (0 = all seasons)
 python3 userpoll.py --ap25-build --year 2027           # Build AP fragments + update both pages (0 = all)
@@ -49,7 +51,6 @@ python3 userpoll.py --cbbpoll --year 2022              # Scrape legacy cbbpoll.c
 python3 userpoll.py --cbbpoll-build --year 2022        # Build legacy season HTML from cached JSON
 python3 userpoll.py --to-webp                          # Convert PNG logos → WebP
 python3 userpoll.py --dark-logos                       # Download ESPN dark-mode logos (ESPN_NAME_OVERRIDES)
-# Data-repair one-offs: --apply-recovery, --fix-contamination, --remove-overwritten REF_YEAR (see --help)
 ```
 
 Local testing: `python3 -m http.server 8000` → http://localhost:8000. Opening via `file://` breaks prior-year and AP loading (fetch blocked).
@@ -59,6 +60,8 @@ Local testing: `python3 -m http.server 8000` → http://localhost:8000. Opening 
 ## userpoll.py layout (search by function name)
 
 - **cbbpoll.net scraping:** `fetch_page_html`, `split_voter_sections`, `extract_next_data`, `fetch_ballot_url_for_week`, `process_voters`. Fallback chain: homepage → seasons archive → `__NEXT_DATA__` JSON → user profile pages. Regex-based parsing via `urllib.request`.
+- **Ballot cleanup in `main()` (every cbbpoll.net scrape):** (1) provisional voters whose username (case-insensitive) is also listed as official are dropped — the official entry wins; (2) `drop_stale_ballots()` drops any ballot created before `season_start(year)` (July 1 of year−1). Ballot IDs are MongoDB ObjectIds, so `ballot_created_at()` reads the creation time from the first 8 hex chars. `process_voters()` repeats the stale check on URLs found via fallbacks. Both steps print what they dropped. Background: on the 2027 pre-season page, cbbpoll.net's Provisional list held only prior seasons' (2022–2025) ballots, 44 of them duplicating official voters.
+- **`--official-only`:** skips the Provisional section entirely (stores 0 provisional ballots for that week). 2027 Pre-Season was scraped this way.
 - **Logos:** `LOGO_NAME_MAP`, `canonical_logo_name`, `download_logos`, `download_dark_logos`, `convert_all_to_webp`.
 - **Legacy cbbpoll.com:** `CBBPOLL_SEASONS`, `CBBPOLL_NAME_OVERRIDES`, `CBBPOLL_ALT_OVERRIDES`, `cbbpoll_scrape_season`, `cbbpoll_build_season`.
 - **AP25:** `AP25_SITE_YEARS`, `AP25_NAME_OVERRIDES`, `_normalize_ap_team_name`, `ap25_fetch_grid`, `ap25_scrape_season`, `ap25_build_season`, `build_ap_week_block`, `build_appage_week_block`, `_update_ap_in_index`.
@@ -71,6 +74,7 @@ Local testing: `python3 -m http.server 8000` → http://localhost:8000. Opening 
 
 - **Globals/caches (top of file):** `_sortedTabsCache`, `_leaderboardDataCache`, `_deltaDataCache` (+`_deltaDataCacheIsProvisional`, invalidated on Official/Provisional toggle), `_officialDeltaDataCache` (official ballots only), `_apDeltaDataCache`, `_apCurrentYear`/`_apCurrentWeekNum` (non-null ⇒ AP mode on index.html), `HIDDEN_YEARS` (2023 + 2024 hidden from userpoll navigation and analysis; mirrors `EXCLUDED_YEARS` in `userpoll.py`), outlier constants.
 - **Loading:** `loadYear(year)` fetches `${FRAG_PATH_PREFIX}${year}.html`; `loadApYear(year)` fetches `data-ap-YEAR.html`. Both inject into `#year-data-container`; `_loadedYears` (AP keyed `ap-YEAR`) and `_loadingYears` dedupe. `backgroundLoad()` → current-year images (16 concurrent) → all fragments in parallel → their images. All year-navigation paths must `await loadYear()` before `showWeek()`.
+- **Week 1 / Pre-Season:** pre-season is stored as week 0 (`week-YEAR-0`; legacy 2017–2022 tabs have no label, newer ones `data-weeklabel="Pre-Season"`), but the UI shows it as **Week 1** everywhere (there is never a real week 1). `isPreseasonTab()` detects it, `displayWeekNum()` returns 1, and `weekTextLabel()` returns undefined so callers fall back to the number. Use these helpers for any user-facing week text — never `dataset.weeknum`/`dataset.weeklabel` directly. Week 1 is shown in the week picker and ←/→ navigation (no longer hidden). Keep storage as week 0: pre-season reclassification, Cmd+0 and AP data depend on it.
 - **Navigation:** `showWeek()` (async), `showApWeek()`, `switchToApBallots()`, `exitApBallots()`, `rebuildWeekPicker()`, `rebuildYearPicker()`, `fitPicker()`, `updateFavicon()` (favicon shows current week number).
 - **Sorting:** `applyTableSort()` / `setGlobalSort()`. Modes: `alphabetic` (labelled "Functions"), `zetabetique` (reverse), `consensus`. Précision and Tenure are **leaderboard modals**, not sorts.
 - **Rows:** `pinRow()` / `pinnedUsers` / `syncPinnedToAggregate()`, `bindVoterCells()`, `injectVeteranTags()`, `injectOverallRows()` / `toggleOverallRow()`.
@@ -78,6 +82,7 @@ Local testing: `python3 -m http.server 8000` → http://localhost:8000. Opening 
 - **Highlighting/outliers:** `toggleTeamHighlight()` (5 color slots), `applyOutliers()` (unranked counts as 26; high outliers capped at #20).
 - **Charts/modals:** `showTeamRankChart()` (Shift+click logo), `showTeamSeasonDotPlot()`, `showWeekHighLowChart()` (modes `highlow` Range / `dots` Spread / `outlook` Outlook), `computeOutlookBands()` (Outlook inner ~50% / outer ~75% bands; also feeds the Likely/Outlook columns in `showAvgRankModal()`), `showAvgRankModal()`, `showSeasonStatsModal()` (incl. #1 Supporter / #1 Hater columns), `showHeatmapModal()`, `showPrecisionModal()`, `showTenureModal()`, `showVoterHistory()`, `saveTableAsPng()`.
 - **Précision:** `computeVoterAvg()`.
+- **Empty-week "N/A" overlay (end of file):** `#no-ballots-overlay` — a viewport-sized diagonal "N/A" in `--color-heading` shown when every visible `.week-block .ballot-section` lacks ballots (`sectionHasBallots()`: a `tr.voter-row` with a `.team-logo`, excluding `.row-weighted-ranking`/`.overall-row`). A `MutationObserver` on `style` changes of `.ballot-section`/`.week-block` triggers `updateNoBallotsOverlay()`, so no show/hide path needs to call it. `sizeNoBallotsOverlay()` fits the rotated text inside the viewport. Layering: overlay z-index 5 (`pointer-events: none`), `.header` z-index 6, modals 1000+.
 - **Keyboard:** single `keydown` handler near the end of the file. Legend HTML lives in `build_full_html()` in `userpoll.py` — **update both when adding a shortcut.**
 
 ### Keyboard shortcuts (all Shift+key unless noted)
@@ -94,7 +99,7 @@ Local testing: `python3 -m http.server 8000` → http://localhost:8000. Opening 
 | Y | Week avg-rank table | G | Week rank-spread chart |
 | U | Season stats | H | Season heatmap |
 | B | Bump/dot chart | P | Save PNG |
-| ? | Legend | Cmd+0 | Jump to pre-season |
+| ? | Legend | Cmd+0 | Jump to Week 1 (pre-season) |
 | V then X | Toggle veteran tags (chord) | Esc | Close modal |
 
 **Locked keybinds:** Shift+D/X/R/T/Y/G/U/H/P/? require a 6-digit PIN (`LOCKED_KEYS` / `KEYBIND_PIN` above the `keydown` handler; `#pin-modal` in `build_full_html()`). Unlock persists via `localStorage.keybindsUnlocked`. Menu/click paths are not locked.

@@ -18,6 +18,8 @@ const _loadingYears = {};
 // Userpoll seasons kept in the data but hidden from navigation and analysis (2024 is incomplete).
 // Keep in sync with EXCLUDED_YEARS in userpoll.py.
 const HIDDEN_YEARS = new Set(["2023", "2024"]);
+// True on ap-ballots.html (IS_AP_PAGE is injected there only).
+const ON_AP_PAGE = typeof IS_AP_PAGE !== "undefined" && IS_AP_PAGE;
 
 const OUTLIER_OMISSION_TOP_N = 15;
 const OUTLIER_HIGH_MAX_RANK = 20;
@@ -142,7 +144,7 @@ function injectVeteranTags(root) {
 async function loadYear(year) {
     if (_loadedYears.has(year)) return;
     if (_loadingYears[year]) return _loadingYears[year];
-    if (typeof FRAGMENT_YEARS === 'undefined' || !FRAGMENT_YEARS.includes(year)) {
+    if (!FRAGMENT_YEARS.includes(year)) {
         _loadedYears.add(year);
         return;
     }
@@ -175,8 +177,7 @@ async function loadApYear(year) {
     const key = `ap-${year}`;
     if (_loadedYears.has(key)) return;
     if (_loadingYears[key]) return _loadingYears[key];
-    const fragList = typeof AP_FRAGMENT_YEARS !== 'undefined' ? AP_FRAGMENT_YEARS : [];
-    if (!fragList.includes(year)) {
+    if (!AP_FRAGMENT_YEARS.includes(year)) {
         _loadedYears.add(key);
         return;
     }
@@ -799,7 +800,7 @@ function handlePickerAction(action) {
             showHeatmapModal();
             break;
         case "results": {
-            const isAp = _apCurrentYear !== null || (typeof IS_AP_PAGE !== "undefined" && IS_AP_PAGE);
+            const isAp = _apCurrentYear !== null || ON_AP_PAGE;
             showVoterHistory(isAp ? "AP Overall" : "Official Overall");
             break;
         }
@@ -2216,7 +2217,7 @@ function rebuildYearPicker() {
         if (!byYear[y]) byYear[y] = [];
         byYear[y].push(t);
     });
-    const showHidden = isAp || (typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE);
+    const showHidden = isAp || ON_AP_PAGE;
     const years = Object.keys(byYear).filter(y => showHidden || !HIDDEN_YEARS.has(y)).sort();
 
     const yearPicker = document.getElementById("year-picker");
@@ -2450,7 +2451,7 @@ async function showWeek(weekId) {
         if (isAggregate) {
             const newActiveTab = document.querySelector(".week-tab.active");
             if (newActiveTab) {
-                if (typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE) {
+                if (ON_AP_PAGE) {
                     injectApWeightedRankingRow(block, newActiveTab.dataset.week, newActiveTab.dataset.year);
                 } else {
                     injectWeightedRankingRow(newActiveTab, block);
@@ -2595,7 +2596,6 @@ function exitApBallots() {
 // Toggle: Official ↔ Provisional (userpoll), Associated Press ↔ Associated Press Data (AP index mode), Associated Press ↔ Data Ballots (ap-ballots.html)
 document.getElementById("toggle-text").addEventListener("click", async () => {
     const current = document.getElementById("toggle-text").innerText;
-    const isApPage = typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE;
 
     // AP mode on index.html: cycle Associated Press ↔ Associated Press Data
     if (_apCurrentYear && _apCurrentWeekNum) {
@@ -2617,7 +2617,7 @@ document.getElementById("toggle-text").addEventListener("click", async () => {
     }
 
     // ap-ballots.html: cycle Associated Press ↔ Data Ballots
-    if (isApPage) {
+    if (ON_AP_PAGE) {
         if (current === "Associated Press") {
             showAggregateSection();
         } else {
@@ -2662,8 +2662,14 @@ document.getElementById("toggle-text").addEventListener("click", async () => {
 
 
 function injectWeightedRankingRow(activeTab, activeBlock) {
-    // Build a "Recency" ranking row in the aggregate table.
-    const sections = activeBlock.querySelectorAll(".ballot-section");
+    const activeYear = activeTab.dataset.year;
+    const yearTabs = getSortedTabs().filter(t => t.dataset.year === activeYear);
+    _injectRecencyRow(activeBlock, activeTab.dataset.week, yearTabs, buildDeltaData(true));
+}
+
+// Build the "Recency" (5-week weighted) ranking row into a week block's aggregate table.
+function _injectRecencyRow(block, weekId, yearTabs, deltaData) {
+    const sections = block.querySelectorAll(".ballot-section");
     const aggTbody = sections[2]?.querySelector("tbody");
     if (!aggTbody) return;
 
@@ -2672,40 +2678,43 @@ function injectWeightedRankingRow(activeTab, activeBlock) {
     const wasExpanded = existingRow?.classList.contains("row-delta") ?? false;
     existingRow?.remove();
 
-    const activeYear = activeTab.dataset.year;
-    const weekId = activeTab.dataset.week;
-    const allTabsSorted = getSortedTabs().filter(t => t.dataset.year === activeYear);
-    const deltaData = buildDeltaData(true);
-
-    const result = compute5WeekWeighted(weekId, deltaData, allTabsSorted);
+    const result = compute5WeekWeighted(weekId, deltaData, yearTabs);
     if (!result) return;
     const { ranked, teamAvgRankSum, totalVoters } = result;
 
     // Display avg = sum / totalVoters (includes rank-26 penalty for non-rankers)
     const teamDisplayAvg = {};
-    ranked.forEach(team => {
-        teamDisplayAvg[team] = teamAvgRankSum[team] / totalVoters;
-    });
+    ranked.forEach(team => { teamDisplayAvg[team] = teamAvgRankSum[team] / totalVoters; });
 
     // Compute previous week's weighted ranking for delta comparison
-    const currIdx = allTabsSorted.findIndex(t => t.dataset.week === weekId);
-    const prevWeekId = currIdx + 1 < allTabsSorted.length ? allTabsSorted[currIdx + 1].dataset.week : null;
-    const prevResult = prevWeekId ? compute5WeekWeighted(prevWeekId, deltaData, allTabsSorted) : null;
+    const currIdx = yearTabs.findIndex(t => t.dataset.week === weekId);
+    const prevWeekId = currIdx + 1 < yearTabs.length ? yearTabs[currIdx + 1].dataset.week : null;
+    const prevResult = prevWeekId ? compute5WeekWeighted(prevWeekId, deltaData, yearTabs) : null;
     const prevRankOf = {};
     if (prevResult) prevResult.ranked.forEach((team, i) => { prevRankOf[team] = i + 1; });
 
     const tr = _buildRecencyRow(ranked, teamDisplayAvg, prevRankOf);
 
-    // Insert after the Official Overall row, restoring expanded state if it was active
+    // Insert after the Overall row, restoring expanded state if it was active
     const overallRow = aggTbody.querySelector(".voter-row:not(.row-weighted-ranking)");
-    if (overallRow) {
-        overallRow.after(tr);
-    } else {
-        aggTbody.appendChild(tr);
-    }
+    if (overallRow) { overallRow.after(tr); } else { aggTbody.appendChild(tr); }
     if (wasExpanded) tr.classList.add("row-delta");
 
     bindTeamLogos();
+}
+
+// Up/down/same delta text for a rank change (positive diff = moved up).
+function setDeltaLabel(label, diff) {
+    if (diff > 0) {
+        label.textContent = diff >= 5 ? "▲" + diff : String(diff);
+        label.classList.add("delta-up");
+    } else if (diff < 0) {
+        label.textContent = -diff >= 5 ? "▼" + -diff : String(-diff);
+        label.classList.add("delta-down");
+    } else {
+        label.textContent = "—";
+        label.classList.add("delta-same");
+    }
 }
 
 function _buildRecencyRow(ranked, teamDisplayAvg, prevRankOf) {
@@ -2727,16 +2736,7 @@ function _buildRecencyRow(ranked, teamDisplayAvg, prevRankOf) {
         if (!prev) {
             deltaLabel.textContent = "NEW"; deltaLabel.classList.add("delta-new");
         } else {
-            const diff = prev - currRank;
-            if (diff > 0) {
-                deltaLabel.textContent = diff >= 5 ? "▲" + diff : String(diff);
-                deltaLabel.classList.add("delta-up");
-            } else if (diff < 0) {
-                deltaLabel.textContent = Math.abs(diff) >= 5 ? "▼" + Math.abs(diff) : String(Math.abs(diff));
-                deltaLabel.classList.add("delta-down");
-            } else {
-                deltaLabel.textContent = "—"; deltaLabel.classList.add("delta-same");
-            }
+            setDeltaLabel(deltaLabel, prev - currRank);
         }
         td.appendChild(deltaLabel);
 
@@ -2757,14 +2757,15 @@ function _buildRecencyRow(ranked, teamDisplayAvg, prevRankOf) {
     return tr;
 }
 
+function apYearTabs(year) {
+    const tabs = ON_AP_PAGE ? getSortedTabs() : getSortedApTabs();
+    return tabs.filter(t => t.dataset.year === String(year));
+}
+
 function buildApDeltaData(year) {
     if (_apDeltaDataCache[year]) return _apDeltaDataCache[year];
     const data = {};
-    const isApPage = typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE;
-    const apTabs = isApPage
-        ? getSortedTabs().filter(t => t.dataset.year === String(year))
-        : getSortedApTabs().filter(t => t.dataset.year === String(year));
-    apTabs.forEach(tab => {
+    apYearTabs(year).forEach(tab => {
         const weekId = tab.dataset.week;
         const block = document.getElementById(weekId);
         if (!block) return;
@@ -2782,40 +2783,7 @@ function buildApDeltaData(year) {
 }
 
 function injectApWeightedRankingRow(apBlock, apWeekId, year) {
-    const sections = apBlock.querySelectorAll(".ballot-section");
-    const aggTbody = sections[2]?.querySelector("tbody");
-    if (!aggTbody) return;
-
-    const existingRow = aggTbody.querySelector(".row-weighted-ranking");
-    const wasExpanded = existingRow?.classList.contains("row-delta") ?? false;
-    existingRow?.remove();
-
-    const isApPage = typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE;
-    const apYearTabs = isApPage
-        ? getSortedTabs().filter(t => t.dataset.year === String(year))
-        : getSortedApTabs().filter(t => t.dataset.year === String(year));
-    const apDeltaData = buildApDeltaData(year);
-
-    const result = compute5WeekWeighted(apWeekId, apDeltaData, apYearTabs);
-    if (!result) return;
-    const { ranked, teamAvgRankSum, totalVoters } = result;
-
-    const teamDisplayAvg = {};
-    ranked.forEach(team => { teamDisplayAvg[team] = teamAvgRankSum[team] / totalVoters; });
-
-    const currIdx = apYearTabs.findIndex(t => t.dataset.week === apWeekId);
-    const prevWeekId = currIdx + 1 < apYearTabs.length ? apYearTabs[currIdx + 1].dataset.week : null;
-    const prevResult = prevWeekId ? compute5WeekWeighted(prevWeekId, apDeltaData, apYearTabs) : null;
-    const prevRankOf = {};
-    if (prevResult) prevResult.ranked.forEach((team, i) => { prevRankOf[team] = i + 1; });
-
-    const tr = _buildRecencyRow(ranked, teamDisplayAvg, prevRankOf);
-
-    const overallRow = aggTbody.querySelector(".voter-row:not(.row-weighted-ranking)");
-    if (overallRow) { overallRow.after(tr); } else { aggTbody.appendChild(tr); }
-    if (wasExpanded) tr.classList.add("row-delta");
-
-    bindTeamLogos();
+    _injectRecencyRow(apBlock, apWeekId, apYearTabs(year), buildApDeltaData(year));
 }
 
 function showAvgRankModal(weekId) {
@@ -3021,7 +2989,7 @@ function showAggregateSection() {
     sections[2].style.display = "block";
     document.getElementById("toggle-text").innerText = "Data Ballots";
     _deltaDataCache = null;
-    if (typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE) {
+    if (ON_AP_PAGE) {
         injectApWeightedRankingRow(activeBlock, activeTab.dataset.week, activeTab.dataset.year);
     } else {
         injectWeightedRankingRow(activeTab, activeBlock);
@@ -3319,7 +3287,7 @@ function saveTableAsPng() {
         const week = tab ? (weekTextLabel(tab) || padWeekNum(displayWeekNum(tab))) : _apCurrentWeekNum;
         const year = tab ? tab.dataset.year : _apCurrentYear;
         const toggleText = document.getElementById("toggle-text").innerText;
-        const isAp = inApMode || (typeof IS_AP_PAGE !== "undefined" && IS_AP_PAGE);
+        const isAp = inApMode || ON_AP_PAGE;
         const label = isAp
             ? (toggleText.includes("Data") ? "data" : "ballots")
             : (toggleText.includes("Provisional") ? "provisional" : "official");
@@ -3479,7 +3447,7 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
     const logos = row.querySelectorAll(".team-logo");
     logos.forEach((logo, idx) => {
         const team = logo.dataset.team;
-        const wrapper = logo.closest(".cell-logo-wrapper") || logo.closest("td");
+        const wrapper = logo.closest("td");
         if (!wrapper) return;
 
         wrapper.querySelector(".delta-label")?.remove();
@@ -3495,19 +3463,9 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
         } else {
             // Was unranked last period but ranked before — treat as coming from #26
             const effectivePrev = prevIdx2 === -1 ? 25 : prevIdx2; // 0-indexed, so 25 = rank 26
-            const diff = effectivePrev - idx;
-            if (diff > 0) {
-                label.textContent = diff >= 5 ? "▲" + diff : String(diff); label.classList.add("delta-up");
-            } else if (diff < 0) {
-                label.textContent = Math.abs(diff) >= 5 ? "▼" + Math.abs(diff) : String(Math.abs(diff)); label.classList.add("delta-down");
-            }
+            setDeltaLabel(label, effectivePrev - idx);
         }
-        if (label.textContent) {
-            wrapper.insertBefore(label, logo);
-        } else {
-            label.textContent = "—"; label.classList.add("delta-same");
-            wrapper.insertBefore(label, logo);
-        }
+        wrapper.insertBefore(label, logo);
 
         // Below-logo label — skipped for aggregate section rows
         const isAggSection = row.closest('.ballot-section')?.id?.endsWith('-aggregate') || row.classList.contains("overall-row");
@@ -3982,7 +3940,6 @@ function showPrecisionModal() {
 
     sorted.forEach(([username, scores], i) => {
         const adj = scores.boldAdj || 0;
-        const missed = Math.round((scores.combined - scores.avg + (adj)) / 1) || 0;
         // Derive missed from combined = avg - boldAdj + missed * 1
         const missedWeeks = Math.round(scores.combined - scores.avg + adj);
         html += `<tr>
@@ -4007,9 +3964,8 @@ function showPrecisionModal() {
 }
 
 function showTenureModal() {
-    const isApPage = typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE;
     const isApToggle = _apCurrentYear !== null;
-    const isAp = isApPage || isApToggle;
+    const isAp = ON_AP_PAGE || isApToggle;
 
     let currentYear, yearTabs;
     if (isApToggle) {
@@ -4023,9 +3979,7 @@ function showTenureModal() {
     }
     if (yearTabs.length === 0) return;
 
-    const ballotCount = isAp
-        ? ((typeof AP_TENURE_COUNTS !== 'undefined') ? AP_TENURE_COUNTS : {})
-        : ((typeof TENURE_COUNTS !== 'undefined') ? TENURE_COUNTS : {});
+    const ballotCount = isAp ? AP_TENURE_COUNTS : TENURE_COUNTS;
     const skipName = isAp ? "AP Overall" : "Official Overall";
     const lbData = buildLeaderboardData();
 
@@ -4266,7 +4220,7 @@ function navigateWeek(dir) {
         }
     } else {
         const sortedAll = getSortedTabs().filter(t =>
-            ((typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE) || !HIDDEN_YEARS.has(t.dataset.year))).slice().reverse();
+            (ON_AP_PAGE || !HIDDEN_YEARS.has(t.dataset.year))).slice().reverse();
         const idx = sortedAll.findIndex(t => t.dataset.week === activeTab.dataset.week);
         const target = dir > 0 ? sortedAll[idx + 1] : sortedAll[idx - 1];
         if (target) {
@@ -4562,7 +4516,7 @@ document.addEventListener("keydown", e => {
             }).catch(() => {});
         } else {
             const tabs = getSortedTabs();
-            const years = [...new Set(tabs.map(t => t.dataset.year))].filter(y => (typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE) || !HIDDEN_YEARS.has(y)).sort();
+            const years = [...new Set(tabs.map(t => t.dataset.year))].filter(y => ON_AP_PAGE || !HIDDEN_YEARS.has(y)).sort();
             const yearIdx = years.indexOf(currentYear);
             const targetYear = e.key === "ArrowUp" ? years[yearIdx + 1] : years[yearIdx - 1];
             if (!targetYear) return;

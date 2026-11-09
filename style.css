@@ -18,7 +18,6 @@
     --color-keybind-row:     #444;
     --color-kbd:             #333;
     --color-avg-label:       #555;
-    --color-rank-score:      #888;
     --color-picker-cat:      #666;
     --color-spread-text:     #333;
     --color-voter-weighted:  unset;
@@ -26,7 +25,6 @@
     --color-ap-link-hover:   #555;
     --color-heatmap-team:    #333;
     --color-heatmap-rank:    #bbb;
-    --color-heatmap-legend:  #888;
     --color-heatmap-title:   #222;
     --color-history-th-week: #444;
     --color-history-td-week: #555;
@@ -122,11 +120,6 @@ body.show-week-arrows .modal-week-arrows {
 }
 .week-arrow:focus:not(:focus-visible) {
     outline: none;
-}
-
-.dropdown-wrapper {
-    position: relative;
-    display: inline-block;
 }
 
 #year-picker {
@@ -429,17 +422,6 @@ body.show-overall-row .overall-row {
     white-space: nowrap;
 }
 
-.rank-score-label {
-    display: none;
-    font-size: 11px;
-    color: var(--color-rank-score);
-    margin-left: 4px;
-    white-space: nowrap;
-}
-
-.voter-row.row-rank-sorted .rank-score-label {
-    display: inline;
-}
 
 
 
@@ -466,10 +448,6 @@ body.show-overall-row .overall-row {
     font-size: 0.85em;
     pointer-events: none;
     padding: 0 2px;
-}
-
-.picker-sep {
-    pointer-events: none;
 }
 
 .sort-option {
@@ -1047,24 +1025,6 @@ body.year-loading::after {
     vertical-align: middle;
     cursor: default;
 }
-.heatmap-legend {
-    margin-top: 10px;
-    display: flex;
-    align-items: center;
-    gap: 0;
-    justify-content: center;
-    flex-shrink: 0;
-}
-.heatmap-legend-label {
-    font-size: 10px;
-    color: var(--color-heatmap-legend);
-    padding: 0 5px;
-}
-.heatmap-legend-swatch {
-    display: inline-block;
-    width: 11px;
-    height: 11px;
-}
 
 @media (max-device-width: 768px) {
     .header {
@@ -1139,7 +1099,6 @@ body.dark {
     --color-keybind-row:     #bbb;
     --color-kbd:             #ccc;
     --color-avg-label:       #888;
-    --color-rank-score:      #777;
     --color-picker-cat:      #888;
     --color-spread-text:     #ccc;
     --color-voter-weighted:  #888;
@@ -1147,7 +1106,6 @@ body.dark {
     --color-ap-link-hover:   #aaa;
     --color-heatmap-team:    #ccc;
     --color-heatmap-rank:    #777;
-    --color-heatmap-legend:  #666;
     --color-heatmap-title:   #ccc;
     --color-history-th-week: #aaa;
     --color-history-td-week: #888;
