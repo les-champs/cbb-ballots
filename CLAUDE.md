@@ -69,14 +69,14 @@ Local testing: `python3 -m http.server 8000` → http://localhost:8000. Opening 
 
 ## script.js layout (search by function name)
 
-- **Globals/caches (top of file):** `_sortedTabsCache`, `_leaderboardDataCache`, `_deltaDataCache` (+`_deltaDataCacheIsProvisional`, invalidated on Official/Provisional toggle), `_apDeltaDataCache`, `_apCurrentYear`/`_apCurrentWeekNum` (non-null ⇒ AP mode on index.html), `HIDDEN_YEARS` (2024 hidden from userpoll pickers), outlier constants.
+- **Globals/caches (top of file):** `_sortedTabsCache`, `_leaderboardDataCache`, `_deltaDataCache` (+`_deltaDataCacheIsProvisional`, invalidated on Official/Provisional toggle), `_officialDeltaDataCache` (official ballots only), `_apDeltaDataCache`, `_apCurrentYear`/`_apCurrentWeekNum` (non-null ⇒ AP mode on index.html), `HIDDEN_YEARS` (2023 + 2024 hidden from userpoll navigation and analysis; mirrors `EXCLUDED_YEARS` in `userpoll.py`), outlier constants.
 - **Loading:** `loadYear(year)` fetches `${FRAG_PATH_PREFIX}${year}.html`; `loadApYear(year)` fetches `data-ap-YEAR.html`. Both inject into `#year-data-container`; `_loadedYears` (AP keyed `ap-YEAR`) and `_loadingYears` dedupe. `backgroundLoad()` → current-year images (16 concurrent) → all fragments in parallel → their images. All year-navigation paths must `await loadYear()` before `showWeek()`.
 - **Navigation:** `showWeek()` (async), `showApWeek()`, `switchToApBallots()`, `exitApBallots()`, `rebuildWeekPicker()`, `rebuildYearPicker()`, `fitPicker()`, `updateFavicon()` (favicon shows current week number).
 - **Sorting:** `applyTableSort()` / `setGlobalSort()`. Modes: `alphabetic` (labelled "Functions"), `zetabetique` (reverse), `consensus`. Précision and Tenure are **leaderboard modals**, not sorts.
 - **Rows:** `pinRow()` / `pinnedUsers` / `syncPinnedToAggregate()`, `bindVoterCells()`, `injectVeteranTags()`, `injectOverallRows()` / `toggleOverallRow()`.
-- **Deltas:** `buildDeltaData()`, `applyDeltaToRow()`, `deltaWeeksBack`, `deltaSubMode` (`consensus-diff` | `recency`), `compute5WeekWeighted()`, `injectWeightedRankingRow()`, `injectApWeightedRankingRow()`.
+- **Deltas:** `buildDeltaData(officialOnly)` — pass `true` for any aggregate/consensus calculation (provisional ballots must never affect aggregates); omit it only for per-voter deltas that should follow the Official/Provisional toggle. Also `applyDeltaToRow()`, `deltaWeeksBack`, `deltaSubMode` (`consensus-diff` | `recency`), `compute5WeekWeighted()`, `injectWeightedRankingRow()`, `injectApWeightedRankingRow()`.
 - **Highlighting/outliers:** `toggleTeamHighlight()` (5 color slots), `applyOutliers()` (unranked counts as 26; high outliers capped at #20).
-- **Charts/modals:** `showTeamRankChart()` (Shift+click logo), `showTeamSeasonDotPlot()`, `showWeekHighLowChart()`, `showAvgRankModal()`, `showSeasonStatsModal()`, `showHeatmapModal()`, `showPrecisionModal()`, `showTenureModal()`, `showVoterHistory()`, `saveTableAsPng()`.
+- **Charts/modals:** `showTeamRankChart()` (Shift+click logo), `showTeamSeasonDotPlot()`, `showWeekHighLowChart()` (modes `highlow` Range / `dots` Spread / `outlook` Outlook), `computeOutlookBands()` (Outlook inner ~50% / outer ~75% bands; also feeds the Likely/Outlook columns in `showAvgRankModal()`), `showAvgRankModal()`, `showSeasonStatsModal()` (incl. #1 Supporter / #1 Hater columns), `showHeatmapModal()`, `showPrecisionModal()`, `showTenureModal()`, `showVoterHistory()`, `saveTableAsPng()`.
 - **Précision:** `computeVoterAvg()`.
 - **Keyboard:** single `keydown` handler near the end of the file. Legend HTML lives in `build_full_html()` in `userpoll.py` — **update both when adding a shortcut.**
 
@@ -113,7 +113,7 @@ Local testing: `python3 -m http.server 8000` → http://localhost:8000. Opening 
 ## Précision scoring (EXPERIMENTAL — still being tuned)
 
 `computeVoterAvg()` (JS) ≡ `score_voters()` (`poll_simulator.py`, params in `PARAMS` dict):
-- Base distance: position-weighted distance of each ballot from `finalRanking` (5-week weighted avg of last 5 consensus rankings).
+- Base distance: position-weighted distance of each ballot from `finalRanking` (5-week weighted avg of last 5 consensus rankings — unrelated to the Outlook graph).
 - Position weight 1.0 at #1 → 0.5 at #25; week weight 0.5 at week 1 → 1.0 at final week.
 - Boldness adjustment: reward for correctly deviating from weekly consensus toward final ranking (scalar 0.05, magnitude- and position-weighted).
 - Miss penalty: +1 per missed week; ≥5 misses or ≥3 consecutive → disqualified.

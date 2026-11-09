@@ -3549,7 +3549,8 @@ let _chordTimer = null;
 
 const _loadedYears = new Set();
 const _loadingYears = {};
-// Userpoll seasons kept in the data but hidden from navigation and analysis (2024 is incomplete)
+// Userpoll seasons kept in the data but hidden from navigation and analysis (2024 is incomplete).
+// Keep in sync with EXCLUDED_YEARS in userpoll.py.
 const HIDDEN_YEARS = new Set(["2023", "2024"]);
 
 const OUTLIER_OMISSION_TOP_N = 15;
@@ -4284,9 +4285,6 @@ function handlePickerAction(action) {
             break;
         case "highLow":
             if (weekId) showWeekHighLowChart(weekId, "highlow");
-            break;
-        case "weightedRecency":
-            if (weekId) showWeekHighLowChart(weekId, "weighted");
             break;
         case "heatmap":
             showHeatmapModal();
@@ -5267,7 +5265,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
         return { team, avg, hi, lo, allRanks, rankVoters };
     });
 
-    // Outlook mode (internal key "weighted"; official ballots only, never provisional):
+    // Outlook mode (official ballots only, never provisional):
     //   circle = this week's mean voter rank (unranked = 26). A 5-week weighted mean was
     //            tried here and predicted the next 1-4 weeks worse (MAE 3.3/3.8 vs 2.5/3.3).
     //   inner band (~50%): 12th-88th percentile of this week's ballot ranks.
@@ -5279,7 +5277,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
     //            Inner is clamped inside outer.
     //   Backtested 2016-2026 Userpoll + AP (#1-20 teams, consensus rank in each of the next
     //   4 polls): inner holds ~51%; outer ~77% overall and 75-78% at every history length.
-    if (mode === "weighted") {
+    if (mode === "outlook") {
         const bands = computeOutlookBands(weekId, top25);
         if (!bands) return;
         chartData = bands.map(b => ({ ...b, allRanks: [], rankVoters: {} }));
@@ -5316,7 +5314,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
 
     // Outlook graph: order by this week's overall rank (colors follow each team's
     // tier by this week's avg voter rank).
-    if (mode === "weighted") {
+    if (mode === "outlook") {
         const overallPos = t => { const p = top25.indexOf(t); return p === -1 ? Infinity : p; };
         chartData = chartData
             .map((d, i) => ({ d, i }))
@@ -5341,7 +5339,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
     const modeTabs = [
         { key: 'highlow', label: 'Range' },
         { key: 'dots', label: 'Spread' },
-        { key: 'weighted', label: 'Outlook' },
+        { key: 'outlook', label: 'Outlook' },
     ].map(m =>
         `<span class="modal-mode-tab${mode === m.key ? ' active' : ''}"
                onclick="showWeekHighLowChart('${escapedId}', '${m.key}')">${m.label}</span>`
@@ -5428,7 +5426,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
         svg.appendChild(img);
     };
 
-    if (mode === "highlow" || mode === "weighted") {
+    if (mode === "highlow" || mode === "outlook") {
         const capW = Math.min(7, slotW * 0.28);
 
         // Shared tooltip group
@@ -5448,7 +5446,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
             const yLo = yPos(lo);
             const yAvg = yPos(avg);
 
-            if (mode === "weighted") {
+            if (mode === "outlook") {
                 // Two nested bands: pale outer (~75%), solid inner (~50%)
                 const bandW = Math.max(4, Math.min(10, slotW * 0.42));
                 const band = (y1, y2, opacity) => {
@@ -5541,7 +5539,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
             rankTxt.setAttribute("x", x); rankTxt.setAttribute("y", mT + cH + logoSize + 18);
             rankTxt.setAttribute("text-anchor", "middle"); rankTxt.setAttribute("font-size", "9");
             rankTxt.setAttribute("fill", axisColor);
-            if (mode === "weighted") {
+            if (mode === "outlook") {
                 const op = top25.indexOf(team);
                 rankTxt.textContent = op === -1 ? "NR" : op + 1;
             } else {

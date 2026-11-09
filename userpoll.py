@@ -1365,8 +1365,9 @@ def write_year_fragments(data_by_year, current_year, base_dir):
         with open(frag_path, "w", encoding="utf-8") as f:
             f.write(year_html)
 
-# Userpoll seasons kept in the data but left out of all analysis (2024 is an incomplete Wayback recovery)
-TENURE_EXCLUDED_YEARS = {"2023", "2024"}
+# Userpoll seasons kept in the data but left out of all analysis (2024 is an incomplete Wayback recovery).
+# Keep in sync with HIDDEN_YEARS in script.js.
+EXCLUDED_YEARS = {"2023", "2024"}
 
 def compute_tenure_counts(data_html):
     """Count total ballots per voter across all week/year data (all loaded HTML).
@@ -1377,7 +1378,7 @@ def compute_tenure_counts(data_html):
     by_year = split_data_by_year(data_html)
     for year_str, year_html in by_year.items():
         # Incomplete seasons are kept on disk but never counted; the +36 bonus below covers them
-        if year_str in TENURE_EXCLUDED_YEARS:
+        if year_str in EXCLUDED_YEARS:
             continue
         for m in name_re.finditer(year_html):
             username = m.group(1).strip()
