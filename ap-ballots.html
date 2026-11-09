@@ -1985,6 +1985,15 @@ function toggleAllDeltas() {
     }
 }
 
+// Underline the Deltas menu item when every row is expanded — the same test
+// toggleAllDeltas uses, so the underline always predicts what a click will do.
+// Rows can be expanded one at a time too, so this is checked when a picker opens.
+function syncDeltasMenu(root = document) {
+    const allRows = Array.from(document.querySelectorAll(".voter-row, .overall-row"));
+    const on = allRows.length > 0 && allRows.every(r => r.classList.contains("row-delta"));
+    root.querySelectorAll("[data-action='expandDeltas']").forEach(el => el.classList.toggle("active", on));
+}
+
 function expandAllDeltas() {
     const allRows = Array.from(document.querySelectorAll(".voter-row, .overall-row"));
     const deltaData = buildDeltaData();
@@ -2166,6 +2175,7 @@ function bindVotersToggle() {
                 toggle.style.display = "none";
                 picker.classList.remove("settings-mode");
                 refreshSettingsLabels(picker);
+                syncDeltasMenu(picker);
                 picker.classList.add("open");
                 hideRankHeaders(block);
             } else {
@@ -2185,10 +2195,11 @@ document.addEventListener("mousedown", e => {
     const sort = opt.dataset.sort;
     const action = opt.dataset.action;
     const picker = opt.closest(".sort-picker");
-    // Settings swap the picker's contents in place and keep it open. The row
-    // reflows under the cursor, so swallow the click that follows this
+    // Settings and the Show toggles act in place and keep the picker open. The
+    // row can reflow under the cursor, so swallow the click that follows this
     // mousedown — otherwise it can land outside the picker and close it.
-    const inPlace = ["settings", "darkMode", "weekArrows"].includes(action);
+    const showToggles = ["toggleOverall", "expandDeltas", "toggleOutliers"];
+    const inPlace = ["settings", "darkMode", "weekArrows", ...showToggles].includes(action);
     if (inPlace) {
         const swallow = ev => ev.stopPropagation();
         window.addEventListener("click", swallow, { capture: true, once: true });
@@ -2201,6 +2212,11 @@ document.addEventListener("mousedown", e => {
     }
     if (action === "darkMode") { toggleDarkMode(); return; }
     if (action === "weekArrows") { setWeekArrowsVisible(!_showWeekArrows); return; }
+    if (showToggles.includes(action)) {
+        handlePickerAction(action);
+        syncDeltasMenu(picker);
+        return;
+    }
     // Show the toggle again
     if (picker._toggle) picker._toggle.style.display = "";
     picker.classList.remove("open");
