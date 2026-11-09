@@ -1492,7 +1492,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
 
 <div id="keybind-legend-modal">
   <div id="keybind-legend-box">
-    <h2>Keyboard Shortcuts</h2>
+    <h2>Keybinds</h2>
     <div class="keybind-section">
       <div class="keybind-section-title">Navigation</div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>→</kbd> / <kbd>←</kbd></span><span>Next / Previous Week</span></div>
@@ -1513,7 +1513,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>C</kbd></span><span>Sort by Consensus</span></div>
     </div>
     <div class="keybind-section">
-      <div class="keybind-section-title">Other</div>
+      <div class="keybind-section-title">Locked</div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>R</kbd></span><span>Précision leaderboard</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>T</kbd></span><span>Tenure leaderboard</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>Y</kbd></span><span>Week avg rank table</span></div>
@@ -1522,8 +1522,14 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>H</kbd></span><span>Season rank heatmap</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>P</kbd></span><span>Save as PNG</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>?</kbd></span><span>Show legend</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Esc</kbd></span><span>Close</span></div>
     </div>
+  </div>
+</div>
+
+<div id="pin-modal">
+  <div id="pin-box">
+    <h2>Enter PIN</h2>
+    <input id="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="6-digit PIN">
   </div>
 </div>
 

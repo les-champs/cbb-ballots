@@ -604,6 +604,47 @@ body:has([id$="-modal"].open) {
     font-size: 1.05rem;
     color: var(--color-modal-h2);
 }
+#pin-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 1100;
+    justify-content: center;
+    align-items: center;
+}
+#pin-modal.open { display: flex; }
+#pin-box {
+    background: var(--color-bg-modal);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    padding: 20px 24px;
+    text-align: center;
+}
+#pin-box h2 {
+    margin: 0 0 12px;
+    font-size: 1.05rem;
+    color: var(--color-modal-h2);
+}
+#pin-input {
+    width: 9.5em;
+    padding: 6px 8px;
+    font-size: 20px;
+    letter-spacing: 0.4em;
+    text-align: center;
+    font-family: monospace;
+    background: var(--color-bg-kbd);
+    color: var(--color-kbd);
+    border: 1px solid var(--color-section-title);
+    border-radius: 6px;
+    outline: none;
+}
+#pin-input.wrong { animation: pin-shake 0.3s; border-color: #d33; }
+@keyframes pin-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
+}
 .keybind-section {
     margin-bottom: 12px;
 }
@@ -1489,7 +1530,7 @@ body.dark .pin-btn.pinned {
 
 <div id="keybind-legend-modal">
   <div id="keybind-legend-box">
-    <h2>Keyboard Shortcuts</h2>
+    <h2>Keybinds</h2>
     <div class="keybind-section">
       <div class="keybind-section-title">Navigation</div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>→</kbd> / <kbd>←</kbd></span><span>Next / Previous Week</span></div>
@@ -1510,7 +1551,7 @@ body.dark .pin-btn.pinned {
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>C</kbd></span><span>Sort by Consensus</span></div>
     </div>
     <div class="keybind-section">
-      <div class="keybind-section-title">Other</div>
+      <div class="keybind-section-title">Locked</div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>R</kbd></span><span>Précision leaderboard</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>T</kbd></span><span>Tenure leaderboard</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>Y</kbd></span><span>Week avg rank table</span></div>
@@ -1519,8 +1560,14 @@ body.dark .pin-btn.pinned {
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>H</kbd></span><span>Season rank heatmap</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>P</kbd></span><span>Save as PNG</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>?</kbd></span><span>Show legend</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Esc</kbd></span><span>Close</span></div>
     </div>
+  </div>
+</div>
+
+<div id="pin-modal">
+  <div id="pin-box">
+    <h2>Enter PIN</h2>
+    <input id="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="6-digit PIN">
   </div>
 </div>
 
@@ -4431,7 +4478,7 @@ function setGlobalSort(sort) {
     document.querySelectorAll(".voters-toggle").forEach(t => {
         if (t.style.display !== "none") t.textContent = label;
     });
-    document.querySelectorAll(".sort-option").forEach(o => {
+    document.querySelectorAll(".sort-option[data-sort]").forEach(o => {
         o.classList.toggle("active", o.dataset.sort === sort);
     });
     document.body.classList.toggle("hide-veteran-tags", (sort !== "alphabetic" && sort !== "zetabetique") || _hideVeteranTagsOverride);
@@ -7890,7 +7937,57 @@ setWeekArrowsVisible(_showWeekArrows);
 document.getElementById("week-arrow-prev").addEventListener("click", () => navigateWeek(-1));
 document.getElementById("week-arrow-next").addEventListener("click", () => navigateWeek(1));
 
+// ── PIN lock for the "Locked" keybinds (Shift+R/T/Y/G/U/H/P/?) ─────────────
+// Client-side only — a deterrent, not real security. Unlock is remembered.
+const LOCKED_KEYS = new Set(["R", "T", "Y", "G", "U", "H", "P", "?"]);
+const KEYBIND_PIN = "925289";
+let _keybindsUnlocked = false;
+try { _keybindsUnlocked = localStorage.getItem("keybindsUnlocked") === "1"; } catch (e) {}
+let _pinPendingEvent = null;
+const _pinModal = document.getElementById("pin-modal");
+const _pinInput = document.getElementById("pin-input");
+
+function openPinModal(e) {
+    _pinPendingEvent = { key: e.key, code: e.code, shiftKey: true };
+    _pinInput.value = "";
+    _pinInput.classList.remove("wrong");
+    _pinModal.classList.add("open");
+    _pinInput.focus();
+}
+function closePinModal() {
+    _pinModal.classList.remove("open");
+    _pinInput.value = "";
+    _pinPendingEvent = null;
+}
+_pinInput.addEventListener("input", () => {
+    _pinInput.value = _pinInput.value.replace(/\D/g, "").slice(0, 6);
+    _pinInput.classList.remove("wrong");
+    if (_pinInput.value.length < 6) return;
+    if (_pinInput.value === KEYBIND_PIN) {
+        _keybindsUnlocked = true;
+        try { localStorage.setItem("keybindsUnlocked", "1"); } catch (e) {}
+        const pending = _pinPendingEvent;
+        closePinModal();
+        if (pending) document.dispatchEvent(new KeyboardEvent("keydown", pending));
+    } else {
+        _pinInput.value = "";
+        void _pinInput.offsetWidth; // restart shake animation
+        _pinInput.classList.add("wrong");
+    }
+});
+_pinInput.addEventListener("keydown", e => {
+    e.stopPropagation(); // keep digits/Shift combos out of the global handler
+    if (e.key === "Escape") closePinModal();
+});
+_pinModal.addEventListener("click", e => { if (e.target === _pinModal) closePinModal(); });
+
 document.addEventListener("keydown", e => {
+    if (_pinModal.classList.contains("open")) return;
+    if (e.shiftKey && !_keybindsUnlocked && LOCKED_KEYS.has(e.key.length === 1 ? e.key.toUpperCase() : e.key)) {
+        e.preventDefault();
+        openPinModal(e);
+        return;
+    }
     if (e.key === "Escape") {
         document.getElementById("voter-history-modal").classList.remove("open");
         document.getElementById("keybind-legend-modal").classList.remove("open");

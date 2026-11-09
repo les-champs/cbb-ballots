@@ -834,7 +834,7 @@ function setGlobalSort(sort) {
     document.querySelectorAll(".voters-toggle").forEach(t => {
         if (t.style.display !== "none") t.textContent = label;
     });
-    document.querySelectorAll(".sort-option").forEach(o => {
+    document.querySelectorAll(".sort-option[data-sort]").forEach(o => {
         o.classList.toggle("active", o.dataset.sort === sort);
     });
     document.body.classList.toggle("hide-veteran-tags", (sort !== "alphabetic" && sort !== "zetabetique") || _hideVeteranTagsOverride);
@@ -4293,7 +4293,57 @@ setWeekArrowsVisible(_showWeekArrows);
 document.getElementById("week-arrow-prev").addEventListener("click", () => navigateWeek(-1));
 document.getElementById("week-arrow-next").addEventListener("click", () => navigateWeek(1));
 
+// ── PIN lock for the "Locked" keybinds (Shift+R/T/Y/G/U/H/P/?) ─────────────
+// Client-side only — a deterrent, not real security. Unlock is remembered.
+const LOCKED_KEYS = new Set(["R", "T", "Y", "G", "U", "H", "P", "?"]);
+const KEYBIND_PIN = "925289";
+let _keybindsUnlocked = false;
+try { _keybindsUnlocked = localStorage.getItem("keybindsUnlocked") === "1"; } catch (e) {}
+let _pinPendingEvent = null;
+const _pinModal = document.getElementById("pin-modal");
+const _pinInput = document.getElementById("pin-input");
+
+function openPinModal(e) {
+    _pinPendingEvent = { key: e.key, code: e.code, shiftKey: true };
+    _pinInput.value = "";
+    _pinInput.classList.remove("wrong");
+    _pinModal.classList.add("open");
+    _pinInput.focus();
+}
+function closePinModal() {
+    _pinModal.classList.remove("open");
+    _pinInput.value = "";
+    _pinPendingEvent = null;
+}
+_pinInput.addEventListener("input", () => {
+    _pinInput.value = _pinInput.value.replace(/\D/g, "").slice(0, 6);
+    _pinInput.classList.remove("wrong");
+    if (_pinInput.value.length < 6) return;
+    if (_pinInput.value === KEYBIND_PIN) {
+        _keybindsUnlocked = true;
+        try { localStorage.setItem("keybindsUnlocked", "1"); } catch (e) {}
+        const pending = _pinPendingEvent;
+        closePinModal();
+        if (pending) document.dispatchEvent(new KeyboardEvent("keydown", pending));
+    } else {
+        _pinInput.value = "";
+        void _pinInput.offsetWidth; // restart shake animation
+        _pinInput.classList.add("wrong");
+    }
+});
+_pinInput.addEventListener("keydown", e => {
+    e.stopPropagation(); // keep digits/Shift combos out of the global handler
+    if (e.key === "Escape") closePinModal();
+});
+_pinModal.addEventListener("click", e => { if (e.target === _pinModal) closePinModal(); });
+
 document.addEventListener("keydown", e => {
+    if (_pinModal.classList.contains("open")) return;
+    if (e.shiftKey && !_keybindsUnlocked && LOCKED_KEYS.has(e.key.length === 1 ? e.key.toUpperCase() : e.key)) {
+        e.preventDefault();
+        openPinModal(e);
+        return;
+    }
     if (e.key === "Escape") {
         document.getElementById("voter-history-modal").classList.remove("open");
         document.getElementById("keybind-legend-modal").classList.remove("open");

@@ -584,6 +584,47 @@ body:has([id$="-modal"].open) {
     font-size: 1.05rem;
     color: var(--color-modal-h2);
 }
+#pin-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 1100;
+    justify-content: center;
+    align-items: center;
+}
+#pin-modal.open { display: flex; }
+#pin-box {
+    background: var(--color-bg-modal);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    padding: 20px 24px;
+    text-align: center;
+}
+#pin-box h2 {
+    margin: 0 0 12px;
+    font-size: 1.05rem;
+    color: var(--color-modal-h2);
+}
+#pin-input {
+    width: 9.5em;
+    padding: 6px 8px;
+    font-size: 20px;
+    letter-spacing: 0.4em;
+    text-align: center;
+    font-family: monospace;
+    background: var(--color-bg-kbd);
+    color: var(--color-kbd);
+    border: 1px solid var(--color-section-title);
+    border-radius: 6px;
+    outline: none;
+}
+#pin-input.wrong { animation: pin-shake 0.3s; border-color: #d33; }
+@keyframes pin-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
+}
 .keybind-section {
     margin-bottom: 12px;
 }
