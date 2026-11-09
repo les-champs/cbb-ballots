@@ -1922,10 +1922,12 @@ def main():
     else:
         parser.error(f"--store-week is required when --week is a non-numeric slug like '{week}'")
 
-    # Try homepage first (most up-to-date for current week), then seasons archive for past weeks
+    # Seasons page first: it is year-scoped. The homepage links each voter's ballot for this week
+    # *number* from any season (2027 Week 2 listed 90 of 129 ballots from prior seasons), so it is
+    # only a fallback for when the seasons page has no voters yet.
     candidate_urls = [
-        f"{BASE_URL}/",
         f"{BASE_URL}/seasons/{year}/{week}",
+        f"{BASE_URL}/",
     ]
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -1935,8 +1937,9 @@ def main():
             print(f"Trying {poll_url}...")
             html = fetch_page_html(poll_url)
             # Verify the page contains voter data for this week
-            # Homepage has ballot links; seasons archive has "Poll Voters" heading
-            if f"/ballots/{week}/" in html or "Poll Voters" in html:
+            # Seasons page: ballot IDs in __NEXT_DATA__; homepage: direct ballot links
+            nd = extract_next_data(html) if "Poll Voters" in html else None
+            if (nd and extract_ballot_urls_from_next_data(nd, week)) or f"/ballots/{week}/" in html:
                 print(f"✓ Found Week {week} data at {poll_url}\n")
                 break
             else:
