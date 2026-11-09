@@ -97,7 +97,7 @@ Local testing: `python3 -m http.server 8000` → http://localhost:8000. Opening 
 | ? | Legend | Cmd+0 | Jump to pre-season |
 | V then X | Toggle veteran tags (chord) | Esc | Close modal |
 
-**Locked keybinds:** Shift+R/T/Y/G/U/H/P/? require a 6-digit PIN (`LOCKED_KEYS` / `KEYBIND_PIN` above the `keydown` handler; `#pin-modal` in `build_full_html()`). Unlock persists via `localStorage.keybindsUnlocked`. Menu/click paths are not locked.
+**Locked keybinds:** Shift+D/X/R/T/Y/G/U/H/P/? require a 6-digit PIN (`LOCKED_KEYS` / `KEYBIND_PIN` above the `keydown` handler; `#pin-modal` in `build_full_html()`). Unlock persists via `localStorage.keybindsUnlocked`. Menu/click paths are not locked.
 
 ### Toggle states (`#toggle-text`)
 

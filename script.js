@@ -4293,9 +4293,9 @@ setWeekArrowsVisible(_showWeekArrows);
 document.getElementById("week-arrow-prev").addEventListener("click", () => navigateWeek(-1));
 document.getElementById("week-arrow-next").addEventListener("click", () => navigateWeek(1));
 
-// ── PIN lock for the "Locked" keybinds (Shift+R/T/Y/G/U/H/P/?) ─────────────
+// ── PIN lock for the "Locked" keybinds (Shift+D/X/R/T/Y/G/U/H/P/?) ─────────────
 // Client-side only — a deterrent, not real security. Unlock is remembered.
-const LOCKED_KEYS = new Set(["R", "T", "Y", "G", "U", "H", "P", "?"]);
+const LOCKED_KEYS = new Set(["D", "X", "R", "T", "Y", "G", "U", "H", "P", "?"]);
 const KEYBIND_PIN = "925289";
 let _keybindsUnlocked = false;
 try { _keybindsUnlocked = localStorage.getItem("keybindsUnlocked") === "1"; } catch (e) {}
@@ -4339,7 +4339,8 @@ _pinModal.addEventListener("click", e => { if (e.target === _pinModal) closePinM
 
 document.addEventListener("keydown", e => {
     if (_pinModal.classList.contains("open")) return;
-    if (e.shiftKey && !_keybindsUnlocked && LOCKED_KEYS.has(e.key.length === 1 ? e.key.toUpperCase() : e.key)) {
+    const _isVetChord = _chordPending === "v" && (e.key === "x" || e.key === "X");
+    if (e.shiftKey && !_keybindsUnlocked && !_isVetChord && LOCKED_KEYS.has(e.key.length === 1 ? e.key.toUpperCase() : e.key)) {
         e.preventDefault();
         openPinModal(e);
         return;
