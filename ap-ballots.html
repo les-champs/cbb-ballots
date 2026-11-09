@@ -508,6 +508,12 @@ body.show-overall-row .overall-row {
     opacity: 0.7;
 }
 
+/* Settings mode: the picker shows only its .settings-only items */
+.sort-picker:not(.settings-mode) > .settings-only,
+.sort-picker.settings-mode > :not(.settings-only) {
+    display: none;
+}
+
 .sort-option.active {
     text-decoration: underline;
     color: inherit;
@@ -561,7 +567,7 @@ thead th:first-child {
     white-space: nowrap;
 }
 
-#voter-history-modal, #keybind-legend-modal, #settings-modal {
+#voter-history-modal, #keybind-legend-modal {
     display: none;
     position: fixed;
     inset: 0;
@@ -570,10 +576,10 @@ thead th:first-child {
     justify-content: center;
     align-items: center;
 }
-#voter-history-modal.open, #keybind-legend-modal.open, #settings-modal.open {
+#voter-history-modal.open, #keybind-legend-modal.open {
     display: flex;
 }
-#keybind-legend-box, #settings-box {
+#keybind-legend-box {
     background: var(--color-bg-modal);
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.25);
@@ -583,7 +589,7 @@ thead th:first-child {
     overflow: auto;
     padding: 20px 24px 20px;
 }
-#keybind-legend-box h2, #settings-box h2 {
+#keybind-legend-box h2 {
     margin: 0 0 14px;
     font-size: 1.05rem;
     color: var(--color-modal-h2);
@@ -612,69 +618,6 @@ thead th:first-child {
     flex-shrink: 0;
     min-width: 130px;
     justify-content: flex-end;
-}
-#settings-box {
-    max-width: 340px;
-}
-.settings-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 5px 0;
-    font-size: 13px;
-    color: var(--color-keybind-row);
-}
-label.settings-row {
-    cursor: pointer;
-}
-.settings-row kbd {
-    margin-left: 2px;
-}
-.settings-switch {
-    appearance: none;
-    -webkit-appearance: none;
-    position: relative;
-    flex-shrink: 0;
-    width: 34px;
-    height: 20px;
-    margin: 0;
-    border-radius: 10px;
-    background: var(--color-border-kbd);
-    cursor: pointer;
-    transition: background 0.15s ease;
-}
-.settings-switch::after {
-    content: "";
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: var(--color-bg-modal);
-    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
-    transition: transform 0.15s ease;
-}
-.settings-switch:checked {
-    background: var(--color-bg-tab-active);
-}
-.settings-switch:checked::after {
-    transform: translateX(14px);
-}
-.settings-btn {
-    flex-shrink: 0;
-    font: inherit;
-    font-size: 12px;
-    padding: 3px 12px;
-    border-radius: 4px;
-    border: 1px solid var(--color-border-kbd);
-    background: var(--color-bg-kbd);
-    color: var(--color-kbd);
-    cursor: pointer;
-}
-.settings-btn:hover {
-    background: var(--color-bg-tab-hover);
 }
 kbd {
     display: inline-block;
@@ -1364,33 +1307,9 @@ body.dark .pin-btn.pinned {
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>G</kbd></span><span>Week rank spread chart</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>U</kbd></span><span>Season statistics</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>H</kbd></span><span>Season rank heatmap</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>P</kbd></span><span>Save table as PNG</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>P</kbd></span><span>Save as PNG</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>?</kbd></span><span>Show legend</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Esc</kbd></span><span>Close</span></div>
-    </div>
-  </div>
-</div>
-
-<div id="settings-modal">
-  <div id="settings-box">
-    <h2>Settings</h2>
-    <div class="keybind-section">
-      <div class="keybind-section-title">Display</div>
-      <label class="settings-row" for="settings-dark-toggle">
-        <span>Dark Mode</span>
-        <input type="checkbox" id="settings-dark-toggle" class="settings-switch">
-      </label>
-      <label class="settings-row" for="settings-week-arrows-toggle">
-        <span>Week Arrows</span>
-        <input type="checkbox" id="settings-week-arrows-toggle" class="settings-switch">
-      </label>
-    </div>
-    <div class="keybind-section">
-      <div class="keybind-section-title">Actions</div>
-      <div class="settings-row">
-        <span>Save table as PNG <kbd>Shift</kbd><kbd>P</kbd></span>
-        <button type="button" id="settings-save-png" class="settings-btn">Capture</button>
-      </div>
     </div>
   </div>
 </div>
@@ -1436,7 +1355,7 @@ body.dark .pin-btn.pinned {
 <div id="week-2027-0" class="week-block" style="display:none;">
   <div id="week-2027-0-official" class="ballot-section">
     <div class="table-scroll"><div class="table-container"><table>
-<thead><tr><th><span class='voters-toggle' style='cursor:pointer; display:inline-block; transition:transform 0.1s ease;'>Functions</span><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Tables</span><span class='sort-option' data-action='weeklyStats'>Week</span><span class='sort-option' data-action='yearlyStats'>Year</span><span class='picker-category'>Graphs</span><span class='sort-option' data-action='dotPlot'>Spread</span><span class='sort-option' data-action='heatmap'>Heatmap</span><span class='picker-category'>Actions</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Deltas</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='sort-option' data-action='settings'>Settings</span></span></th><th><span class='rank-header-num'>1</span></th><th><span class='rank-header-num'>2</span></th><th><span class='rank-header-num'>3</span></th><th><span class='rank-header-num'>4</span></th><th><span class='rank-header-num'>5</span></th><th><span class='rank-header-num'>6</span></th><th><span class='rank-header-num'>7</span></th><th><span class='rank-header-num'>8</span></th><th><span class='rank-header-num'>9</span></th><th><span class='rank-header-num'>10</span></th><th><span class='rank-header-num'>11</span></th><th><span class='rank-header-num'>12</span></th><th><span class='rank-header-num'>13</span></th><th><span class='rank-header-num'>14</span></th><th><span class='rank-header-num'>15</span></th><th><span class='rank-header-num'>16</span></th><th><span class='rank-header-num'>17</span></th><th><span class='rank-header-num'>18</span></th><th><span class='rank-header-num'>19</span></th><th><span class='rank-header-num'>20</span></th><th><span class='rank-header-num'>21</span></th><th><span class='rank-header-num'>22</span></th><th><span class='rank-header-num'>23</span></th><th><span class='rank-header-num'>24</span></th><th><span class='rank-header-num'>25</span></th></tr></thead>
+<thead><tr><th><span class='voters-toggle' style='cursor:pointer; display:inline-block; transition:transform 0.1s ease;'>Functions</span><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Tables</span><span class='sort-option' data-action='weeklyStats'>Week</span><span class='sort-option' data-action='yearlyStats'>Year</span><span class='picker-category'>Graphs</span><span class='sort-option' data-action='dotPlot'>Spread</span><span class='sort-option' data-action='heatmap'>Heatmap</span><span class='picker-category'>Actions</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Deltas</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='sort-option' data-action='settings'>Settings</span><span class='sort-option settings-only' data-action='settingsBack'>&larr; Back</span><span class='picker-category settings-only'>Settings</span><span class='sort-option settings-only' data-action='darkMode'>Dark Mode</span><span class='sort-option settings-only' data-action='weekArrows'>Week Arrows OFF</span><span class='picker-category settings-only'>Other</span><span class='sort-option settings-only' data-action='savePng'>Save as PNG</span><span class='sort-option settings-only' data-action='legend'>Legend</span></span></th><th><span class='rank-header-num'>1</span></th><th><span class='rank-header-num'>2</span></th><th><span class='rank-header-num'>3</span></th><th><span class='rank-header-num'>4</span></th><th><span class='rank-header-num'>5</span></th><th><span class='rank-header-num'>6</span></th><th><span class='rank-header-num'>7</span></th><th><span class='rank-header-num'>8</span></th><th><span class='rank-header-num'>9</span></th><th><span class='rank-header-num'>10</span></th><th><span class='rank-header-num'>11</span></th><th><span class='rank-header-num'>12</span></th><th><span class='rank-header-num'>13</span></th><th><span class='rank-header-num'>14</span></th><th><span class='rank-header-num'>15</span></th><th><span class='rank-header-num'>16</span></th><th><span class='rank-header-num'>17</span></th><th><span class='rank-header-num'>18</span></th><th><span class='rank-header-num'>19</span></th><th><span class='rank-header-num'>20</span></th><th><span class='rank-header-num'>21</span></th><th><span class='rank-header-num'>22</span></th><th><span class='rank-header-num'>23</span></th><th><span class='rank-header-num'>24</span></th><th><span class='rank-header-num'>25</span></th></tr></thead>
 <tbody><tr class="voter-row"><td><div class="voter-cell" ><span class="voter-name">Andrew Kahn</span></div></td><td class="logo-cell"><img class="logo team-logo" data-team="Florida" data-src="Florida"></td><td class="logo-cell"><img class="logo team-logo" data-team="Illinois" data-src="Illinois"></td><td class="logo-cell"><img class="logo team-logo" data-team="Duke" data-src="Duke"></td><td class="logo-cell"><img class="logo team-logo" data-team="MichiganState" data-src="MichiganState"></td><td class="logo-cell"><img class="logo team-logo" data-team="Texas" data-src="Texas"></td><td class="logo-cell"><img class="logo team-logo" data-team="UConn" data-src="UConn"></td><td class="logo-cell"><img class="logo team-logo" data-team="Tennessee" data-src="Tennessee"></td><td class="logo-cell"><img class="logo team-logo" data-team="Houston" data-src="Houston"></td><td class="logo-cell"><img class="logo team-logo" data-team="Virginia" data-src="Virginia"></td><td class="logo-cell"><img class="logo team-logo" data-team="Alabama" data-src="Alabama"></td><td class="logo-cell"><img class="logo team-logo" data-team="Gonzaga" data-src="Gonzaga"></td><td class="logo-cell"><img class="logo team-logo" data-team="StJohns" data-src="StJohns"></td><td class="logo-cell"><img class="logo team-logo" data-team="Kentucky" data-src="Kentucky"></td><td class="logo-cell"><img class="logo team-logo" data-team="IowaState" data-src="IowaState"></td><td class="logo-cell"><img class="logo team-logo" data-team="Michigan" data-src="Michigan"></td><td class="logo-cell"><img class="logo team-logo" data-team="BYU" data-src="BYU"></td><td class="logo-cell"><img class="logo team-logo" data-team="Arizona" data-src="Arizona"></td><td class="logo-cell"><img class="logo team-logo" data-team="Arkansas" data-src="Arkansas"></td><td class="logo-cell"><img class="logo team-logo" data-team="Louisville" data-src="Louisville"></td><td class="logo-cell"><img class="logo team-logo" data-team="Missouri" data-src="Missouri"></td><td class="logo-cell"><img class="logo team-logo" data-team="MiamiFL" data-src="MiamiFL"></td><td class="logo-cell"><img class="logo team-logo" data-team="Vanderbilt" data-src="Vanderbilt"></td><td class="logo-cell"><img class="logo team-logo" data-team="USC" data-src="USC"></td><td class="logo-cell"><img class="logo team-logo" data-team="Kansas" data-src="Kansas"></td><td class="logo-cell"><img class="logo team-logo" data-team="Purdue" data-src="Purdue"></td></tr>
 <tr class="voter-row"><td><div class="voter-cell" ><span class="voter-name">Andrew Krammer</span></div></td><td class="logo-cell"><img class="logo team-logo" data-team="Florida" data-src="Florida"></td><td class="logo-cell"><img class="logo team-logo" data-team="Duke" data-src="Duke"></td><td class="logo-cell"><img class="logo team-logo" data-team="UConn" data-src="UConn"></td><td class="logo-cell"><img class="logo team-logo" data-team="Illinois" data-src="Illinois"></td><td class="logo-cell"><img class="logo team-logo" data-team="Texas" data-src="Texas"></td><td class="logo-cell"><img class="logo team-logo" data-team="Arizona" data-src="Arizona"></td><td class="logo-cell"><img class="logo team-logo" data-team="MichiganState" data-src="MichiganState"></td><td class="logo-cell"><img class="logo team-logo" data-team="Tennessee" data-src="Tennessee"></td><td class="logo-cell"><img class="logo team-logo" data-team="Virginia" data-src="Virginia"></td><td class="logo-cell"><img class="logo team-logo" data-team="Gonzaga" data-src="Gonzaga"></td><td class="logo-cell"><img class="logo team-logo" data-team="Louisville" data-src="Louisville"></td><td class="logo-cell"><img class="logo team-logo" data-team="Arkansas" data-src="Arkansas"></td><td class="logo-cell"><img class="logo team-logo" data-team="MiamiFL" data-src="MiamiFL"></td><td class="logo-cell"><img class="logo team-logo" data-team="USC" data-src="USC"></td><td class="logo-cell"><img class="logo team-logo" data-team="Houston" data-src="Houston"></td><td class="logo-cell"><img class="logo team-logo" data-team="StJohns" data-src="StJohns"></td><td class="logo-cell"><img class="logo team-logo" data-team="TexasTech" data-src="TexasTech"></td><td class="logo-cell"><img class="logo team-logo" data-team="Michigan" data-src="Michigan"></td><td class="logo-cell"><img class="logo team-logo" data-team="IowaState" data-src="IowaState"></td><td class="logo-cell"><img class="logo team-logo" data-team="Kentucky" data-src="Kentucky"></td><td class="logo-cell"><img class="logo team-logo" data-team="Missouri" data-src="Missouri"></td><td class="logo-cell"><img class="logo team-logo" data-team="Kansas" data-src="Kansas"></td><td class="logo-cell"><img class="logo team-logo" data-team="UCLA" data-src="UCLA"></td><td class="logo-cell"><img class="logo team-logo" data-team="Vanderbilt" data-src="Vanderbilt"></td><td class="logo-cell"><img class="logo team-logo" data-team="BYU" data-src="BYU"></td></tr>
 <tr class="voter-row"><td><div class="voter-cell" ><span class="voter-name">Andrew Quinn</span></div></td><td class="logo-cell"><img class="logo team-logo" data-team="Florida" data-src="Florida"></td><td class="logo-cell"><img class="logo team-logo" data-team="Duke" data-src="Duke"></td><td class="logo-cell"><img class="logo team-logo" data-team="Illinois" data-src="Illinois"></td><td class="logo-cell"><img class="logo team-logo" data-team="UConn" data-src="UConn"></td><td class="logo-cell"><img class="logo team-logo" data-team="Arizona" data-src="Arizona"></td><td class="logo-cell"><img class="logo team-logo" data-team="Texas" data-src="Texas"></td><td class="logo-cell"><img class="logo team-logo" data-team="MichiganState" data-src="MichiganState"></td><td class="logo-cell"><img class="logo team-logo" data-team="TexasTech" data-src="TexasTech"></td><td class="logo-cell"><img class="logo team-logo" data-team="Tennessee" data-src="Tennessee"></td><td class="logo-cell"><img class="logo team-logo" data-team="MiamiFL" data-src="MiamiFL"></td><td class="logo-cell"><img class="logo team-logo" data-team="StJohns" data-src="StJohns"></td><td class="logo-cell"><img class="logo team-logo" data-team="Arkansas" data-src="Arkansas"></td><td class="logo-cell"><img class="logo team-logo" data-team="Gonzaga" data-src="Gonzaga"></td><td class="logo-cell"><img class="logo team-logo" data-team="Virginia" data-src="Virginia"></td><td class="logo-cell"><img class="logo team-logo" data-team="Louisville" data-src="Louisville"></td><td class="logo-cell"><img class="logo team-logo" data-team="Missouri" data-src="Missouri"></td><td class="logo-cell"><img class="logo team-logo" data-team="USC" data-src="USC"></td><td class="logo-cell"><img class="logo team-logo" data-team="Houston" data-src="Houston"></td><td class="logo-cell"><img class="logo team-logo" data-team="Kansas" data-src="Kansas"></td><td class="logo-cell"><img class="logo team-logo" data-team="Alabama" data-src="Alabama"></td><td class="logo-cell"><img class="logo team-logo" data-team="BYU" data-src="BYU"></td><td class="logo-cell"><img class="logo team-logo" data-team="Michigan" data-src="Michigan"></td><td class="logo-cell"><img class="logo team-logo" data-team="UCLA" data-src="UCLA"></td><td class="logo-cell"><img class="logo team-logo" data-team="Kentucky" data-src="Kentucky"></td><td class="logo-cell"><img class="logo team-logo" data-team="Vanderbilt" data-src="Vanderbilt"></td></tr>
@@ -1501,13 +1420,13 @@ body.dark .pin-btn.pinned {
   </div>
   <div id="week-2027-0-provisional" class="ballot-section" style="display:none;">
     <div class="table-scroll"><div class="table-container"><table>
-<thead><tr><th><span class='voters-toggle' style='cursor:pointer; display:inline-block; transition:transform 0.1s ease;'>Functions</span><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Tables</span><span class='sort-option' data-action='weeklyStats'>Week</span><span class='sort-option' data-action='yearlyStats'>Year</span><span class='picker-category'>Graphs</span><span class='sort-option' data-action='dotPlot'>Spread</span><span class='sort-option' data-action='heatmap'>Heatmap</span><span class='picker-category'>Actions</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Deltas</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='sort-option' data-action='settings'>Settings</span></span></th><th><span class='rank-header-num'>1</span></th><th><span class='rank-header-num'>2</span></th><th><span class='rank-header-num'>3</span></th><th><span class='rank-header-num'>4</span></th><th><span class='rank-header-num'>5</span></th><th><span class='rank-header-num'>6</span></th><th><span class='rank-header-num'>7</span></th><th><span class='rank-header-num'>8</span></th><th><span class='rank-header-num'>9</span></th><th><span class='rank-header-num'>10</span></th><th><span class='rank-header-num'>11</span></th><th><span class='rank-header-num'>12</span></th><th><span class='rank-header-num'>13</span></th><th><span class='rank-header-num'>14</span></th><th><span class='rank-header-num'>15</span></th><th><span class='rank-header-num'>16</span></th><th><span class='rank-header-num'>17</span></th><th><span class='rank-header-num'>18</span></th><th><span class='rank-header-num'>19</span></th><th><span class='rank-header-num'>20</span></th><th><span class='rank-header-num'>21</span></th><th><span class='rank-header-num'>22</span></th><th><span class='rank-header-num'>23</span></th><th><span class='rank-header-num'>24</span></th><th><span class='rank-header-num'>25</span></th></tr></thead>
+<thead><tr><th><span class='voters-toggle' style='cursor:pointer; display:inline-block; transition:transform 0.1s ease;'>Functions</span><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Tables</span><span class='sort-option' data-action='weeklyStats'>Week</span><span class='sort-option' data-action='yearlyStats'>Year</span><span class='picker-category'>Graphs</span><span class='sort-option' data-action='dotPlot'>Spread</span><span class='sort-option' data-action='heatmap'>Heatmap</span><span class='picker-category'>Actions</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Deltas</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='sort-option' data-action='settings'>Settings</span><span class='sort-option settings-only' data-action='settingsBack'>&larr; Back</span><span class='picker-category settings-only'>Settings</span><span class='sort-option settings-only' data-action='darkMode'>Dark Mode</span><span class='sort-option settings-only' data-action='weekArrows'>Week Arrows OFF</span><span class='picker-category settings-only'>Other</span><span class='sort-option settings-only' data-action='savePng'>Save as PNG</span><span class='sort-option settings-only' data-action='legend'>Legend</span></span></th><th><span class='rank-header-num'>1</span></th><th><span class='rank-header-num'>2</span></th><th><span class='rank-header-num'>3</span></th><th><span class='rank-header-num'>4</span></th><th><span class='rank-header-num'>5</span></th><th><span class='rank-header-num'>6</span></th><th><span class='rank-header-num'>7</span></th><th><span class='rank-header-num'>8</span></th><th><span class='rank-header-num'>9</span></th><th><span class='rank-header-num'>10</span></th><th><span class='rank-header-num'>11</span></th><th><span class='rank-header-num'>12</span></th><th><span class='rank-header-num'>13</span></th><th><span class='rank-header-num'>14</span></th><th><span class='rank-header-num'>15</span></th><th><span class='rank-header-num'>16</span></th><th><span class='rank-header-num'>17</span></th><th><span class='rank-header-num'>18</span></th><th><span class='rank-header-num'>19</span></th><th><span class='rank-header-num'>20</span></th><th><span class='rank-header-num'>21</span></th><th><span class='rank-header-num'>22</span></th><th><span class='rank-header-num'>23</span></th><th><span class='rank-header-num'>24</span></th><th><span class='rank-header-num'>25</span></th></tr></thead>
 <tbody></tbody>
 </table></div></div>
   </div>
   <div id="week-2027-0-aggregate" class="ballot-section" style="display:none;">
     <div class="table-scroll"><div class="table-container"><table>
-<thead><tr><th><span class='voters-toggle' style='cursor:pointer; display:inline-block; transition:transform 0.1s ease;'>Functions</span><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Tables</span><span class='sort-option' data-action='weeklyStats'>Week</span><span class='sort-option' data-action='yearlyStats'>Year</span><span class='picker-category'>Graphs</span><span class='sort-option' data-action='dotPlot'>Spread</span><span class='sort-option' data-action='heatmap'>Heatmap</span><span class='picker-category'>Actions</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Deltas</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='sort-option' data-action='settings'>Settings</span></span></th><th><span class='rank-header-num'>1</span></th><th><span class='rank-header-num'>2</span></th><th><span class='rank-header-num'>3</span></th><th><span class='rank-header-num'>4</span></th><th><span class='rank-header-num'>5</span></th><th><span class='rank-header-num'>6</span></th><th><span class='rank-header-num'>7</span></th><th><span class='rank-header-num'>8</span></th><th><span class='rank-header-num'>9</span></th><th><span class='rank-header-num'>10</span></th><th><span class='rank-header-num'>11</span></th><th><span class='rank-header-num'>12</span></th><th><span class='rank-header-num'>13</span></th><th><span class='rank-header-num'>14</span></th><th><span class='rank-header-num'>15</span></th><th><span class='rank-header-num'>16</span></th><th><span class='rank-header-num'>17</span></th><th><span class='rank-header-num'>18</span></th><th><span class='rank-header-num'>19</span></th><th><span class='rank-header-num'>20</span></th><th><span class='rank-header-num'>21</span></th><th><span class='rank-header-num'>22</span></th><th><span class='rank-header-num'>23</span></th><th><span class='rank-header-num'>24</span></th><th><span class='rank-header-num'>25</span></th></tr></thead>
+<thead><tr><th><span class='voters-toggle' style='cursor:pointer; display:inline-block; transition:transform 0.1s ease;'>Functions</span><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Tables</span><span class='sort-option' data-action='weeklyStats'>Week</span><span class='sort-option' data-action='yearlyStats'>Year</span><span class='picker-category'>Graphs</span><span class='sort-option' data-action='dotPlot'>Spread</span><span class='sort-option' data-action='heatmap'>Heatmap</span><span class='picker-category'>Actions</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Deltas</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='sort-option' data-action='settings'>Settings</span><span class='sort-option settings-only' data-action='settingsBack'>&larr; Back</span><span class='picker-category settings-only'>Settings</span><span class='sort-option settings-only' data-action='darkMode'>Dark Mode</span><span class='sort-option settings-only' data-action='weekArrows'>Week Arrows OFF</span><span class='picker-category settings-only'>Other</span><span class='sort-option settings-only' data-action='savePng'>Save as PNG</span><span class='sort-option settings-only' data-action='legend'>Legend</span></span></th><th><span class='rank-header-num'>1</span></th><th><span class='rank-header-num'>2</span></th><th><span class='rank-header-num'>3</span></th><th><span class='rank-header-num'>4</span></th><th><span class='rank-header-num'>5</span></th><th><span class='rank-header-num'>6</span></th><th><span class='rank-header-num'>7</span></th><th><span class='rank-header-num'>8</span></th><th><span class='rank-header-num'>9</span></th><th><span class='rank-header-num'>10</span></th><th><span class='rank-header-num'>11</span></th><th><span class='rank-header-num'>12</span></th><th><span class='rank-header-num'>13</span></th><th><span class='rank-header-num'>14</span></th><th><span class='rank-header-num'>15</span></th><th><span class='rank-header-num'>16</span></th><th><span class='rank-header-num'>17</span></th><th><span class='rank-header-num'>18</span></th><th><span class='rank-header-num'>19</span></th><th><span class='rank-header-num'>20</span></th><th><span class='rank-header-num'>21</span></th><th><span class='rank-header-num'>22</span></th><th><span class='rank-header-num'>23</span></th><th><span class='rank-header-num'>24</span></th><th><span class='rank-header-num'>25</span></th></tr></thead>
 <tbody><tr class="voter-row"><td><div class="voter-cell" ><span class="voter-name">AP Overall</span></div></td><td class="logo-cell"><img class="logo team-logo" data-team="Florida" data-src="Florida"></td><td class="logo-cell"><img class="logo team-logo" data-team="Duke" data-src="Duke"></td><td class="logo-cell"><img class="logo team-logo" data-team="Illinois" data-src="Illinois"></td><td class="logo-cell"><img class="logo team-logo" data-team="UConn" data-src="UConn"></td><td class="logo-cell"><img class="logo team-logo" data-team="Arizona" data-src="Arizona"></td><td class="logo-cell"><img class="logo team-logo" data-team="MichiganState" data-src="MichiganState"></td><td class="logo-cell"><img class="logo team-logo" data-team="Texas" data-src="Texas"></td><td class="logo-cell"><img class="logo team-logo" data-team="Tennessee" data-src="Tennessee"></td><td class="logo-cell"><img class="logo team-logo" data-team="Virginia" data-src="Virginia"></td><td class="logo-cell"><img class="logo team-logo" data-team="Houston" data-src="Houston"></td><td class="logo-cell"><img class="logo team-logo" data-team="Louisville" data-src="Louisville"></td><td class="logo-cell"><img class="logo team-logo" data-team="Arkansas" data-src="Arkansas"></td><td class="logo-cell"><img class="logo team-logo" data-team="StJohns" data-src="StJohns"></td><td class="logo-cell"><img class="logo team-logo" data-team="MiamiFL" data-src="MiamiFL"></td><td class="logo-cell"><img class="logo team-logo" data-team="Gonzaga" data-src="Gonzaga"></td><td class="logo-cell"><img class="logo team-logo" data-team="Michigan" data-src="Michigan"></td><td class="logo-cell"><img class="logo team-logo" data-team="Kansas" data-src="Kansas"></td><td class="logo-cell"><img class="logo team-logo" data-team="IowaState" data-src="IowaState"></td><td class="logo-cell"><img class="logo team-logo" data-team="TexasTech" data-src="TexasTech"></td><td class="logo-cell"><img class="logo team-logo" data-team="Alabama" data-src="Alabama"></td><td class="logo-cell"><img class="logo team-logo" data-team="USC" data-src="USC"></td><td class="logo-cell"><img class="logo team-logo" data-team="UCLA" data-src="UCLA"></td><td class="logo-cell"><img class="logo team-logo" data-team="Kentucky" data-src="Kentucky"></td><td class="logo-cell"><img class="logo team-logo" data-team="Vanderbilt" data-src="Vanderbilt"></td><td class="logo-cell"><img class="logo team-logo" data-team="BYU" data-src="BYU"></td></tr>
 </tbody>
 </table></div></div>
@@ -1560,9 +1479,20 @@ function svgColors() {
     };
 }
 
+// Settings items live inside every Functions picker (shown in .settings-mode).
+// Labels describe the current state, so refresh them whenever it changes and
+// whenever a picker opens (fragments loaded later carry the default labels).
+function refreshSettingsLabels(root = document) {
+    root.querySelectorAll('.sort-option[data-action="darkMode"]').forEach(o => {
+        o.textContent = isDarkMode() ? 'Light Mode' : 'Dark Mode';
+    });
+    const arrowsOn = document.body.classList.contains('show-week-arrows');
+    root.querySelectorAll('.sort-option[data-action="weekArrows"]').forEach(o => {
+        o.textContent = arrowsOn ? 'Week Arrows ON' : 'Week Arrows OFF';
+    });
+}
 function updateDarkModeLabel() {
-    const toggle = document.getElementById('settings-dark-toggle');
-    if (toggle) toggle.checked = isDarkMode();
+    refreshSettingsLabels();
 }
 
 function logoSrc(team) {
@@ -2217,11 +2147,15 @@ function bindVotersToggle() {
                 const rect = toggle.getBoundingClientRect();
                 const tableLeft = (toggle.closest("table") || toggle).getBoundingClientRect().left;
                 picker.style.top = rect.top + "px";
+                const th = toggle.closest("th");
+                picker._thOffsetY = th ? rect.top - th.getBoundingClientRect().top : 0;
                 picker.style.left = tableLeft + "px";
                 // Match toggle font exactly
                 const ts = getComputedStyle(toggle);
                 picker.style.font = ts.font;
                 toggle.style.display = "none";
+                picker.classList.remove("settings-mode");
+                refreshSettingsLabels(picker);
                 picker.classList.add("open");
                 hideRankHeaders(block);
             } else {
@@ -2241,6 +2175,22 @@ document.addEventListener("mousedown", e => {
     const sort = opt.dataset.sort;
     const action = opt.dataset.action;
     const picker = opt.closest(".sort-picker");
+    // Settings swap the picker's contents in place and keep it open. The row
+    // reflows under the cursor, so swallow the click that follows this
+    // mousedown — otherwise it can land outside the picker and close it.
+    const inPlace = ["settings", "settingsBack", "darkMode", "weekArrows"].includes(action);
+    if (inPlace) {
+        const swallow = ev => ev.stopPropagation();
+        window.addEventListener("click", swallow, { capture: true, once: true });
+        setTimeout(() => window.removeEventListener("click", swallow, true), 1000);
+    }
+    if (action === "settings" || action === "settingsBack") {
+        picker.classList.toggle("settings-mode", action === "settings");
+        refreshSettingsLabels(picker);
+        return;
+    }
+    if (action === "darkMode") { toggleDarkMode(); return; }
+    if (action === "weekArrows") { setWeekArrowsVisible(!_showWeekArrows); return; }
     // Show the toggle again
     if (picker._toggle) picker._toggle.style.display = "";
     picker.classList.remove("open");
@@ -2287,9 +2237,8 @@ function handlePickerAction(action) {
         case "toggleOutliers":
             toggleOutliers();
             break;
-        case "settings":
-            updateDarkModeLabel();
-            document.getElementById("settings-modal").classList.add("open");
+        case "savePng":
+            saveTableAsPng();
             break;
         case "legend":
             document.getElementById("keybind-legend-modal").classList.toggle("open");
@@ -4663,12 +4612,15 @@ window.addEventListener("resize", () => {
     _pickerResizeRaf = requestAnimationFrame(refitOpenPickers);
 });
 
-// Close sort pickers on scroll
+// Keep open sort pickers pinned to their header cell while scrolling. The
+// picker is position:fixed on <body> and its toggle is hidden, so track the
+// toggle's <th> (sticky) using the offset recorded when it opened.
 document.addEventListener("scroll", () => {
     document.querySelectorAll(".sort-picker.open").forEach(p => {
-        p.classList.remove("open");
-        if (p._toggle) p._toggle.style.display = "";
-        showRankHeaders(p._sourceBlock || p.closest(".week-block"));
+        const th = p._toggle && p._toggle.closest("th");
+        if (!th) return;
+        p.style.top = (th.getBoundingClientRect().top + (p._thOffsetY || 0)) + "px";
+        p.style.left = (th.closest("table") || th).getBoundingClientRect().left + "px";
     });
 }, { passive: true });
 
@@ -5672,19 +5624,12 @@ function computeVoterAvg(yearTabs, lbData) {
     return voterAvg;
 }
 
-["keybind-legend-modal", "settings-modal", "avg-rank-modal", "season-stats-modal", "heatmap-modal"].forEach(id => {
+["keybind-legend-modal", "avg-rank-modal", "season-stats-modal", "heatmap-modal"].forEach(id => {
     document.getElementById(id).addEventListener("click", e => {
         if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
     });
 });
 
-document.getElementById("settings-dark-toggle").addEventListener("change", e => {
-    if (e.target.checked !== isDarkMode()) toggleDarkMode();
-});
-document.getElementById("settings-save-png").addEventListener("click", () => {
-    document.getElementById("settings-modal").classList.remove("open");
-    saveTableAsPng();
-});
 
 (function() {
     let _resizeTimer;
@@ -5763,14 +5708,10 @@ try { _showWeekArrows = localStorage.getItem("showWeekArrows") === "1"; } catch 
 function setWeekArrowsVisible(on) {
     _showWeekArrows = on;
     document.body.classList.toggle("show-week-arrows", on);
-    const t = document.getElementById("settings-week-arrows-toggle");
-    if (t) t.checked = on;
+    refreshSettingsLabels();
     try { localStorage.setItem("showWeekArrows", on ? "1" : "0"); } catch (e) {}
 }
 setWeekArrowsVisible(_showWeekArrows);
-document.getElementById("settings-week-arrows-toggle").addEventListener("change", e => {
-    setWeekArrowsVisible(e.target.checked);
-});
 document.getElementById("week-arrow-prev").addEventListener("click", () => navigateWeek(-1));
 document.getElementById("week-arrow-next").addEventListener("click", () => navigateWeek(1));
 
@@ -5778,7 +5719,6 @@ document.addEventListener("keydown", e => {
     if (e.key === "Escape") {
         document.getElementById("voter-history-modal").classList.remove("open");
         document.getElementById("keybind-legend-modal").classList.remove("open");
-        document.getElementById("settings-modal").classList.remove("open");
         document.getElementById("avg-rank-modal").classList.remove("open");
         document.getElementById("season-stats-modal").classList.remove("open");
         document.getElementById("precision-modal").classList.remove("open");

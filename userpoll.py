@@ -1246,6 +1246,13 @@ THEAD_HTML = (
     f"<span class='sort-option' data-action='expandDeltas'>Deltas</span>"
     f"<span class='sort-option' data-action='toggleOutliers'>Outliers</span>"
     f"<span class='sort-option' data-action='settings'>Settings</span>"
+    f"<span class='sort-option settings-only' data-action='settingsBack'>&larr; Back</span>"
+    f"<span class='picker-category settings-only'>Settings</span>"
+    f"<span class='sort-option settings-only' data-action='darkMode'>Dark Mode</span>"
+    f"<span class='sort-option settings-only' data-action='weekArrows'>Week Arrows OFF</span>"
+    f"<span class='picker-category settings-only'>Other</span>"
+    f"<span class='sort-option settings-only' data-action='savePng'>Save as PNG</span>"
+    f"<span class='sort-option settings-only' data-action='legend'>Legend</span>"
     f"</span></th>"
     f"{RANK_HEADERS}</tr></thead>"
 )
@@ -1513,33 +1520,9 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>G</kbd></span><span>Week rank spread chart</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>U</kbd></span><span>Season statistics</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>H</kbd></span><span>Season rank heatmap</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>P</kbd></span><span>Save table as PNG</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>P</kbd></span><span>Save as PNG</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>?</kbd></span><span>Show legend</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Esc</kbd></span><span>Close</span></div>
-    </div>
-  </div>
-</div>
-
-<div id="settings-modal">
-  <div id="settings-box">
-    <h2>Settings</h2>
-    <div class="keybind-section">
-      <div class="keybind-section-title">Display</div>
-      <label class="settings-row" for="settings-dark-toggle">
-        <span>Dark Mode</span>
-        <input type="checkbox" id="settings-dark-toggle" class="settings-switch">
-      </label>
-      <label class="settings-row" for="settings-week-arrows-toggle">
-        <span>Week Arrows</span>
-        <input type="checkbox" id="settings-week-arrows-toggle" class="settings-switch">
-      </label>
-    </div>
-    <div class="keybind-section">
-      <div class="keybind-section-title">Actions</div>
-      <div class="settings-row">
-        <span>Save table as PNG <kbd>Shift</kbd><kbd>P</kbd></span>
-        <button type="button" id="settings-save-png" class="settings-btn">Capture</button>
-      </div>
     </div>
   </div>
 </div>

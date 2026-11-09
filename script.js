@@ -36,9 +36,20 @@ function svgColors() {
     };
 }
 
+// Settings items live inside every Functions picker (shown in .settings-mode).
+// Labels describe the current state, so refresh them whenever it changes and
+// whenever a picker opens (fragments loaded later carry the default labels).
+function refreshSettingsLabels(root = document) {
+    root.querySelectorAll('.sort-option[data-action="darkMode"]').forEach(o => {
+        o.textContent = isDarkMode() ? 'Light Mode' : 'Dark Mode';
+    });
+    const arrowsOn = document.body.classList.contains('show-week-arrows');
+    root.querySelectorAll('.sort-option[data-action="weekArrows"]').forEach(o => {
+        o.textContent = arrowsOn ? 'Week Arrows ON' : 'Week Arrows OFF';
+    });
+}
 function updateDarkModeLabel() {
-    const toggle = document.getElementById('settings-dark-toggle');
-    if (toggle) toggle.checked = isDarkMode();
+    refreshSettingsLabels();
 }
 
 function logoSrc(team) {
@@ -693,11 +704,15 @@ function bindVotersToggle() {
                 const rect = toggle.getBoundingClientRect();
                 const tableLeft = (toggle.closest("table") || toggle).getBoundingClientRect().left;
                 picker.style.top = rect.top + "px";
+                const th = toggle.closest("th");
+                picker._thOffsetY = th ? rect.top - th.getBoundingClientRect().top : 0;
                 picker.style.left = tableLeft + "px";
                 // Match toggle font exactly
                 const ts = getComputedStyle(toggle);
                 picker.style.font = ts.font;
                 toggle.style.display = "none";
+                picker.classList.remove("settings-mode");
+                refreshSettingsLabels(picker);
                 picker.classList.add("open");
                 hideRankHeaders(block);
             } else {
@@ -717,6 +732,22 @@ document.addEventListener("mousedown", e => {
     const sort = opt.dataset.sort;
     const action = opt.dataset.action;
     const picker = opt.closest(".sort-picker");
+    // Settings swap the picker's contents in place and keep it open. The row
+    // reflows under the cursor, so swallow the click that follows this
+    // mousedown — otherwise it can land outside the picker and close it.
+    const inPlace = ["settings", "settingsBack", "darkMode", "weekArrows"].includes(action);
+    if (inPlace) {
+        const swallow = ev => ev.stopPropagation();
+        window.addEventListener("click", swallow, { capture: true, once: true });
+        setTimeout(() => window.removeEventListener("click", swallow, true), 1000);
+    }
+    if (action === "settings" || action === "settingsBack") {
+        picker.classList.toggle("settings-mode", action === "settings");
+        refreshSettingsLabels(picker);
+        return;
+    }
+    if (action === "darkMode") { toggleDarkMode(); return; }
+    if (action === "weekArrows") { setWeekArrowsVisible(!_showWeekArrows); return; }
     // Show the toggle again
     if (picker._toggle) picker._toggle.style.display = "";
     picker.classList.remove("open");
@@ -763,9 +794,8 @@ function handlePickerAction(action) {
         case "toggleOutliers":
             toggleOutliers();
             break;
-        case "settings":
-            updateDarkModeLabel();
-            document.getElementById("settings-modal").classList.add("open");
+        case "savePng":
+            saveTableAsPng();
             break;
         case "legend":
             document.getElementById("keybind-legend-modal").classList.toggle("open");
@@ -3139,12 +3169,15 @@ window.addEventListener("resize", () => {
     _pickerResizeRaf = requestAnimationFrame(refitOpenPickers);
 });
 
-// Close sort pickers on scroll
+// Keep open sort pickers pinned to their header cell while scrolling. The
+// picker is position:fixed on <body> and its toggle is hidden, so track the
+// toggle's <th> (sticky) using the offset recorded when it opened.
 document.addEventListener("scroll", () => {
     document.querySelectorAll(".sort-picker.open").forEach(p => {
-        p.classList.remove("open");
-        if (p._toggle) p._toggle.style.display = "";
-        showRankHeaders(p._sourceBlock || p.closest(".week-block"));
+        const th = p._toggle && p._toggle.closest("th");
+        if (!th) return;
+        p.style.top = (th.getBoundingClientRect().top + (p._thOffsetY || 0)) + "px";
+        p.style.left = (th.closest("table") || th).getBoundingClientRect().left + "px";
     });
 }, { passive: true });
 
@@ -4148,19 +4181,12 @@ function computeVoterAvg(yearTabs, lbData) {
     return voterAvg;
 }
 
-["keybind-legend-modal", "settings-modal", "avg-rank-modal", "season-stats-modal", "heatmap-modal"].forEach(id => {
+["keybind-legend-modal", "avg-rank-modal", "season-stats-modal", "heatmap-modal"].forEach(id => {
     document.getElementById(id).addEventListener("click", e => {
         if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
     });
 });
 
-document.getElementById("settings-dark-toggle").addEventListener("change", e => {
-    if (e.target.checked !== isDarkMode()) toggleDarkMode();
-});
-document.getElementById("settings-save-png").addEventListener("click", () => {
-    document.getElementById("settings-modal").classList.remove("open");
-    saveTableAsPng();
-});
 
 (function() {
     let _resizeTimer;
@@ -4239,14 +4265,10 @@ try { _showWeekArrows = localStorage.getItem("showWeekArrows") === "1"; } catch 
 function setWeekArrowsVisible(on) {
     _showWeekArrows = on;
     document.body.classList.toggle("show-week-arrows", on);
-    const t = document.getElementById("settings-week-arrows-toggle");
-    if (t) t.checked = on;
+    refreshSettingsLabels();
     try { localStorage.setItem("showWeekArrows", on ? "1" : "0"); } catch (e) {}
 }
 setWeekArrowsVisible(_showWeekArrows);
-document.getElementById("settings-week-arrows-toggle").addEventListener("change", e => {
-    setWeekArrowsVisible(e.target.checked);
-});
 document.getElementById("week-arrow-prev").addEventListener("click", () => navigateWeek(-1));
 document.getElementById("week-arrow-next").addEventListener("click", () => navigateWeek(1));
 
@@ -4254,7 +4276,6 @@ document.addEventListener("keydown", e => {
     if (e.key === "Escape") {
         document.getElementById("voter-history-modal").classList.remove("open");
         document.getElementById("keybind-legend-modal").classList.remove("open");
-        document.getElementById("settings-modal").classList.remove("open");
         document.getElementById("avg-rank-modal").classList.remove("open");
         document.getElementById("season-stats-modal").classList.remove("open");
         document.getElementById("precision-modal").classList.remove("open");
