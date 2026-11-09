@@ -1156,7 +1156,7 @@ function renderVoterHistoryTable(mergedData, yearTabs, container) {
 
         const weekTd = document.createElement("td");
         weekTd.className = "week-label";
-        weekTd.textContent = tab.dataset.weeklabel || ("Week " + tab.dataset.weeknum);
+        weekTd.textContent = weekTextLabel(tab) || ("Week " + displayWeekNum(tab));
         weekTd.style.cssText = "white-space:nowrap; padding-right:16px; width:1px; min-width:0;";
         tr.appendChild(weekTd);
 
@@ -1461,7 +1461,8 @@ function showTeamSeasonDotPlot(team, mode = "dots") {
         }
         return {
             weekNum: parseInt(tab.dataset.weeknum),
-            weekLabel: tab.dataset.weeklabel,
+            weekLabel: weekTextLabel(tab),
+            displayNum: displayWeekNum(tab),
             rankVoters,
             totalBallots,
         };
@@ -1634,9 +1635,8 @@ function showTeamSeasonDotPlot(team, mode = "dots") {
         lbl.setAttribute("text-anchor", "middle");
         lbl.setAttribute("font-size", "9");
         lbl.setAttribute("fill", axisColor);
-        lbl.textContent = wl.toLowerCase().includes("pre") ? "Pre"
-            : wl.toLowerCase().includes("final") ? "Fin"
-            : String(w.weekNum);
+        lbl.textContent = wl.toLowerCase().includes("final") ? "Fin"
+            : String(w.displayNum);
         svg.appendChild(lbl);
     });
 
@@ -1843,9 +1843,9 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
     const titleTab = (_apCurrentYear !== null
         ? document.querySelector(`.week-tab[data-poll="ap"][data-year="${_apCurrentYear}"][data-weeknum="${_apCurrentWeekNum}"]`)
         : null) || document.querySelector(".week-tab.active");
-    const weekNum = titleTab?.dataset.weeknum || "";
+    const weekNum = titleTab ? displayWeekNum(titleTab) : "";
     const year = titleTab?.dataset.year || "";
-    const weekLabel = titleTab?.dataset.weeklabel;
+    const weekLabel = weekTextLabel(titleTab);
     const weekLabelText = weekLabel
         ? `${year} ${weekLabel}`
         : `${year} Week ${String(weekNum).padStart(2, "0")}`;
@@ -2245,7 +2245,7 @@ function rebuildYearPicker() {
                 try { await loadYear(y); } catch { return; }
                 const activeTab = document.querySelector(".week-tab.active");
                 const currentWeekNum = activeTab ? parseInt(activeTab.dataset.weeknum) : null;
-                const sameWeek = currentWeekNum ? byYear[y].find(t => parseInt(t.dataset.weeknum) === currentWeekNum) : null;
+                const sameWeek = currentWeekNum !== null ? byYear[y].find(t => parseInt(t.dataset.weeknum) === currentWeekNum) : null;
                 const target = sameWeek || byYear[y][byYear[y].length - 1];
                 showWeek(target.dataset.week);
                 backgroundLoad();
@@ -2265,13 +2265,24 @@ function rebuildYearPicker() {
     });
 }
 
+// Pre-Season ballots are stored as week 0 (older seasons have no label, newer ones
+// are labelled "Pre-Season"); everywhere in the UI they are shown as Week 1.
+function isPreseasonTab(tab) {
+    return !!tab && (parseInt(tab.dataset.weeknum) === 0 || /pre/i.test(tab.dataset.weeklabel || ""));
+}
+
+// Text label for a week, or undefined when it should be shown by number. Pre-Season → undefined (shown as 1).
+function weekTextLabel(tab) {
+    return isPreseasonTab(tab) ? undefined : tab?.dataset.weeklabel;
+}
+
 // Number shown for a week in the picker/header. Pre-Season (stored as week 0) shows
 // as 1; Final (stored as week 20) shows as one past the season's last regular week,
 // so the numbers run in order (e.g. 02 … 18 19 for an 18-week season).
 function displayWeekNum(tab) {
     const label = (tab.dataset.weeklabel || "").toLowerCase();
     const wn = parseInt(tab.dataset.weeknum);
-    if (label.includes("pre")) return 1;
+    if (isPreseasonTab(tab)) return 1;
     if (label.includes("final")) {
         const pollSel = tab.dataset.poll === "ap" ? '[data-poll="ap"]' : ':not([data-poll="ap"])';
         const regular = Array.from(document.querySelectorAll(`.week-tab[data-year="${tab.dataset.year}"]${pollSel}`))
@@ -2320,7 +2331,6 @@ function rebuildWeekPicker() {
         const activeTab = document.querySelector(".week-tab.active");
         const tabs = Array.from(document.querySelectorAll(`.week-tab[data-year="${currentYear}"]`))
             .filter(t => t.dataset.poll !== "ap")
-            .filter(t => parseInt(t.dataset.weeknum) !== 0)
             .sort((a, b) => parseInt(a.dataset.weeknum) - parseInt(b.dataset.weeknum));
         tabs.forEach(t => {
             const btn = document.createElement("button");
@@ -2880,9 +2890,9 @@ function showAvgRankModal(weekId) {
     };
 
     const titleTab = allTabsSorted[currTabIdx] || document.querySelector(".week-tab.active");
-    const weekNum = titleTab?.dataset.weeknum || "";
+    const weekNum = titleTab ? displayWeekNum(titleTab) : "";
     const year = titleTab?.dataset.year || "";
-    const weekLabel = titleTab?.dataset.weeklabel;
+    const weekLabel = weekTextLabel(titleTab);
 
     const modal = document.getElementById("avg-rank-modal");
     const title = document.getElementById("avg-rank-title");
@@ -3306,7 +3316,7 @@ function saveTableAsPng() {
     if (!table) return;
     html2canvas(table, { useCORS: true, scale: 2 }).then(canvas => {
         const link = document.createElement("a");
-        const week = tab ? (tab.dataset.weeklabel || tab.dataset.weeknum) : _apCurrentWeekNum;
+        const week = tab ? (weekTextLabel(tab) || padWeekNum(displayWeekNum(tab))) : _apCurrentWeekNum;
         const year = tab ? tab.dataset.year : _apCurrentYear;
         const toggleText = document.getElementById("toggle-text").innerText;
         const isAp = inApMode || (typeof IS_AP_PAGE !== "undefined" && IS_AP_PAGE);
@@ -4255,14 +4265,9 @@ function navigateWeek(dir) {
             }).catch(() => {});
         }
     } else {
-        const sortedAll = getSortedTabs().filter(t => parseInt(t.dataset.weeknum) !== 0
-            && ((typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE) || !HIDDEN_YEARS.has(t.dataset.year))).slice().reverse();
-        let idx = sortedAll.findIndex(t => t.dataset.week === activeTab.dataset.week);
-        if (idx === -1 && currentWeekNum === 0) {
-            // Currently on pre-season; treat as just before week 1 of this year
-            const firstOfYear = sortedAll.findIndex(t => t.dataset.year === currentYear);
-            idx = firstOfYear - 1;
-        }
+        const sortedAll = getSortedTabs().filter(t =>
+            ((typeof IS_AP_PAGE !== 'undefined' && IS_AP_PAGE) || !HIDDEN_YEARS.has(t.dataset.year))).slice().reverse();
+        const idx = sortedAll.findIndex(t => t.dataset.week === activeTab.dataset.week);
         const target = dir > 0 ? sortedAll[idx + 1] : sortedAll[idx - 1];
         if (target) {
             loadYear(target.dataset.year).then(async () => {
@@ -4624,3 +4629,60 @@ if (allTabs.length > 0) {
     showWeek(allTabs[0].dataset.week);
     setTimeout(() => backgroundLoad(), 1000);
 }
+
+// ── "N/A" overlay for weeks with no ballots ────────────────────────────────
+// Shows a viewport-sized diagonal "N/A" whenever the visible ballot section (Official,
+// Provisional or aggregate; userpoll or AP) has no ballots. A MutationObserver on
+// style changes catches every path that shows or hides a week or section.
+const _noBallotsOverlay = (() => {
+    const el = document.createElement("div");
+    el.id = "no-ballots-overlay";
+    el.setAttribute("aria-hidden", "true");
+    el.innerHTML = "<span>N/A</span>";
+    document.body.appendChild(el);
+    return el;
+})();
+
+function sectionHasBallots(section) {
+    return !!section.querySelector("tbody tr.voter-row:not(.row-weighted-ranking):not(.overall-row) .team-logo");
+}
+
+function sizeNoBallotsOverlay() {
+    const span = _noBallotsOverlay.firstElementChild;
+    const w = window.innerWidth, h = window.innerHeight;
+    // Measure the text at 100px (layout size ignores transforms), then take the largest size
+    // whose rotated box (width × cap height) still fits inside the viewport.
+    span.style.transform = "none";
+    span.style.fontSize = "100px";
+    const r = span.offsetWidth / 100;          // text width per px of font-size
+    const c = 0.72;                            // cap height per px of font-size (bold sans)
+    const t = Math.atan2(h, w), cos = Math.cos(t), sin = Math.sin(t);
+    const fs = 0.96 * Math.min(w / (r * cos + c * sin), h / (r * sin + c * cos));
+    span.style.fontSize = fs + "px";
+    span.style.transform = `rotate(${-t}rad)`;
+}
+
+let _noBallotsRaf = null;
+function updateNoBallotsOverlay() {
+    _noBallotsRaf = null;
+    const visible = Array.from(document.querySelectorAll(".week-block .ballot-section"))
+        .filter(s => s.offsetParent !== null);
+    const empty = visible.length > 0 && visible.every(s => !sectionHasBallots(s));
+    const wasVisible = _noBallotsOverlay.classList.contains("visible");
+    _noBallotsOverlay.classList.toggle("visible", empty);
+    if (empty && !wasVisible) sizeNoBallotsOverlay();
+}
+
+function scheduleNoBallotsUpdate() {
+    if (_noBallotsRaf === null) _noBallotsRaf = requestAnimationFrame(updateNoBallotsOverlay);
+}
+
+new MutationObserver(muts => {
+    if (muts.some(m => m.target.classList && (m.target.classList.contains("ballot-section")
+            || m.target.classList.contains("week-block")))) scheduleNoBallotsUpdate();
+}).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["style"] });
+
+window.addEventListener("resize", () => {
+    if (_noBallotsOverlay.classList.contains("visible")) sizeNoBallotsOverlay();
+});
+scheduleNoBallotsUpdate();

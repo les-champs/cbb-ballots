@@ -5,6 +5,7 @@ import time
 import html as html_mod
 import argparse
 import urllib.request
+import datetime
 from io import BytesIO
 from urllib.parse import unquote
 from PIL import Image
@@ -324,6 +325,31 @@ def download_logos(logos):
         except Exception as e:
             print(f"✗ Failed to download {logo}: {e}")
 
+def ballot_created_at(ballot_url):
+    """cbbpoll.net ballot IDs are MongoDB ObjectIds; the first 8 hex chars are the creation time."""
+    m = re.search(r'/([0-9a-f]{24})/?$', ballot_url or "")
+    if not m:
+        return None
+    return datetime.datetime.fromtimestamp(int(m.group(1)[:8], 16), datetime.timezone.utc)
+
+def season_start(year):
+    """Earliest valid ballot date for season YEAR (the YEAR-1 to YEAR season starts in the fall of YEAR-1)."""
+    return datetime.datetime(year - 1, 7, 1, tzinfo=datetime.timezone.utc)
+
+def is_stale_ballot(ballot_url, year):
+    created = ballot_created_at(ballot_url)
+    return created is not None and year is not None and created < season_start(year)
+
+def drop_stale_ballots(voters, year, label):
+    """Drop voters whose listed ballot was created before season YEAR began (leftovers from past seasons)."""
+    kept, dropped = [], []
+    for v in voters:
+        (dropped if is_stale_ballot(v[2], year) else kept).append(v)
+    if dropped:
+        names = ", ".join(f"{v[1]} ({ballot_created_at(v[2]).date()})" for v in dropped)
+        print(f"Dropped {len(dropped)} {label} ballot(s) created before {season_start(year).date()}: {names}")
+    return kept
+
 def process_voters(voters, label, week=None, year=None, ballot_map=None):
     if DEBUG_LIMIT is not None:
         voters = voters[:DEBUG_LIMIT]
@@ -343,6 +369,9 @@ def process_voters(voters, label, week=None, year=None, ballot_map=None):
                 else:
                     print(f"    → no ballot found for week {week}")
             time.sleep(0.3)
+            if ballot_url and is_stale_ballot(ballot_url, year):
+                print(f"    → ballot is from {ballot_created_at(ballot_url).date()}, before this season; skipping")
+                ballot_url = None
         if ballot_url:
             ballot_logos = fetch_ballot_logos(ballot_url)
             new_logos = [l for l in ballot_logos if not os.path.exists(os.path.join(OUTPUT_DIR, l))]
@@ -2331,6 +2360,8 @@ def main():
                         help="Override the week number used for HTML storage/label (e.g. 0 for pre-season)")
     parser.add_argument("--label", type=str, help="Custom display label for the week tab (e.g. 'Pre-Season')")
     parser.add_argument("--year", type=int, help="Poll year (e.g. 2026)")
+    parser.add_argument("--official-only", action="store_true", dest="official_only",
+                        help="Scrape only the Official section; store no provisional ballots for this week")
     parser.add_argument("--rebuild", action="store_true", help="Rebuild HTML from existing data without scraping")
     parser.add_argument("--to-webp", action="store_true", help="Convert all existing PNG logos to WebP and exit")
     parser.add_argument("--dark-logos", action="store_true", help="Download ESPN dark-mode logos for all teams")
@@ -2475,6 +2506,17 @@ def main():
     official_section, provisional_section = split_voter_sections(html)
     official_voters = extract_voters_from_section(official_section)
     provisional_voters = extract_voters_from_section(provisional_section)
+    # cbbpoll.net sometimes lists a voter under both headings; the official listing wins.
+    official_names = {v[1].lower() for v in official_voters}
+    dupes = [v[1] for v in provisional_voters if v[1].lower() in official_names]
+    if dupes:
+        provisional_voters = [v for v in provisional_voters if v[1].lower() not in official_names]
+        print(f"Dropped {len(dupes)} provisional duplicate(s) also listed as official: {', '.join(dupes)}")
+    official_voters = drop_stale_ballots(official_voters, year, "official")
+    provisional_voters = drop_stale_ballots(provisional_voters, year, "provisional")
+    if args.official_only:
+        print(f"--official-only: ignoring {len(provisional_voters)} provisional voter(s).")
+        provisional_voters = []
     print(f"Found {len(official_voters)} official and {len(provisional_voters)} provisional voters.\n")
 
     print("Fetching official ballots...")
@@ -2492,7 +2534,7 @@ def main():
             provisional_with_ballots = [v for v in all_voters if v[1] not in official_panel]
             print(f"\nReclassified week 0 using weeks 2/3 panel: {len(official_with_ballots)} official + {len(provisional_with_ballots)} provisional")
         else:
-            print("\nNo weeks 2/3 data found — keeping pre-season voters as provisional")
+            print("\nNo weeks 2/3 data found — keeping pre-season sections as scraped")
 
     week_block = build_week_block(store_week, year, official_with_ballots, provisional_with_ballots)
     save_html(store_week, year, week_block, HTML_PATH, week_label=args.label)

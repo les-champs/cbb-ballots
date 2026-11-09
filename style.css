@@ -1177,3 +1177,34 @@ body.dark .pin-btn.pinned {
     fill-opacity: 0.25;
     stroke-width: 2;
 }
+
+/* Giant diagonal "N/A" across the viewport when the visible ballot section has no ballots
+   (e.g. a week with no provisional ballots). Toggled by updateNoBallotsOverlay() in script.js.
+   Sits above the table but under the header and modals, and never blocks clicks. */
+#no-ballots-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    overflow: hidden;
+    align-items: center;
+    justify-content: center;
+}
+
+#no-ballots-overlay.visible {
+    display: flex;
+}
+
+#no-ballots-overlay span {
+    font-family: sans-serif;
+    font-weight: bold;
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--color-heading);
+    user-select: none;
+}
+
+.header {
+    z-index: 6;
+}
