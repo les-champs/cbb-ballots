@@ -37,7 +37,7 @@ function svgColors() {
 }
 
 // Settings items live inside every Functions picker (shown in .settings-mode).
-// Labels describe the current state, so refresh them whenever it changes and
+// Labels name what clicking does (e.g. "Nav Arrows ON" turns them on), so refresh them whenever it changes and
 // whenever a picker opens (fragments loaded later carry the default labels).
 function refreshSettingsLabels(root = document) {
     root.querySelectorAll('.sort-option[data-action="darkMode"]').forEach(o => {
@@ -45,7 +45,7 @@ function refreshSettingsLabels(root = document) {
     });
     const arrowsOn = document.body.classList.contains('show-week-arrows');
     root.querySelectorAll('.sort-option[data-action="weekArrows"]').forEach(o => {
-        o.textContent = arrowsOn ? 'Week Arrows ON' : 'Week Arrows OFF';
+        o.textContent = arrowsOn ? 'Nav Arrows OFF' : 'Nav Arrows ON';
     });
 }
 function updateDarkModeLabel() {
@@ -735,14 +735,14 @@ document.addEventListener("mousedown", e => {
     // Settings swap the picker's contents in place and keep it open. The row
     // reflows under the cursor, so swallow the click that follows this
     // mousedown — otherwise it can land outside the picker and close it.
-    const inPlace = ["settings", "settingsBack", "darkMode", "weekArrows"].includes(action);
+    const inPlace = ["settings", "darkMode", "weekArrows"].includes(action);
     if (inPlace) {
         const swallow = ev => ev.stopPropagation();
         window.addEventListener("click", swallow, { capture: true, once: true });
         setTimeout(() => window.removeEventListener("click", swallow, true), 1000);
     }
-    if (action === "settings" || action === "settingsBack") {
-        picker.classList.toggle("settings-mode", action === "settings");
+    if (action === "settings") {
+        picker.classList.add("settings-mode");
         refreshSettingsLabels(picker);
         return;
     }
@@ -782,6 +782,11 @@ function handlePickerAction(action) {
         case "heatmap":
             showHeatmapModal();
             break;
+        case "results": {
+            const isAp = _apCurrentYear !== null || (typeof IS_AP_PAGE !== "undefined" && IS_AP_PAGE);
+            showVoterHistory(isAp ? "AP Overall" : "Official Overall");
+            break;
+        }
         case "precisionLeaderboard":
             showPrecisionModal();
             break;

@@ -547,6 +547,16 @@ thead th:first-child {
     white-space: nowrap;
 }
 
+/* While any modal is open, lock the page behind it so scrolling only moves the
+   modal's own content; overscroll-behavior stops a scroll that reaches the end
+   of the modal's content from chaining through to the page. */
+body:has([id$="-modal"].open) {
+    overflow: hidden;
+}
+[id$="-modal"], [id$="-modal"] * {
+    overscroll-behavior: contain;
+}
+
 #voter-history-modal, #keybind-legend-modal {
     display: none;
     position: fixed;
