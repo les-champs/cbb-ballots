@@ -697,8 +697,10 @@ kbd {
 #avg-rank-table tr.rv-divider td { padding: 6px 0 2px; color: var(--color-divider-text); font-size: 11px; text-align: left; border-bottom: none; }
 #avg-rank-table th:nth-child(5), #avg-rank-table td:nth-child(5),
 #avg-rank-table th:nth-child(9), #avg-rank-table td:nth-child(9),
-#avg-rank-table th:nth-child(11), #avg-rank-table td:nth-child(11) { border-right: none; }
-#avg-rank-table th:nth-child(8), #avg-rank-table td:nth-child(8) { border-right: 1px solid var(--color-border-strong); }
+#avg-rank-table th:nth-child(11), #avg-rank-table td:nth-child(11),
+#avg-rank-table th:nth-child(12), #avg-rank-table td:nth-child(12) { border-right: none; }
+#avg-rank-table th:nth-child(8), #avg-rank-table td:nth-child(8),
+#avg-rank-table th:nth-child(10), #avg-rank-table td:nth-child(10) { border-right: 1px solid var(--color-border-strong); }
 
 #season-stats-modal {
     display: none;
@@ -2980,6 +2982,79 @@ function showTeamSeasonDotPlot(team, mode = "dots") {
 }
 
 
+// Outlook bands for `teams` in week `weekId` (official ballots only). Returns an array
+// sorted by this week's mean voter rank: { team, avg, hi, lo, innerHi, innerLo } where
+// hi/lo = outer (~75%) band and innerHi/innerLo = inner (~50%) band, or null if no history.
+// Used by the Outlook graph and the Week Statistics table. See notes in showWeekHighLowChart.
+function computeOutlookBands(weekId, teams) {
+    const percentileRank = (sortedArr, p) => {
+        if (sortedArr.length === 1) return sortedArr[0];
+        const idx = p * (sortedArr.length - 1);
+        const lo = Math.floor(idx);
+        const hi = Math.ceil(idx);
+        return sortedArr[lo] + (idx - lo) * (sortedArr[hi] - sortedArr[lo]);
+    };
+    const wDelta = buildDeltaData(true);
+    const wTab = document.querySelector(`.week-tab[data-week="${weekId}"]`);
+    const wYear = wTab?.dataset.year || "";
+    const isApWeek = weekId.startsWith("week-ap-");
+    const wAllTabs = isApWeek ? getSortedApTabs() : getSortedTabs();
+    const wYearTabs = wAllTabs.filter(t => t.dataset.year === wYear);
+    const wCurrIdx = wYearTabs.findIndex(t => t.dataset.week === weekId);
+    const wLast5 = [];
+    for (let i = wCurrIdx; i < wYearTabs.length && wLast5.length < 5; i++) {
+        wLast5.push(wYearTabs[i].dataset.week);
+    }
+    if (wLast5.length === 0) return null;
+    const wVoters = Object.keys(wDelta[weekId] || {}).filter(u => u !== "Official Overall");
+    const thisWeekRanks = team => wVoters.map(u => wDelta[weekId]?.[u]).filter(b => b?.length)
+        .map(b => { const p = b.indexOf(team); return p === -1 ? 26 : p + 1; })
+        .sort((a, b) => a - b);
+    const twAvg = {};
+    teams.forEach(t => {
+        const r = thisWeekRanks(t);
+        twAvg[t] = r.length ? r.reduce((a, b) => a + b, 0) / r.length : 26;
+    });
+    // Sorted by this week's avg so the graph's tier colors follow it.
+    const wTeams = [...teams].sort((a, b) => twAvg[a] - twAvg[b]);
+    // Each current voter's best and worst rank for a team across the last 5 weeks
+    // (unranked = 26; weeks the voter skipped are left out). Unweighted on purpose:
+    // the band is a ceiling/floor, so one big week counts in full.
+    const voterBestWorst = (u, team) => {
+        let best = null, worst = null;
+        wLast5.forEach(wid => {
+            const ballot = wDelta[wid]?.[u];
+            if (!ballot?.length) return;
+            const pos = ballot.indexOf(team);
+            const r = pos === -1 ? 26 : pos + 1;
+            if (best === null || r < best) best = r;
+            if (worst === null || r > worst) worst = r;
+        });
+        return best === null ? null : { best, worst };
+    };
+    // Floor cap: the outer floor may sit at most FLOOR_CAP spots below this week's 90th
+    // percentile ballot rank. Stops a rising team's old unranked weeks from forcing
+    // an NR floor once this week's voters clearly rank it.
+    const OUTER_PCT = 0.14, INNER_PCT = 0.12, FLOOR_CAP = 5;
+    const OUTER_MARGIN = [3.5, 3.0, 2.0, 1.5, 0][wLast5.length - 1];
+    return wTeams.map(team => {
+        const perVoter = wVoters.map(u => voterBestWorst(u, team)).filter(v => v !== null);
+        const bests = perVoter.map(v => v.best).sort((a, b) => a - b);
+        const worsts = perVoter.map(v => v.worst).sort((a, b) => a - b);
+        const thisWeek = thisWeekRanks(team);
+        const hi = Math.max(1, (bests.length > 0 ? percentileRank(bests, OUTER_PCT) : 26) - OUTER_MARGIN);
+        let lo = worsts.length > 0 ? percentileRank(worsts, 1 - OUTER_PCT) : 26;
+        if (thisWeek.length > 0) lo = Math.min(lo, percentileRank(thisWeek, 0.90) + FLOOR_CAP);
+        lo = Math.min(26, Math.max(lo + OUTER_MARGIN, hi));
+        let innerHi = hi, innerLo = lo;
+        if (thisWeek.length > 0) {
+            innerHi = Math.max(percentileRank(thisWeek, INNER_PCT), hi);
+            innerLo = Math.max(Math.min(percentileRank(thisWeek, 1 - INNER_PCT), lo), innerHi);
+        }
+        return { team, avg: twAvg[team], hi, lo, innerHi, innerLo };
+    });
+}
+
 function showWeekHighLowChart(weekId, mode = "highlow") {
     const block = document.getElementById(weekId);
     if (!block) return;
@@ -3040,71 +3115,22 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
         return { team, avg, hi, lo, allRanks, rankVoters };
     });
 
-    // 5 Week mode (official ballots only, never provisional):
-    //   circle = 5-week recency-weighted avg voter rank (compute5WeekWeighted, weights 5..1);
-    //   bar    = ceiling/floor: top = 22nd percentile of each current voter's best rank
-    //            over the last 5 weeks, bottom = 78th percentile of each voter's worst rank
-    //            (unranked = 26), floor capped at this week's 90th percentile + 5.
-    //            Backtested 2016-2026 (#1-20 teams): inside ~70% of the next 4 weeks, vs
-    //            ~35% for the old 10th-90th of 5-week averages, which averaged away the
-    //            week-to-week swings the bar is meant to contain. Window lengths 3-8 gave
-    //            near-identical width at equal coverage; 5 matches the circle.
+    // Outlook mode (internal key "weighted"; official ballots only, never provisional):
+    //   circle = this week's mean voter rank (unranked = 26). A 5-week weighted mean was
+    //            tried here and predicted the next 1-4 weeks worse (MAE 3.3/3.8 vs 2.5/3.3).
+    //   inner band (~50%): 12th-88th percentile of this week's ballot ranks.
+    //   outer band (~75%): ceiling = 14th percentile of each current voter's best rank over
+    //            the last 5 polls, floor = 86th percentile of their worst rank, capped at this
+    //            week's 90th percentile + 5; then widened by OUTER_MARGIN ranks on each side,
+    //            which shrinks as history builds (1 poll of history: 3.5 ... 5 polls: 0).
+    //            Without the margin, early-season bands held only ~57% and late ones ~80%.
+    //            Inner is clamped inside outer.
+    //   Backtested 2016-2026 Userpoll + AP (#1-20 teams, consensus rank in each of the next
+    //   4 polls): inner holds ~51%; outer ~77% overall and 75-78% at every history length.
     if (mode === "weighted") {
-        const wDelta = buildDeltaData(true);
-        const wTab = document.querySelector(`.week-tab[data-week="${weekId}"]`);
-        const wYear = wTab?.dataset.year || "";
-        const isApWeek = weekId.startsWith("week-ap-");
-        const wAllTabs = isApWeek ? getSortedApTabs() : getSortedTabs();
-        const wYearTabs = wAllTabs.filter(t => t.dataset.year === wYear);
-        const wCurrIdx = wYearTabs.findIndex(t => t.dataset.week === weekId);
-        const wLast5 = [];
-        for (let i = wCurrIdx; i < wYearTabs.length && wLast5.length < 5; i++) {
-            wLast5.push(wYearTabs[i].dataset.week);
-        }
-        if (wLast5.length === 0) return;
-        const w5Result = compute5WeekWeighted(weekId, wDelta, wYearTabs);
-        if (!w5Result) return;
-        const wTop25 = w5Result.ranked;
-        if (wTop25.length === 0) return;
-        const wVoters = Object.keys(wDelta[weekId] || {}).filter(u => u !== "Official Overall");
-        // Teams: 5-week top 25 plus any of this week's overall top 25 not already in it,
-        // sorted by 5-week avg so tier colors follow 5-week standing.
-        const w5Avg = t => (w5Result.teamAvgRankSum[t] ?? 26 * w5Result.totalVoters) / w5Result.totalVoters;
-        const wTeams = [...wTop25, ...top25.filter(t => !wTop25.includes(t))]
-            .sort((a, b) => w5Avg(a) - w5Avg(b));
-        // Each current voter's best and worst rank for a team across the last 5 weeks
-        // (unranked = 26; weeks the voter skipped are left out). Unweighted on purpose:
-        // the bar is a ceiling/floor, so one big week counts in full.
-        const voterBestWorst = (u, team) => {
-            let best = null, worst = null;
-            wLast5.forEach(wid => {
-                const ballot = wDelta[wid]?.[u];
-                if (!ballot?.length) return;
-                const pos = ballot.indexOf(team);
-                const r = pos === -1 ? 26 : pos + 1;
-                if (best === null || r < best) best = r;
-                if (worst === null || r > worst) worst = r;
-            });
-            return best === null ? null : { best, worst };
-        };
-        // Floor cap: the floor may sit at most FLOOR_CAP spots below this week's 90th
-        // percentile ballot rank. Stops a rising team's old unranked weeks from forcing
-        // an NR floor once this week's voters clearly rank it.
-        const CEIL_PCT = 0.22, FLOOR_PCT = 0.78, FLOOR_CAP = 5;
-        chartData = wTeams.map(team => {
-            const perVoter = wVoters.map(u => voterBestWorst(u, team)).filter(v => v !== null);
-            const bests = perVoter.map(v => v.best).sort((a, b) => a - b);
-            const worsts = perVoter.map(v => v.worst).sort((a, b) => a - b);
-            const thisWeek = wVoters.map(u => wDelta[weekId]?.[u]).filter(b => b?.length)
-                .map(b => { const p = b.indexOf(team); return p === -1 ? 26 : p + 1; })
-                .sort((a, b) => a - b);
-            const hi = bests.length > 0 ? percentileRank(bests, CEIL_PCT) : 26;
-            let lo = worsts.length > 0 ? percentileRank(worsts, FLOOR_PCT) : 26;
-            if (thisWeek.length > 0) lo = Math.min(lo, percentileRank(thisWeek, 0.90) + FLOOR_CAP);
-            lo = Math.max(lo, hi);
-            const avg = w5Avg(team);
-            return { team, avg, hi, lo, allRanks: [], rankVoters: {} };
-        });
+        const bands = computeOutlookBands(weekId, top25);
+        if (!bands) return;
+        chartData = bands.map(b => ({ ...b, allRanks: [], rankVoters: {} }));
     }
 
     // Tier coloring: fixed rank zones so a color means roughly the same area week to week.
@@ -3136,8 +3162,8 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
         d.color = tierColors[d.tier];
     });
 
-    // 5 Week graph: order by this week's overall rank (colors stay with each team's
-    // 5-week tier). Teams outside the week's top 25 keep 5-week order at the end.
+    // Outlook graph: order by this week's overall rank (colors follow each team's
+    // tier by this week's avg voter rank).
     if (mode === "weighted") {
         const overallPos = t => { const p = top25.indexOf(t); return p === -1 ? Infinity : p; };
         chartData = chartData
@@ -3163,7 +3189,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
     const modeTabs = [
         { key: 'highlow', label: 'Range' },
         { key: 'dots', label: 'Spread' },
-        { key: 'weighted', label: '5 Week' },
+        { key: 'weighted', label: 'Outlook' },
     ].map(m =>
         `<span class="modal-mode-tab${mode === m.key ? ' active' : ''}"
                onclick="showWeekHighLowChart('${escapedId}', '${m.key}')">${m.label}</span>`
@@ -3264,37 +3290,56 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
         tipG.appendChild(tipRect);
         svg.appendChild(tipG);
 
-        chartData.forEach(({ team, avg, hi, lo, color }, i) => {
+        chartData.forEach(({ team, avg, hi, lo, innerHi, innerLo, color }, i) => {
             const x = xPos(i);
             const yHi = yPos(hi);
             const yLo = yPos(lo);
             const yAvg = yPos(avg);
 
-            // Vertical high-low line
-            const vLine = document.createElementNS(svgNS, "line");
-            vLine.setAttribute("x1", x); vLine.setAttribute("x2", x);
-            vLine.setAttribute("y1", yHi); vLine.setAttribute("y2", yLo);
-            vLine.setAttribute("stroke", color.fill);
-            vLine.setAttribute("stroke-width", "2.5");
-            vLine.setAttribute("stroke-linecap", "round");
-            vLine.setAttribute("class", "chart-stroke"); vLine.dataset.team = team;
-            svg.insertBefore(vLine, tipG);
+            if (mode === "weighted") {
+                // Two nested bands: pale outer (~75%), solid inner (~50%)
+                const bandW = Math.max(4, Math.min(10, slotW * 0.42));
+                const band = (y1, y2, opacity) => {
+                    const b = document.createElementNS(svgNS, "line");
+                    b.setAttribute("x1", x); b.setAttribute("x2", x);
+                    b.setAttribute("y1", y1); b.setAttribute("y2", Math.max(y2, y1 + 1.5));
+                    b.setAttribute("stroke", color.fill);
+                    b.setAttribute("stroke-width", bandW);
+                    b.setAttribute("stroke-linecap", "butt");
+                    b.setAttribute("stroke-opacity", opacity);
+                    b.setAttribute("class", "chart-stroke"); b.dataset.team = team;
+                    svg.insertBefore(b, tipG);
+                };
+                band(yHi, yLo, 0.3);
+                band(yPos(innerHi), yPos(innerLo), 0.9);
+            } else {
 
-            // Top cap (P90+)
-            const topCap = document.createElementNS(svgNS, "line");
-            topCap.setAttribute("x1", x - capW); topCap.setAttribute("x2", x + capW);
-            topCap.setAttribute("y1", yHi); topCap.setAttribute("y2", yHi);
-            topCap.setAttribute("stroke", color.fill); topCap.setAttribute("stroke-width", "2");
-            topCap.setAttribute("class", "chart-stroke"); topCap.dataset.team = team;
-            svg.insertBefore(topCap, tipG);
+                // Vertical high-low line
+                const vLine = document.createElementNS(svgNS, "line");
+                vLine.setAttribute("x1", x); vLine.setAttribute("x2", x);
+                vLine.setAttribute("y1", yHi); vLine.setAttribute("y2", yLo);
+                vLine.setAttribute("stroke", color.fill);
+                vLine.setAttribute("stroke-width", "2.5");
+                vLine.setAttribute("stroke-linecap", "round");
+                vLine.setAttribute("class", "chart-stroke"); vLine.dataset.team = team;
+                svg.insertBefore(vLine, tipG);
 
-            // Bottom cap (P10-)
-            const botCap = document.createElementNS(svgNS, "line");
-            botCap.setAttribute("x1", x - capW); botCap.setAttribute("x2", x + capW);
-            botCap.setAttribute("y1", yLo); botCap.setAttribute("y2", yLo);
-            botCap.setAttribute("stroke", color.fill); botCap.setAttribute("stroke-width", "2");
-            botCap.setAttribute("class", "chart-stroke"); botCap.dataset.team = team;
-            svg.insertBefore(botCap, tipG);
+                // Top cap (P90+)
+                const topCap = document.createElementNS(svgNS, "line");
+                topCap.setAttribute("x1", x - capW); topCap.setAttribute("x2", x + capW);
+                topCap.setAttribute("y1", yHi); topCap.setAttribute("y2", yHi);
+                topCap.setAttribute("stroke", color.fill); topCap.setAttribute("stroke-width", "2");
+                topCap.setAttribute("class", "chart-stroke"); topCap.dataset.team = team;
+                svg.insertBefore(topCap, tipG);
+
+                // Bottom cap (P10-)
+                const botCap = document.createElementNS(svgNS, "line");
+                botCap.setAttribute("x1", x - capW); botCap.setAttribute("x2", x + capW);
+                botCap.setAttribute("y1", yLo); botCap.setAttribute("y2", yLo);
+                botCap.setAttribute("stroke", color.fill); botCap.setAttribute("stroke-width", "2");
+                botCap.setAttribute("class", "chart-stroke"); botCap.dataset.team = team;
+                svg.insertBefore(botCap, tipG);
+            }
 
             // Tooltip anchored above (or below, if near the top) a point; r = marker half-height
             const showTip = (label, ax, ay, r) => {
@@ -3322,25 +3367,6 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
                 tipG.style.display = "";
             };
             const hideTip = () => { tipG.style.display = "none"; };
-
-            if (mode === "weighted") {
-                const rankStr = r => (r >= 26 ? "NR" : r.toFixed(1));
-                // Invisible, wider hover target along a horizontal segment
-                const addHoverTarget = (y, halfW, label) => {
-                    const hit = document.createElementNS(svgNS, "line");
-                    hit.setAttribute("x1", x - halfW); hit.setAttribute("x2", x + halfW);
-                    hit.setAttribute("y1", y); hit.setAttribute("y2", y);
-                    hit.setAttribute("stroke", "transparent"); hit.setAttribute("stroke-width", "8");
-                    hit.setAttribute("pointer-events", "stroke");
-                    hit.addEventListener("mouseenter", () => showTip(label, x, y, 4));
-                    hit.addEventListener("mouseleave", hideTip);
-                    svg.insertBefore(hit, tipG);
-                };
-
-                // Hover: ceiling (22nd pct of voters' best ranks) and floor (78th pct of worst ranks, capped)
-                addHoverTarget(yHi, capW + 2, rankStr(hi));
-                if (lo !== hi) addHoverTarget(yLo, capW + 2, rankStr(lo));
-            }
 
             // Mean circle
             const circle = document.createElementNS(svgNS, "circle");
@@ -4180,13 +4206,14 @@ function showAvgRankModal(weekId) {
         if (wTeams) wTeams.forEach(t => seasonTeamsSeen.add(t));
     }
 
-    // 5-week weighted averages for current and previous weeks
-    const deltaData = deltaDataForNew;
-    const yearTabs = allTabsSorted.filter(t => t.dataset.year === currYear);
-    const curr5W = compute5WeekWeighted(weekId, deltaData, yearTabs);
-    const prev5W = (prevTab && prevTab.dataset.year === currYear)
-        ? compute5WeekWeighted(prevTab.dataset.week, deltaData, yearTabs)
-        : null;
+    // Outlook graph bands (inner ~50%, outer ~75%) for this week's top 25
+    const outlookBands = {};
+    (computeOutlookBands(weekId, top25) || []).forEach(b => { outlookBands[b.team] = b; });
+    const fmtBandRank = r => { const n = Math.round(r); return n >= 26 ? "NR" : n; };
+    const fmtBand = (a, b) => {
+        const x = fmtBandRank(a), y = fmtBandRank(b);
+        return x === y ? `${x}` : `${x}–${y}`;
+    };
 
     const titleTab = allTabsSorted[currTabIdx] || document.querySelector(".week-tab.active");
     const weekNum = titleTab?.dataset.weeknum || "";
@@ -4237,29 +4264,9 @@ function showAvgRankModal(weekId) {
         }
         const inTop25 = rank <= 25;
         const rankDisplay = `<div style="font-variant-numeric:tabular-nums;text-align:center">${rank}</div>`;
-        let cell5WAvg = '<td>—</td>';
-        if (curr5W) {
-            const rawSum = curr5W.teamAvgRankSum[team];
-            if (rawSum != null) {
-                const avgVal = rawSum / curr5W.totalVoters;
-                let deltaHtml = '';
-                if (prev5W) {
-                    const prevSum = prev5W.teamAvgRankSum[team];
-                    if (prevSum != null) {
-                        const prevAvgVal = prevSum / prev5W.totalVoters;
-                        const diff = prevAvgVal - avgVal; // positive = improved (rank number decreased)
-                        if (Math.abs(diff) < 0.05) {
-                            deltaHtml = ' <span class="delta-same">—</span>';
-                        } else if (diff > 0) {
-                            deltaHtml = ` <span class="delta-up">(${diff.toFixed(1)})</span>`;
-                        } else {
-                            deltaHtml = ` <span class="delta-down">(${Math.abs(diff).toFixed(1)})</span>`;
-                        }
-                    }
-                }
-                cell5WAvg = `<td style="white-space:nowrap">${avgVal.toFixed(1)}${deltaHtml}</td>`;
-            }
-        }
+        const band = outlookBands[team];
+        const cellLikely = band ? `<td style="white-space:nowrap">${fmtBand(band.innerHi, band.innerLo)}</td>` : '<td>—</td>';
+        const cellOutlook = band ? `<td style="white-space:nowrap">${fmtBand(band.hi, band.lo)}</td>` : '<td>—</td>';
         return `<tr>
             <td>${rankDisplay}</td>
             <td style="padding:2px 4px;"><img class="logo-sm" src="${logoSrc(team)}"></td>
@@ -4269,7 +4276,8 @@ function showAvgRankModal(weekId) {
             <td>${inTop25 ? avg.toFixed(1) : ""}</td>
             <td>${inTop25 ? (Number.isInteger(lo) ? lo : lo.toFixed(1)) : ""}</td>
             <td>${inTop25 ? (sdRaw != null ? sdRaw.toFixed(1) : "—") : ""}</td>
-            ${inTop25 ? cell5WAvg : "<td></td>"}
+            ${inTop25 ? cellLikely : "<td></td>"}
+            ${inTop25 ? cellOutlook : "<td></td>"}
             <td>${count}</td>
             <td>${pts}</td>
         </tr>`;
@@ -4284,7 +4292,8 @@ function showAvgRankModal(weekId) {
         <col style="width:52px">
         <col style="width:44px">
         <col style="width:48px">
-        <col style="width:80px">
+        <col style="width:60px">
+        <col style="width:60px">
         <col style="width:36px">
         <col style="width:64px">
     </colgroup><thead><tr>
@@ -4295,13 +4304,14 @@ function showAvgRankModal(weekId) {
         <th>Avg</th>
         <th title="90th percentile rank across all voters">P<sub>10−</sub></th>
         <th title="Standard deviation of ranks given by voters this week">Dev</th>
-        <th title="5-week weighted average rank (change from previous week in parentheses)">5 Week</th>
+        <th title="Outlook inner band: likely range (~50%) of this team's rank over the next few polls">Likely</th>
+        <th title="Outlook outer band: wider range (~75%) of this team's rank over the next few polls, from voters' best/worst ranks over the last 5 polls">Outlook</th>
         <th>Voters</th>
         <th>Pts</th>
     </tr></thead><tbody>`;
     top25.forEach((team, i) => { html += buildRow(team, i + 1); });
     if (receivingVotes.length > 0) {
-        html += `<tr class="rv-divider"><td colspan="11">Receiving Votes</td></tr>`;
+        html += `<tr class="rv-divider"><td colspan="12">Receiving Votes</td></tr>`;
         receivingVotes.forEach((team, i) => { html += buildRow(team, 26 + i); });
     }
     html += "</tbody>";

@@ -677,8 +677,10 @@ kbd {
 #avg-rank-table tr.rv-divider td { padding: 6px 0 2px; color: var(--color-divider-text); font-size: 11px; text-align: left; border-bottom: none; }
 #avg-rank-table th:nth-child(5), #avg-rank-table td:nth-child(5),
 #avg-rank-table th:nth-child(9), #avg-rank-table td:nth-child(9),
-#avg-rank-table th:nth-child(11), #avg-rank-table td:nth-child(11) { border-right: none; }
-#avg-rank-table th:nth-child(8), #avg-rank-table td:nth-child(8) { border-right: 1px solid var(--color-border-strong); }
+#avg-rank-table th:nth-child(11), #avg-rank-table td:nth-child(11),
+#avg-rank-table th:nth-child(12), #avg-rank-table td:nth-child(12) { border-right: none; }
+#avg-rank-table th:nth-child(8), #avg-rank-table td:nth-child(8),
+#avg-rank-table th:nth-child(10), #avg-rank-table td:nth-child(10) { border-right: 1px solid var(--color-border-strong); }
 
 #season-stats-modal {
     display: none;
