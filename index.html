@@ -3418,21 +3418,43 @@ function computeOutlookBands(weekId, teams) {
     // Floor cap: the outer floor may sit at most FLOOR_CAP spots below this week's 90th
     // percentile ballot rank. Stops a rising team's old unranked weeks from forcing
     // an NR floor once this week's voters clearly rank it.
-    const OUTER_PCT = 0.14, INNER_PCT = 0.12, FLOOR_CAP = 5;
+    const FLOOR_CAP = 5;
     const OUTER_MARGIN = [3.5, 3.0, 2.0, 1.5, 0][wLast5.length - 1];
-    return wTeams.map(team => {
+    // Band-edge percentiles per rank tier (#1-5, 6-10, 11-15, 16-20, 21-25 by this week's avg):
+    //   oh/ol = Outlook ceiling/floor, ih/il = Likely ceiling/floor (floor uses 1 - pct).
+    // Each edge was fit so that ~11.25% (Outlook) or ~25% (Likely) of outcomes miss on its
+    // side, so Likely holds ~50% and Outlook ~77.5% in every tier with misses split evenly.
+    // Top teams get low floor percentiles because they fall further than they rise; bubble
+    // teams get high ones because their old 26s otherwise pin every floor to NR.
+    // AP has its own table: AP ballots are ~20-25% more tightly grouped than userpoll ballots
+    // while AP consensus moves as much week to week, so userpoll-sized bands run narrow on AP.
+    const BAND_PCT = (isApWeek || ON_AP_PAGE) ? [
+        { oh: 0.28, ol: 0.02, ih: 0.25, il: 0.00 },
+        { oh: 0.25, ol: 0.00, ih: 0.17, il: 0.03 },
+        { oh: 0.11, ol: 0.01, ih: 0.17, il: 0.05 },
+        { oh: 0.08, ol: 0.20, ih: 0.13, il: 0.11 },
+        { oh: 0.08, ol: 0.53, ih: 0.12, il: 0.34 },
+    ] : [
+        { oh: 0.26, ol: 0.01, ih: 0.34, il: 0.02 },
+        { oh: 0.22, ol: 0.03, ih: 0.19, il: 0.05 },
+        { oh: 0.18, ol: 0.09, ih: 0.19, il: 0.09 },
+        { oh: 0.13, ol: 0.27, ih: 0.18, il: 0.15 },
+        { oh: 0.14, ol: 0.57, ih: 0.16, il: 0.36 },
+    ];
+    return wTeams.map((team, idx) => {
+        const pc = BAND_PCT[Math.min(4, Math.floor(idx / 5))];
         const perVoter = wVoters.map(u => voterBestWorst(u, team)).filter(v => v !== null);
         const bests = perVoter.map(v => v.best).sort((a, b) => a - b);
         const worsts = perVoter.map(v => v.worst).sort((a, b) => a - b);
         const thisWeek = thisWeekRanks(team);
-        const hi = Math.max(1, (bests.length > 0 ? percentileRank(bests, OUTER_PCT) : 26) - OUTER_MARGIN);
-        let lo = worsts.length > 0 ? percentileRank(worsts, 1 - OUTER_PCT) : 26;
+        const hi = Math.max(1, (bests.length > 0 ? percentileRank(bests, pc.oh) : 26) - OUTER_MARGIN);
+        let lo = worsts.length > 0 ? percentileRank(worsts, 1 - pc.ol) : 26;
         if (thisWeek.length > 0) lo = Math.min(lo, percentileRank(thisWeek, 0.90) + FLOOR_CAP);
         lo = Math.min(26, Math.max(lo + OUTER_MARGIN, hi));
         let innerHi = hi, innerLo = lo;
         if (thisWeek.length > 0) {
-            innerHi = Math.max(percentileRank(thisWeek, INNER_PCT), hi);
-            innerLo = Math.max(Math.min(percentileRank(thisWeek, 1 - INNER_PCT), lo), innerHi);
+            innerHi = Math.max(percentileRank(thisWeek, pc.ih), hi);
+            innerLo = Math.max(Math.min(percentileRank(thisWeek, 1 - pc.il), lo), innerHi);
         }
         return { team, avg: twAvg[team], hi, lo, innerHi, innerLo };
     });
@@ -3501,15 +3523,16 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
     // Outlook mode (official ballots only, never provisional):
     //   circle = this week's mean voter rank (unranked = 26). A 5-week weighted mean was
     //            tried here and predicted the next 1-4 weeks worse (MAE 3.3/3.8 vs 2.5/3.3).
-    //   inner band (~50%): 12th-88th percentile of this week's ballot ranks.
-    //   outer band (~75%): ceiling = 14th percentile of each current voter's best rank over
-    //            the last 5 polls, floor = 86th percentile of their worst rank, capped at this
-    //            week's 90th percentile + 5; then widened by OUTER_MARGIN ranks on each side,
-    //            which shrinks as history builds (1 poll of history: 3.5 ... 5 polls: 0).
-    //            Without the margin, early-season bands held only ~57% and late ones ~80%.
+    //   inner band (Likely, ~50%): percentiles of this week's ballot ranks.
+    //   outer band (Outlook, ~77.5%): ceiling = a low percentile of each current voter's best
+    //            rank over the last 5 polls, floor = a high percentile of their worst rank,
+    //            capped at this week's 90th percentile + 5; then widened by OUTER_MARGIN ranks
+    //            on each side, which shrinks as history builds (1 poll of history: 3.5 ... 5: 0).
     //            Inner is clamped inside outer.
-    //   Backtested 2016-2026 Userpoll + AP (#1-20 teams, consensus rank in each of the next
-    //   4 polls): inner holds ~51%; outer ~77% overall and 75-78% at every history length.
+    //   Percentiles come from BAND_PCT in computeOutlookBands (per rank tier, separate tables
+    //   for Userpoll and AP). Backtested leave-one-season-out on Userpoll 2016-2022 + 2025-2026
+    //   and AP 2022-2026 (#1-25 teams, consensus rank in each of the next 4 polls): Likely
+    //   ~50% and Outlook ~77-78% in every tier, misses split about evenly above and below.
     if (mode === "outlook") {
         const bands = computeOutlookBands(weekId, top25);
         if (!bands) return;
