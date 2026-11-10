@@ -3,7 +3,8 @@
 Scraper + static site generator for college basketball poll ballots. `userpoll.py` scrapes voter ballots (r/CollegeBasketball userpoll from cbbpoll.net / legacy cbbpoll.com, plus AP Top 25 from collegepolltracker.com) and generates `index.html` and `ap-ballots.html`, inlining `style.css` and `script.js` at build time.
 
 - **Live:** https://www.userpoll-landscape.com/ (custom domain via `CNAME`; `les-champs.github.io/cbb-ballots/` redirects there)
-- **Repo:** `les-champs/cbb-ballots`, branch `main` only. Push to `main` → `.github/workflows/pages.yml` ("Deploy Pages") publishes `*.html`, `cbb-logos/`, `thumbnail.png` and `CNAME` to GitHub Pages (Pages source: GitHub Actions; deploy timeout 30 min). Add any new runtime asset to its "Assemble site" step.
+- **Repo:** `les-champs/cbb-ballots`, branch `main` only. Push to `main` → `.github/workflows/pages.yml` ("Deploy Pages") publishes `*.html`, `cbb-logos/`, `thumbnail.png` and `CNAME` to GitHub Pages (deploy timeout 30 min). Add any new runtime asset to its "Assemble site" step.
+- **Deploys:** Pages source must stay **GitHub Actions** (Settings → Pages). Do not switch back to "Deploy from a branch": the legacy `pages-build-deployment` pipeline timed out at `syncing_files` on every deploy on 2026-11-10 and left uncancellable "queued" runs (#218, #222, #224; ignore them). If a deploy fails, re-run it with `gh workflow run pages.yml -R les-champs/cbb-ballots` (or Actions → Deploy Pages → Run workflow) rather than pushing an empty commit. Pushing workflow changes needs the `workflow` token scope (`gh auth refresh -h github.com -s workflow`).
 - No build tooling, no tests, no package manager. Python 3 stdlib + PIL; vanilla JS.
 - `_config.yml` only matters to the old Jekyll Pages build (unused since the switch to the Actions workflow); html2canvas is loaded on demand by `loadHtml2canvas()` (Save as PNG), not by a `<script>` tag.
 
@@ -11,7 +12,7 @@ Scraper + static site generator for college basketball poll ballots. `userpoll.p
 
 1. **Edit only source files:** `script.js`, `style.css`, `userpoll.py` (and `poll_simulator.py`). Everything else at the root is generated.
 2. **After any change to `script.js`, `style.css`, or HTML templates in `userpoll.py`, run `python3 userpoll.py --rebuild`.** This regenerates `index.html`, `ap-ballots.html`, and all fragment files. Commit source + regenerated output together.
-3. **Never read generated or data files whole.** They are huge (`index.html` ≈ 5 MB, each `data-*.html` 3–7 MB, `cbbpoll-*.json`/`ap25-*.json` ~1–2 MB, `ballots.json` 2 MB). Use `grep -n`/`grep -c`, `head`, or `python3 -c` with `json` to inspect specific pieces. Do not open `ballots.json` at all.
+3. **Never read generated or data files whole.** They are huge (`index.html` ≈ 0.8 MB, each `data-*.html` 3–5 MB, `cbbpoll-*.json`/`ap25-*.json` ~1–2 MB, `ballots.json` 2 MB). Use `grep -n`/`grep -c`, `head`, or `python3 -c` with `json` to inspect specific pieces. Do not open `ballots.json` at all.
 4. **`script.js` is ~4,700 lines and `userpoll.py` ~2,000.** Locate code with `grep -n "function name"` and read targeted ranges rather than the whole file.
 5. Features automatically appear on both `index.html` and `ap-ballots.html` (same inlined CSS/JS). Always consider both pages, and AP mode on `index.html`, when changing JS.
 6. When changing the Précision formula in `computeVoterAvg()` (JS), keep `score_voters()` in `poll_simulator.py` in sync.
@@ -34,6 +35,8 @@ cbbpoll-YEAR.json      # Cached legacy cbbpoll.com scrapes (2016–2022)
 ap25-YEAR.json         # Cached AP25 scrapes (2022–2027)
 cbbpoll-2024-recovery.json  # Output of the removed one-off 2024 Wayback recovery (in git history)
 ballots.json           # Browser-exported poll data for poll_simulator.py --from-json (do not read)
+.github/workflows/pages.yml  # GitHub Pages deploy (source)
+_config.yml            # Unused (legacy Jekyll excludes); safe to delete
 cbb-logos/             # Team logos: Team.webp + Team-dark.webp (dark-mode variants from ESPN)
 logos voters(png)/     # Untracked, not used by the build
 thumbnail.png          # OG/Twitter card image
@@ -76,9 +79,10 @@ Local testing: `python3 -m http.server 8000` → http://localhost:8000. Opening 
 ## script.js layout (search by function name)
 
 - **Globals/caches (top of file):** `_sortedTabsCache`, `_leaderboardDataCache`, `_deltaDataCache` (+`_deltaDataCacheIsProvisional`, invalidated on Official/Provisional toggle), `_officialDeltaDataCache` (official ballots only), `_apDeltaDataCache`, `_apCurrentYear`/`_apCurrentWeekNum` (non-null ⇒ AP mode on index.html), `HIDDEN_YEARS` (2023 + 2024 hidden from userpoll navigation and analysis; mirrors `EXCLUDED_YEARS` in `userpoll.py`), outlier constants.
-- **Loading:** `loadYear(year)` fetches `${FRAG_PATH_PREFIX}${year}.html`; `loadApYear(year)` fetches `data-ap-YEAR.html`. Both inject into `#year-data-container`; `_loadedYears` (AP keyed `ap-YEAR`) and `_loadingYears` dedupe. `backgroundLoad()` → current-year images (16 concurrent) → all fragments in parallel → their images. All year-navigation paths must `await loadYear()` before `showWeek()`.
+- **Loading:** `loadYear(year)` fetches `${FRAG_PATH_PREFIX}${year}.html`; `loadApYear(year)` fetches `data-ap-YEAR.html`. Both inject into `#year-data-container`; `_loadedYears` (AP keyed `ap-YEAR`) and `_loadingYears` dedupe. `backgroundLoad()` lazy-loads images (16 concurrent) for weeks already in the DOM only; prior-year fragments load on demand when navigated to (eager preloading of every fragment caused a ~30 s DOM stall). All year-navigation paths must `await loadYear()` before `showWeek()`.
 - **Week 1 / Pre-Season:** pre-season is stored as week 0 (`week-YEAR-0`; legacy 2017–2022 tabs have no label, newer ones `data-weeklabel="Pre-Season"`), but the UI shows it as **Week 1** everywhere (there is never a real week 1). `isPreseasonTab()` detects it, `displayWeekNum()` returns 1, and `weekTextLabel()` returns undefined so callers fall back to the number. Use these helpers for any user-facing week text — never `dataset.weeknum`/`dataset.weeklabel` directly. Week 1 is shown in the week picker and ←/→ navigation (no longer hidden). Keep storage as week 0: pre-season reclassification, Cmd+0 and AP data depend on it.
 - **Navigation:** `showWeek()` (async), `showApWeek()`, `switchToApBallots()`, `exitApBallots()`, `rebuildWeekPicker()`, `rebuildYearPicker()`, `fitPicker()`, `updateFavicon()` (favicon shows current week number).
+- **Functions menu:** cloned per table from `#picker-template` by `createPicker()` (see `PICKER_HTML`). Clicks are handled by one capture-phase `mousedown` listener; in-place actions (Settings, Credits, Dark Mode, Nav Arrows, Show toggles) keep it open. Settings and Credits swap the menu contents via `.settings-mode` / `.credits-mode` (`.settings-only` / `.credits-only` items; CSS in `style.css`). Credits is a single line that `fitCreditsText()` shrinks to end at the table's right edge (never below the table's min width). Credits text lives in `PICKER_HTML`.
 - **Sorting:** `applyTableSort()` / `setGlobalSort()`. Modes: `alphabetic` (labelled "Functions"), `zetabetique` (reverse), `consensus`. Précision and Tenure are **leaderboard modals**, not sorts.
 - **Rows:** `pinRow()` / `pinnedUsers` / `syncPinnedToAggregate()`, `bindVoterCells()`, `injectVeteranTags()`, `injectOverallRows()` / `toggleOverallRow()`.
 - **Deltas:** `buildDeltaData(officialOnly)` — pass `true` for any aggregate/consensus calculation (provisional ballots must never affect aggregates); omit it only for per-voter deltas that should follow the Official/Provisional toggle. Also `applyDeltaToRow()`, `deltaWeeksBack`, `deltaSubMode` (`consensus-diff` | `recency`), `compute5WeekWeighted()`, `injectWeightedRankingRow()`, `injectApWeightedRankingRow()`.
