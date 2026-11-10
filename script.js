@@ -827,9 +827,6 @@ function handlePickerAction(action) {
         ? `week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`
         : activeTab?.dataset.week;
     switch (action) {
-        case "weeklyStats":
-            if (weekId) showAvgRankModal(weekId);
-            break;
         case "yearlyStats":
             showSeasonStatsModal();
             break;
@@ -1291,6 +1288,7 @@ function showVoterHistory(username) {
     const modal = document.getElementById("voter-history-modal");
     const title = document.getElementById("voter-history-title");
     const table = document.getElementById("voter-history-table");
+    table.classList.remove("week-stats-table");
 
     title.textContent = username + " \u2013 " + currentYear + " Ballots";
 
@@ -1382,6 +1380,7 @@ function showTeamRankChart(team, username) {
     const modal = document.getElementById("voter-history-modal");
     const title = document.getElementById("voter-history-title");
     const table = document.getElementById("voter-history-table");
+    table.classList.remove("week-stats-table");
 
     title.innerHTML = `<img class="logo" src="${logoSrc(team)}" style="height:22px;vertical-align:middle;margin-right:6px;">${formatTeamName(team)} — ${username || "Unknown"}`;
     table.innerHTML = "";
@@ -1571,6 +1570,7 @@ function showTeamSeasonDotPlot(team, mode = "dots") {
     const modal = document.getElementById("voter-history-modal");
     const title = document.getElementById("voter-history-title");
     const table = document.getElementById("voter-history-table");
+    table.classList.remove("week-stats-table");
 
     title.innerHTML = `<img class="logo" src="${logoSrc(team)}" style="height:22px;vertical-align:middle;margin-right:6px;">${formatTeamName(team)} \u2013 ${currentYear} Season`;
     table.innerHTML = "";
@@ -1747,7 +1747,7 @@ function showTeamSeasonDotPlot(team, mode = "dots") {
 // Outlook bands for `teams` in week `weekId` (official ballots only). Returns an array
 // sorted by this week's mean voter rank: { team, avg, hi, lo, innerHi, innerLo } where
 // hi/lo = outer (~75%) band and innerHi/innerLo = inner (~50%) band, or null if no history.
-// Used by the Outlook graph and the Week Statistics table. See notes in showWeekHighLowChart.
+// Used by the Outlook graph and the Week Stats tab. See notes in showWeekHighLowChart.
 function computeOutlookBands(weekId, teams) {
     const percentileRank = (sortedArr, p) => {
         if (sortedArr.length === 1) return sortedArr[0];
@@ -1839,7 +1839,50 @@ function computeOutlookBands(weekId, teams) {
     });
 }
 
+// Title (week label + Stats / Range / Spread / Outlook tabs) of the Stats > Week window.
+function renderWeekChartTitle(weekId, mode) {
+    const modal = document.getElementById("voter-history-modal");
+    const title = document.getElementById("voter-history-title");
+    const table = document.getElementById("voter-history-table");
+
+    const titleTab = (_apCurrentYear !== null
+        ? document.querySelector(`.week-tab[data-poll="ap"][data-year="${_apCurrentYear}"][data-weeknum="${_apCurrentWeekNum}"]`)
+        : null) || document.querySelector(".week-tab.active");
+    const weekNum = titleTab ? displayWeekNum(titleTab) : "";
+    const year = titleTab?.dataset.year || "";
+    const weekLabel = weekTextLabel(titleTab);
+    const weekLabelText = weekLabel
+        ? `${year} ${weekLabel}`
+        : `${year} Week ${String(weekNum).padStart(2, "0")}`;
+    const escapedId = weekId.replace(/'/g, "\\'");
+    const modeTabs = [
+        { key: 'stats', label: 'Stats' },
+        { key: 'highlow', label: 'Range' },
+        { key: 'dots', label: 'Spread' },
+        { key: 'outlook', label: 'Outlook' },
+    ].map(m =>
+        `<span class="modal-mode-tab${mode === m.key ? ' active' : ''}"
+               onclick="showWeekHighLowChart('${escapedId}', '${m.key}')">${m.label}</span>`
+    ).join('');
+    title.innerHTML = `${modalWeekArrowsHtml()}${weekLabelText} — ${modeTabs}`;
+    return { modal, table };
+}
+
 function showWeekHighLowChart(weekId, mode = "highlow") {
+    // Stats tab: the per-team week statistics table (formerly its own window)
+    if (mode === "stats") {
+        const html = buildWeekStatsTableHtml(weekId);
+        if (html === null) return;
+        const { modal, table } = renderWeekChartTitle(weekId, mode);
+        table.style.cssText = "";
+        table.classList.add("week-stats-table");
+        table.innerHTML = html;
+        modal.dataset.chartType = "highlow";
+        modal.dataset.chartMode = mode;
+        modal.classList.add("open");
+        return;
+    }
+
     const block = document.getElementById(weekId);
     if (!block) return;
     const sections = block.querySelectorAll(".ballot-section");
@@ -1957,30 +2000,8 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
             .map(x => x.d);
     }
 
-    const modal = document.getElementById("voter-history-modal");
-    const title = document.getElementById("voter-history-title");
-    const table = document.getElementById("voter-history-table");
-
-    const titleTab = (_apCurrentYear !== null
-        ? document.querySelector(`.week-tab[data-poll="ap"][data-year="${_apCurrentYear}"][data-weeknum="${_apCurrentWeekNum}"]`)
-        : null) || document.querySelector(".week-tab.active");
-    const weekNum = titleTab ? displayWeekNum(titleTab) : "";
-    const year = titleTab?.dataset.year || "";
-    const weekLabel = weekTextLabel(titleTab);
-    const weekLabelText = weekLabel
-        ? `${year} ${weekLabel}`
-        : `${year} Week ${String(weekNum).padStart(2, "0")}`;
-    const escapedId = weekId.replace(/'/g, "\\'");
-    const modeTabs = [
-        { key: 'highlow', label: 'Range' },
-        { key: 'dots', label: 'Spread' },
-        { key: 'outlook', label: 'Outlook' },
-    ].map(m =>
-        `<span class="modal-mode-tab${mode === m.key ? ' active' : ''}"
-               onclick="showWeekHighLowChart('${escapedId}', '${m.key}')">${m.label}</span>`
-    ).join('');
-    title.innerHTML = `${modalWeekArrowsHtml()}${weekLabelText} Graphs — ${modeTabs}`;
-
+    const { modal, table } = renderWeekChartTitle(weekId, mode);
+    table.classList.remove("week-stats-table");
     table.innerHTML = "";
     table.style.cssText = "display:block; white-space:normal; width:100%;";
 
@@ -3018,18 +3039,20 @@ function injectApWeightedRankingRow(apBlock, apWeekId, year) {
     _injectConferenceRows(apBlock, apWeekId, year, yearTabs, deltaData);
 }
 
-function showAvgRankModal(weekId) {
+// Week Stats table (the "Stats" tab of the Stats > Week window). Returns the
+// table's inner HTML, or null when the week has no official ballots.
+function buildWeekStatsTableHtml(weekId) {
     const block = document.getElementById(weekId);
-    if (!block) return;
+    if (!block) return null;
     const sections = block.querySelectorAll(".ballot-section");
     const officialSection = sections[0];
-    if (!officialSection) return;
+    if (!officialSection) return null;
 
     // Collect all voter rows (exclude Official Overall)
     const voterRows = Array.from(officialSection.querySelectorAll(".voter-row"))
         .filter(r => getVoterName(r) !== "Official Overall");
     const totalVoters = voterRows.length;
-    if (totalVoters === 0) return;
+    if (totalVoters === 0) return null;
 
     // Compute rank sums, voter counts, points, and rank lists per team
     const teamRankSum = {};
@@ -3088,18 +3111,6 @@ function showAvgRankModal(weekId) {
         const x = fmtBandRank(a), y = fmtBandRank(b);
         return x === y ? `${x}` : `${x}–${y}`;
     };
-
-    const titleTab = allTabsSorted[currTabIdx] || document.querySelector(".week-tab.active");
-    const weekNum = titleTab ? displayWeekNum(titleTab) : "";
-    const year = titleTab?.dataset.year || "";
-    const weekLabel = weekTextLabel(titleTab);
-
-    const modal = document.getElementById("avg-rank-modal");
-    const title = document.getElementById("avg-rank-title");
-    const table = document.getElementById("avg-rank-table");
-
-    const weekPad = String(weekNum).padStart(2, "0");
-    title.innerHTML = modalWeekArrowsHtml() + (weekLabel ? `${year} ${weekLabel} Statistics` : `${year} #${weekPad} Statistics`);
 
     const percentileRank = (sortedArr, p) => {
         if (sortedArr.length === 1) return sortedArr[0];
@@ -3189,8 +3200,7 @@ function showAvgRankModal(weekId) {
         receivingVotes.forEach((team, i) => { html += buildRow(team, 26 + i); });
     }
     html += "</tbody>";
-    table.innerHTML = html;
-    modal.classList.add("open");
+    return html;
 }
 
 function showAggregateSection() {
@@ -4526,7 +4536,7 @@ function computeVoterAvg(yearTabs, lbData) {
     return voterAvg;
 }
 
-["keybind-legend-modal", "avg-rank-modal", "season-stats-modal", "heatmap-modal"].forEach(id => {
+["keybind-legend-modal", "season-stats-modal", "heatmap-modal"].forEach(id => {
     document.getElementById(id).addEventListener("click", e => {
         if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
     });
@@ -4542,7 +4552,7 @@ function computeVoterAvg(yearTabs, lbData) {
 })();
 
 
-// Prev/next week arrows floated into the week Statistics and Graphs modal
+// Prev/next week arrows floated into the Stats > Week modal
 // titles. Same chevrons as the header's #week-arrows and shown under the same
 // Settings toggle (body.show-week-arrows); navigateWeek() re-renders whichever
 // of those modals is open.
@@ -4571,8 +4581,6 @@ function navigateWeek(dir) {
                 await showApWeek(target.dataset.year, target.dataset.weeknum);
                 if (weekPickerPinned) rebuildWeekPicker();
                 const apWeekId = `week-ap-${target.dataset.year}-${target.dataset.weeknum}`;
-                if (document.getElementById("avg-rank-modal").classList.contains("open"))
-                    showAvgRankModal(apWeekId);
                 const vhm = document.getElementById("voter-history-modal");
                 if (vhm.classList.contains("open") && vhm.dataset.chartType === "highlow")
                     showWeekHighLowChart(apWeekId, vhm.dataset.chartMode || "highlow");
@@ -4587,8 +4595,6 @@ function navigateWeek(dir) {
             loadYear(target.dataset.year).then(async () => {
                 await showWeek(target.dataset.week);
                 if (weekPickerPinned) rebuildWeekPicker();
-                if (document.getElementById("avg-rank-modal").classList.contains("open"))
-                    showAvgRankModal(target.dataset.week);
                 const vhm = document.getElementById("voter-history-modal");
                 if (vhm.classList.contains("open") && vhm.dataset.chartType === "highlow")
                     showWeekHighLowChart(target.dataset.week, vhm.dataset.chartMode || "highlow");
@@ -4667,7 +4673,6 @@ document.addEventListener("keydown", e => {
     if (e.key === "Escape") {
         document.getElementById("voter-history-modal").classList.remove("open");
         document.getElementById("keybind-legend-modal").classList.remove("open");
-        document.getElementById("avg-rank-modal").classList.remove("open");
         document.getElementById("season-stats-modal").classList.remove("open");
         document.getElementById("precision-modal").classList.remove("open");
         document.getElementById("tenure-modal").classList.remove("open");
@@ -4763,10 +4768,10 @@ document.addEventListener("keydown", e => {
     if (e.key === "Y" || e.key === "y") {
         e.preventDefault();
         if (_apCurrentYear !== null) {
-            showAvgRankModal(`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`);
+            showWeekHighLowChart(`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`, "stats");
         } else {
             const activeTab = document.querySelector(".week-tab.active");
-            if (activeTab) showAvgRankModal(activeTab.dataset.week);
+            if (activeTab) showWeekHighLowChart(activeTab.dataset.week, "stats");
         }
         return;
     }
@@ -4874,8 +4879,6 @@ document.addEventListener("keydown", e => {
                     await showApWeek(target.dataset.year, target.dataset.weeknum);
                     if (weekPickerPinned) rebuildWeekPicker();
                     const apWeekId = `week-ap-${target.dataset.year}-${target.dataset.weeknum}`;
-                    if (document.getElementById("avg-rank-modal").classList.contains("open"))
-                        showAvgRankModal(apWeekId);
                     const vhm2 = document.getElementById("voter-history-modal");
                     if (vhm2.classList.contains("open") && vhm2.dataset.chartType === "highlow")
                         showWeekHighLowChart(apWeekId, vhm2.dataset.chartMode || "highlow");
@@ -4894,8 +4897,6 @@ document.addEventListener("keydown", e => {
                 if (target) {
                     await showWeek(target.dataset.week);
                     if (weekPickerPinned) rebuildWeekPicker();
-                    if (document.getElementById("avg-rank-modal").classList.contains("open"))
-                        showAvgRankModal(target.dataset.week);
                     const vhm2 = document.getElementById("voter-history-modal");
                     if (vhm2.classList.contains("open") && vhm2.dataset.chartType === "highlow")
                         showWeekHighLowChart(target.dataset.week, vhm2.dataset.chartMode || "highlow");

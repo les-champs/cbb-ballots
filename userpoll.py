@@ -1263,10 +1263,8 @@ PICKER_HTML = (
     f"<span class='sort-option' data-action='expandDeltas'>Deltas</span>"
     f"<span class='sort-option' data-action='toggleOutliers'>Outliers</span>"
     f"<span class='picker-category'>Stats</span>"
-    f"<span class='sort-option' data-action='weeklyStats'>Week</span>"
+    f"<span class='sort-option' data-action='dotPlot'>Week</span>"
     f"<span class='sort-option' data-action='yearlyStats'>Year</span>"
-    f"<span class='picker-category'>Charts</span>"
-    f"<span class='sort-option' data-action='dotPlot'>Spread</span>"
     f"<span class='sort-option' data-action='results'>Results</span>"
     f"<span class='picker-category'>&bull;</span>"
     f"<span class='sort-option' data-action='settings'>Settings</span>"
@@ -1277,7 +1275,7 @@ PICKER_HTML = (
     f"<span class='picker-category settings-only'>Other</span>"
     f"<span class='sort-option settings-only' data-action='savePng'>Save as PNG</span>"
     f"<span class='sort-option settings-only' data-action='legend'>Keybinds</span>"
-    f"<span class='credits-only credits-text'>Site reports &amp; analyzes the results of ballot votes from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span>"
+    f"<span class='credits-only credits-text'>Site displays &amp; analyzes the results of ballot votes from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span>"
     f"</span>"
 )
 
@@ -1570,7 +1568,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>X</kbd></span><span>Toggle AP Ballots</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>R</kbd></span><span>Précision leaderboard</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>T</kbd></span><span>Tenure leaderboard</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>Y</kbd></span><span>Week avg rank table</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>Y</kbd></span><span>Week stats table</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>G</kbd></span><span>Week rank spread chart</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>U</kbd></span><span>Season statistics</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>H</kbd></span><span>Season rank heatmap</span></div>
@@ -1587,13 +1585,6 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
   <div id="pin-box">
     <h2>Enter PIN</h2>
     <input id="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="6-digit PIN">
-  </div>
-</div>
-
-<div id="avg-rank-modal">
-  <div id="avg-rank-box">
-    <h2 id="avg-rank-title"></h2>
-    <table id="avg-rank-table"></table>
   </div>
 </div>
 

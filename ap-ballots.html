@@ -544,7 +544,6 @@ thead th {
     background: var(--color-bg);
     z-index: 2;
 }
-#avg-rank-table thead th,
 #season-stats-table thead th,
 #precision-table thead th,
 #tenure-table thead th,
@@ -552,7 +551,7 @@ thead th {
 .heatmap-table thead th {
     background: transparent;
 }
-#avg-rank-table thead th,
+#voter-history-table.week-stats-table thead th,
 #season-stats-table thead th {
     position: static;
 }
@@ -740,40 +739,13 @@ kbd {
     letter-spacing: 1px;
 }
 
-#avg-rank-modal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.55);
-    z-index: 1000;
-    justify-content: center;
-    align-items: center;
-}
-#avg-rank-modal.open {
-    display: flex;
-}
-#avg-rank-box {
-    background: var(--color-bg-modal);
-    border-radius: 8px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
-    width: max-content;
-    max-width: 95vw;
-    max-height: 88vh;
-    overflow: auto;
-    padding: 20px 24px 16px;
-}
-#avg-rank-box h2 {
-    margin: 0 0 12px;
-    font-size: 1.05rem;
-    color: var(--color-modal-h2);
-}
-#avg-rank-table {
+#voter-history-table.week-stats-table {
     border-collapse: collapse;
     width: 100%;
     font-size: 13px;
     table-layout: auto;
 }
-#avg-rank-table th {
+#voter-history-table.week-stats-table th {
     font-size: 11px;
     font-weight: normal;
     padding: 4px 8px;
@@ -781,8 +753,8 @@ kbd {
     white-space: nowrap;
     vertical-align: bottom;
 }
-#avg-rank-table th.team-col { text-align: left; }
-#avg-rank-table td {
+#voter-history-table.week-stats-table th.team-col { text-align: left; }
+#voter-history-table.week-stats-table td {
     padding: 3px 6px;
     text-align: center;
     border-bottom: 1px solid var(--color-border-subtle);
@@ -790,16 +762,16 @@ kbd {
     white-space: nowrap;
     overflow: hidden;
 }
-#avg-rank-table td:first-child { font-size: 11px; }
-#avg-rank-table td.team-col { text-align: left; font-size: 12px; color: var(--color-table-team-col); white-space: normal; overflow: visible; min-width: 80px; }
-#avg-rank-table .logo-sm { height: 20px; width: 20px; object-fit: contain; vertical-align: middle; }
-#avg-rank-table tr.rv-divider td { padding: 6px 0 2px; color: var(--color-divider-text); font-size: 11px; text-align: left; border-bottom: none; }
-#avg-rank-table th:nth-child(5), #avg-rank-table td:nth-child(5),
-#avg-rank-table th:nth-child(9), #avg-rank-table td:nth-child(9),
-#avg-rank-table th:nth-child(11), #avg-rank-table td:nth-child(11),
-#avg-rank-table th:nth-child(12), #avg-rank-table td:nth-child(12) { border-right: none; }
-#avg-rank-table th:nth-child(8), #avg-rank-table td:nth-child(8),
-#avg-rank-table th:nth-child(10), #avg-rank-table td:nth-child(10) { border-right: 1px solid var(--color-border-strong); }
+#voter-history-table.week-stats-table td:first-child { font-size: 11px; }
+#voter-history-table.week-stats-table td.team-col { text-align: left; font-size: 12px; color: var(--color-table-team-col); white-space: normal; overflow: visible; min-width: 80px; }
+#voter-history-table.week-stats-table .logo-sm { height: 20px; width: 20px; object-fit: contain; vertical-align: middle; }
+#voter-history-table.week-stats-table tr.rv-divider td { padding: 6px 0 2px; color: var(--color-divider-text); font-size: 11px; text-align: left; border-bottom: none; }
+#voter-history-table.week-stats-table th:nth-child(5), #voter-history-table.week-stats-table td:nth-child(5),
+#voter-history-table.week-stats-table th:nth-child(9), #voter-history-table.week-stats-table td:nth-child(9),
+#voter-history-table.week-stats-table th:nth-child(11), #voter-history-table.week-stats-table td:nth-child(11),
+#voter-history-table.week-stats-table th:nth-child(12), #voter-history-table.week-stats-table td:nth-child(12) { border-right: none; }
+#voter-history-table.week-stats-table th:nth-child(8), #voter-history-table.week-stats-table td:nth-child(8),
+#voter-history-table.week-stats-table th:nth-child(10), #voter-history-table.week-stats-table td:nth-child(10) { border-right: 1px solid var(--color-border-strong); }
 
 #season-stats-modal {
     display: none;
@@ -1452,7 +1424,7 @@ body.dark .pin-btn.pinned {
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>X</kbd></span><span>Toggle AP Ballots</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>R</kbd></span><span>Précision leaderboard</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>T</kbd></span><span>Tenure leaderboard</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>Y</kbd></span><span>Week avg rank table</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>Y</kbd></span><span>Week stats table</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>G</kbd></span><span>Week rank spread chart</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>U</kbd></span><span>Season statistics</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>H</kbd></span><span>Season rank heatmap</span></div>
@@ -1463,19 +1435,12 @@ body.dark .pin-btn.pinned {
   </div>
 </div>
 
-<template id="picker-template"><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Show</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Deltas</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='picker-category'>Stats</span><span class='sort-option' data-action='weeklyStats'>Week</span><span class='sort-option' data-action='yearlyStats'>Year</span><span class='picker-category'>Charts</span><span class='sort-option' data-action='dotPlot'>Spread</span><span class='sort-option' data-action='results'>Results</span><span class='picker-category'>&bull;</span><span class='sort-option' data-action='settings'>Settings</span><span class='sort-option' data-action='credits'>Credits</span><span class='picker-category settings-only'>Settings</span><span class='sort-option settings-only' data-action='darkMode'>Dark Mode</span><span class='sort-option settings-only' data-action='weekArrows'>Nav Arrows ON</span><span class='picker-category settings-only'>Other</span><span class='sort-option settings-only' data-action='savePng'>Save as PNG</span><span class='sort-option settings-only' data-action='legend'>Keybinds</span><span class='credits-only credits-text'>Site reports &amp; analyzes the results of ballot votes from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span></span></template>
+<template id="picker-template"><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Show</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Deltas</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='picker-category'>Stats</span><span class='sort-option' data-action='dotPlot'>Week</span><span class='sort-option' data-action='yearlyStats'>Year</span><span class='sort-option' data-action='results'>Results</span><span class='picker-category'>&bull;</span><span class='sort-option' data-action='settings'>Settings</span><span class='sort-option' data-action='credits'>Credits</span><span class='picker-category settings-only'>Settings</span><span class='sort-option settings-only' data-action='darkMode'>Dark Mode</span><span class='sort-option settings-only' data-action='weekArrows'>Nav Arrows ON</span><span class='picker-category settings-only'>Other</span><span class='sort-option settings-only' data-action='savePng'>Save as PNG</span><span class='sort-option settings-only' data-action='legend'>Keybinds</span><span class='credits-only credits-text'>Site displays &amp; analyzes the results of ballot votes from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span></span></template>
 
 <div id="pin-modal">
   <div id="pin-box">
     <h2>Enter PIN</h2>
     <input id="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="6-digit PIN">
-  </div>
-</div>
-
-<div id="avg-rank-modal">
-  <div id="avg-rank-box">
-    <h2 id="avg-rank-title"></h2>
-    <table id="avg-rank-table"></table>
   </div>
 </div>
 
@@ -2439,9 +2404,6 @@ function handlePickerAction(action) {
         ? `week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`
         : activeTab?.dataset.week;
     switch (action) {
-        case "weeklyStats":
-            if (weekId) showAvgRankModal(weekId);
-            break;
         case "yearlyStats":
             showSeasonStatsModal();
             break;
@@ -2903,6 +2865,7 @@ function showVoterHistory(username) {
     const modal = document.getElementById("voter-history-modal");
     const title = document.getElementById("voter-history-title");
     const table = document.getElementById("voter-history-table");
+    table.classList.remove("week-stats-table");
 
     title.textContent = username + " \u2013 " + currentYear + " Ballots";
 
@@ -2994,6 +2957,7 @@ function showTeamRankChart(team, username) {
     const modal = document.getElementById("voter-history-modal");
     const title = document.getElementById("voter-history-title");
     const table = document.getElementById("voter-history-table");
+    table.classList.remove("week-stats-table");
 
     title.innerHTML = `<img class="logo" src="${logoSrc(team)}" style="height:22px;vertical-align:middle;margin-right:6px;">${formatTeamName(team)} — ${username || "Unknown"}`;
     table.innerHTML = "";
@@ -3183,6 +3147,7 @@ function showTeamSeasonDotPlot(team, mode = "dots") {
     const modal = document.getElementById("voter-history-modal");
     const title = document.getElementById("voter-history-title");
     const table = document.getElementById("voter-history-table");
+    table.classList.remove("week-stats-table");
 
     title.innerHTML = `<img class="logo" src="${logoSrc(team)}" style="height:22px;vertical-align:middle;margin-right:6px;">${formatTeamName(team)} \u2013 ${currentYear} Season`;
     table.innerHTML = "";
@@ -3359,7 +3324,7 @@ function showTeamSeasonDotPlot(team, mode = "dots") {
 // Outlook bands for `teams` in week `weekId` (official ballots only). Returns an array
 // sorted by this week's mean voter rank: { team, avg, hi, lo, innerHi, innerLo } where
 // hi/lo = outer (~75%) band and innerHi/innerLo = inner (~50%) band, or null if no history.
-// Used by the Outlook graph and the Week Statistics table. See notes in showWeekHighLowChart.
+// Used by the Outlook graph and the Week Stats tab. See notes in showWeekHighLowChart.
 function computeOutlookBands(weekId, teams) {
     const percentileRank = (sortedArr, p) => {
         if (sortedArr.length === 1) return sortedArr[0];
@@ -3451,7 +3416,50 @@ function computeOutlookBands(weekId, teams) {
     });
 }
 
+// Title (week label + Stats / Range / Spread / Outlook tabs) of the Stats > Week window.
+function renderWeekChartTitle(weekId, mode) {
+    const modal = document.getElementById("voter-history-modal");
+    const title = document.getElementById("voter-history-title");
+    const table = document.getElementById("voter-history-table");
+
+    const titleTab = (_apCurrentYear !== null
+        ? document.querySelector(`.week-tab[data-poll="ap"][data-year="${_apCurrentYear}"][data-weeknum="${_apCurrentWeekNum}"]`)
+        : null) || document.querySelector(".week-tab.active");
+    const weekNum = titleTab ? displayWeekNum(titleTab) : "";
+    const year = titleTab?.dataset.year || "";
+    const weekLabel = weekTextLabel(titleTab);
+    const weekLabelText = weekLabel
+        ? `${year} ${weekLabel}`
+        : `${year} Week ${String(weekNum).padStart(2, "0")}`;
+    const escapedId = weekId.replace(/'/g, "\\'");
+    const modeTabs = [
+        { key: 'stats', label: 'Stats' },
+        { key: 'highlow', label: 'Range' },
+        { key: 'dots', label: 'Spread' },
+        { key: 'outlook', label: 'Outlook' },
+    ].map(m =>
+        `<span class="modal-mode-tab${mode === m.key ? ' active' : ''}"
+               onclick="showWeekHighLowChart('${escapedId}', '${m.key}')">${m.label}</span>`
+    ).join('');
+    title.innerHTML = `${modalWeekArrowsHtml()}${weekLabelText} — ${modeTabs}`;
+    return { modal, table };
+}
+
 function showWeekHighLowChart(weekId, mode = "highlow") {
+    // Stats tab: the per-team week statistics table (formerly its own window)
+    if (mode === "stats") {
+        const html = buildWeekStatsTableHtml(weekId);
+        if (html === null) return;
+        const { modal, table } = renderWeekChartTitle(weekId, mode);
+        table.style.cssText = "";
+        table.classList.add("week-stats-table");
+        table.innerHTML = html;
+        modal.dataset.chartType = "highlow";
+        modal.dataset.chartMode = mode;
+        modal.classList.add("open");
+        return;
+    }
+
     const block = document.getElementById(weekId);
     if (!block) return;
     const sections = block.querySelectorAll(".ballot-section");
@@ -3569,30 +3577,8 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
             .map(x => x.d);
     }
 
-    const modal = document.getElementById("voter-history-modal");
-    const title = document.getElementById("voter-history-title");
-    const table = document.getElementById("voter-history-table");
-
-    const titleTab = (_apCurrentYear !== null
-        ? document.querySelector(`.week-tab[data-poll="ap"][data-year="${_apCurrentYear}"][data-weeknum="${_apCurrentWeekNum}"]`)
-        : null) || document.querySelector(".week-tab.active");
-    const weekNum = titleTab ? displayWeekNum(titleTab) : "";
-    const year = titleTab?.dataset.year || "";
-    const weekLabel = weekTextLabel(titleTab);
-    const weekLabelText = weekLabel
-        ? `${year} ${weekLabel}`
-        : `${year} Week ${String(weekNum).padStart(2, "0")}`;
-    const escapedId = weekId.replace(/'/g, "\\'");
-    const modeTabs = [
-        { key: 'highlow', label: 'Range' },
-        { key: 'dots', label: 'Spread' },
-        { key: 'outlook', label: 'Outlook' },
-    ].map(m =>
-        `<span class="modal-mode-tab${mode === m.key ? ' active' : ''}"
-               onclick="showWeekHighLowChart('${escapedId}', '${m.key}')">${m.label}</span>`
-    ).join('');
-    title.innerHTML = `${modalWeekArrowsHtml()}${weekLabelText} Graphs — ${modeTabs}`;
-
+    const { modal, table } = renderWeekChartTitle(weekId, mode);
+    table.classList.remove("week-stats-table");
     table.innerHTML = "";
     table.style.cssText = "display:block; white-space:normal; width:100%;";
 
@@ -4630,18 +4616,20 @@ function injectApWeightedRankingRow(apBlock, apWeekId, year) {
     _injectConferenceRows(apBlock, apWeekId, year, yearTabs, deltaData);
 }
 
-function showAvgRankModal(weekId) {
+// Week Stats table (the "Stats" tab of the Stats > Week window). Returns the
+// table's inner HTML, or null when the week has no official ballots.
+function buildWeekStatsTableHtml(weekId) {
     const block = document.getElementById(weekId);
-    if (!block) return;
+    if (!block) return null;
     const sections = block.querySelectorAll(".ballot-section");
     const officialSection = sections[0];
-    if (!officialSection) return;
+    if (!officialSection) return null;
 
     // Collect all voter rows (exclude Official Overall)
     const voterRows = Array.from(officialSection.querySelectorAll(".voter-row"))
         .filter(r => getVoterName(r) !== "Official Overall");
     const totalVoters = voterRows.length;
-    if (totalVoters === 0) return;
+    if (totalVoters === 0) return null;
 
     // Compute rank sums, voter counts, points, and rank lists per team
     const teamRankSum = {};
@@ -4700,18 +4688,6 @@ function showAvgRankModal(weekId) {
         const x = fmtBandRank(a), y = fmtBandRank(b);
         return x === y ? `${x}` : `${x}–${y}`;
     };
-
-    const titleTab = allTabsSorted[currTabIdx] || document.querySelector(".week-tab.active");
-    const weekNum = titleTab ? displayWeekNum(titleTab) : "";
-    const year = titleTab?.dataset.year || "";
-    const weekLabel = weekTextLabel(titleTab);
-
-    const modal = document.getElementById("avg-rank-modal");
-    const title = document.getElementById("avg-rank-title");
-    const table = document.getElementById("avg-rank-table");
-
-    const weekPad = String(weekNum).padStart(2, "0");
-    title.innerHTML = modalWeekArrowsHtml() + (weekLabel ? `${year} ${weekLabel} Statistics` : `${year} #${weekPad} Statistics`);
 
     const percentileRank = (sortedArr, p) => {
         if (sortedArr.length === 1) return sortedArr[0];
@@ -4801,8 +4777,7 @@ function showAvgRankModal(weekId) {
         receivingVotes.forEach((team, i) => { html += buildRow(team, 26 + i); });
     }
     html += "</tbody>";
-    table.innerHTML = html;
-    modal.classList.add("open");
+    return html;
 }
 
 function showAggregateSection() {
@@ -6138,7 +6113,7 @@ function computeVoterAvg(yearTabs, lbData) {
     return voterAvg;
 }
 
-["keybind-legend-modal", "avg-rank-modal", "season-stats-modal", "heatmap-modal"].forEach(id => {
+["keybind-legend-modal", "season-stats-modal", "heatmap-modal"].forEach(id => {
     document.getElementById(id).addEventListener("click", e => {
         if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
     });
@@ -6154,7 +6129,7 @@ function computeVoterAvg(yearTabs, lbData) {
 })();
 
 
-// Prev/next week arrows floated into the week Statistics and Graphs modal
+// Prev/next week arrows floated into the Stats > Week modal
 // titles. Same chevrons as the header's #week-arrows and shown under the same
 // Settings toggle (body.show-week-arrows); navigateWeek() re-renders whichever
 // of those modals is open.
@@ -6183,8 +6158,6 @@ function navigateWeek(dir) {
                 await showApWeek(target.dataset.year, target.dataset.weeknum);
                 if (weekPickerPinned) rebuildWeekPicker();
                 const apWeekId = `week-ap-${target.dataset.year}-${target.dataset.weeknum}`;
-                if (document.getElementById("avg-rank-modal").classList.contains("open"))
-                    showAvgRankModal(apWeekId);
                 const vhm = document.getElementById("voter-history-modal");
                 if (vhm.classList.contains("open") && vhm.dataset.chartType === "highlow")
                     showWeekHighLowChart(apWeekId, vhm.dataset.chartMode || "highlow");
@@ -6199,8 +6172,6 @@ function navigateWeek(dir) {
             loadYear(target.dataset.year).then(async () => {
                 await showWeek(target.dataset.week);
                 if (weekPickerPinned) rebuildWeekPicker();
-                if (document.getElementById("avg-rank-modal").classList.contains("open"))
-                    showAvgRankModal(target.dataset.week);
                 const vhm = document.getElementById("voter-history-modal");
                 if (vhm.classList.contains("open") && vhm.dataset.chartType === "highlow")
                     showWeekHighLowChart(target.dataset.week, vhm.dataset.chartMode || "highlow");
@@ -6279,7 +6250,6 @@ document.addEventListener("keydown", e => {
     if (e.key === "Escape") {
         document.getElementById("voter-history-modal").classList.remove("open");
         document.getElementById("keybind-legend-modal").classList.remove("open");
-        document.getElementById("avg-rank-modal").classList.remove("open");
         document.getElementById("season-stats-modal").classList.remove("open");
         document.getElementById("precision-modal").classList.remove("open");
         document.getElementById("tenure-modal").classList.remove("open");
@@ -6375,10 +6345,10 @@ document.addEventListener("keydown", e => {
     if (e.key === "Y" || e.key === "y") {
         e.preventDefault();
         if (_apCurrentYear !== null) {
-            showAvgRankModal(`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`);
+            showWeekHighLowChart(`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`, "stats");
         } else {
             const activeTab = document.querySelector(".week-tab.active");
-            if (activeTab) showAvgRankModal(activeTab.dataset.week);
+            if (activeTab) showWeekHighLowChart(activeTab.dataset.week, "stats");
         }
         return;
     }
@@ -6486,8 +6456,6 @@ document.addEventListener("keydown", e => {
                     await showApWeek(target.dataset.year, target.dataset.weeknum);
                     if (weekPickerPinned) rebuildWeekPicker();
                     const apWeekId = `week-ap-${target.dataset.year}-${target.dataset.weeknum}`;
-                    if (document.getElementById("avg-rank-modal").classList.contains("open"))
-                        showAvgRankModal(apWeekId);
                     const vhm2 = document.getElementById("voter-history-modal");
                     if (vhm2.classList.contains("open") && vhm2.dataset.chartType === "highlow")
                         showWeekHighLowChart(apWeekId, vhm2.dataset.chartMode || "highlow");
@@ -6506,8 +6474,6 @@ document.addEventListener("keydown", e => {
                 if (target) {
                     await showWeek(target.dataset.week);
                     if (weekPickerPinned) rebuildWeekPicker();
-                    if (document.getElementById("avg-rank-modal").classList.contains("open"))
-                        showAvgRankModal(target.dataset.week);
                     const vhm2 = document.getElementById("voter-history-modal");
                     if (vhm2.classList.contains("open") && vhm2.dataset.chartType === "highlow")
                         showWeekHighLowChart(target.dataset.week, vhm2.dataset.chartMode || "highlow");
