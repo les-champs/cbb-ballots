@@ -39,6 +39,7 @@ PARAMS = {
     "boldness_cap":     0.0,    # disabled — set to 0 to remove cap entirely
     "miss_penalty":     10,     # added distance per missed week
     "max_misses":       4,      # misses >= this → disqualified
+    "max_consec_misses": 3,     # longest run of consecutive misses >= this → disqualified
     "final_avg_weeks":  5,      # how many weeks to average for finalRanking
 }
 
@@ -150,6 +151,8 @@ def score_voters(
         total_ww = 0.0
         bold_adj = 0.0
         missed = 0
+        consec_misses = 0
+        max_consec_misses = 0
         last_ballot = None
 
         for wk_idx, consensus in enumerate(consensus_weeks):
@@ -161,6 +164,7 @@ def score_voters(
                 total += dist * ww
                 total_ww += ww
                 last_ballot = ballot
+                consec_misses = 0
 
                 # Boldness
                 week_bold = 0.0
@@ -191,8 +195,10 @@ def score_voters(
                 total += miss_dist * ww
                 total_ww += ww
                 missed += 1
+                consec_misses += 1
+                max_consec_misses = max(max_consec_misses, consec_misses)
 
-        if missed >= p["max_misses"]:
+        if missed >= p["max_misses"] or max_consec_misses >= p["max_consec_misses"]:
             results[username] = {
                 "avg": float("inf"),
                 "bold_adj": 0,

@@ -1513,6 +1513,7 @@ const ON_AP_PAGE = typeof IS_AP_PAGE !== "undefined" && IS_AP_PAGE;
 
 const OUTLIER_OMISSION_TOP_N = 15;
 const OUTLIER_HIGH_MAX_RANK = 20;
+const OUTLIER_SD_THRESHOLD = 2.5;
 let _outliersMode = false;
 
 function svgColors() {
@@ -2114,7 +2115,7 @@ function applyOutliers(weekBlock) {
             const deviation = cRank - voterRank;
             const stat = teamStats[team];
             cell.classList.remove("outlier-high", "outlier-low");
-            if (stat && stat.sd > 0 && Math.abs(voterRank - stat.avg) >= 2 * stat.sd && Math.abs(deviation) >= 3) {
+            if (stat && stat.sd > 0 && Math.abs(voterRank - stat.avg) >= OUTLIER_SD_THRESHOLD * stat.sd && Math.abs(deviation) >= 3) {
                 // High outliers only count in the top 20; #21-25 is ordinary ballot filler.
                 if (deviation > 0 && voterRank <= OUTLIER_HIGH_MAX_RANK) cell.classList.add("outlier-high");
                 else if (deviation < 0) cell.classList.add("outlier-low");
@@ -4795,7 +4796,19 @@ function saveTableAsPng() {
     const section = block.querySelector(".ballot-section[style*='block'], .ballot-section:not([style])");
     const table = section ? section.querySelector("table") : null;
     if (!table) return;
-    html2canvas(table, { useCORS: true, scale: 2 }).then(canvas => {
+    html2canvas(table, {
+        useCORS: true,
+        scale: 2,
+        // Even rows are transparent; html2canvas fills those with white by default,
+        // which leaves dark-mode text unreadable. Use the page background instead.
+        backgroundColor: getComputedStyle(document.body).backgroundColor,
+        // Edit only the clone: hide veteran tags and drop the hover state so the
+        // row under the cursor doesn't show its pin/history buttons.
+        onclone: doc => {
+            doc.body.classList.add("hide-veteran-tags");
+            doc.querySelectorAll(".voter-cell-hover").forEach(el => el.classList.remove("voter-cell-hover"));
+        },
+    }).then(canvas => {
         const link = document.createElement("a");
         const week = tab ? (weekTextLabel(tab) || padWeekNum(displayWeekNum(tab))) : _apCurrentWeekNum;
         const year = tab ? tab.dataset.year : _apCurrentYear;
@@ -5620,7 +5633,7 @@ function computeVoterAvg(yearTabs, lbData) {
     const totalWeeks = yearTabs.length;
 
     allUsernames.forEach(username => {
-        let lastBallot = null, total = 0, totalWW = 0, missed = 0, boldAdj = 0, consecMisses = 0;
+        let lastBallot = null, total = 0, totalWW = 0, missed = 0, boldAdj = 0, consecMisses = 0, maxConsecMisses = 0;
         yearTabs.forEach((tab, weekIdx) => {
             const weekId = tab.dataset.week;
             // Week weight: 0.5 for first week, 1.0 for last week, linear taper
@@ -5665,9 +5678,11 @@ function computeVoterAvg(yearTabs, lbData) {
                 totalWW += ww;
                 missed++;
                 consecMisses++;
+                maxConsecMisses = Math.max(maxConsecMisses, consecMisses);
             }
         });
-        if (missed >= MAX_MISSES || consecMisses >= MAX_CONSEC_MISSES) {
+        // Longest streak anywhere in the season, not just a trailing one
+        if (missed >= MAX_MISSES || maxConsecMisses >= MAX_CONSEC_MISSES) {
             voterAvg[username] = { avg: Infinity, combined: Infinity };
             return;
         }
