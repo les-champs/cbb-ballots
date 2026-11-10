@@ -709,14 +709,31 @@ window.addEventListener("resize", () => {
     document.querySelectorAll(".sort-picker.open.credits-mode").forEach(fitCreditsText);
 });
 
+// Tables carry only the Functions toggle; the menu itself is cloned from the
+// page's single <template id="picker-template"> on first use, then synced to
+// the current sort and Show states (later changes reach it via the page-wide
+// querySelectorAll updates in setGlobalSort, toggleOutliers and syncOverallMenu).
+function createPicker(toggle) {
+    const tpl = document.getElementById("picker-template");
+    const picker = tpl?.content.firstElementChild?.cloneNode(true);
+    if (!picker) return null;
+    picker.querySelectorAll(".sort-option[data-sort]").forEach(o => {
+        o.classList.toggle("active", o.dataset.sort === currentSort);
+    });
+    picker.querySelectorAll("[data-action='toggleOutliers']").forEach(o => o.classList.toggle("active", _outliersMode));
+    picker.querySelectorAll("[data-action='toggleOverall']").forEach(o => o.classList.toggle("active", _showOverallRow));
+    toggle.after(picker);
+    return picker;
+}
+
 function bindVotersToggle() {
     document.querySelectorAll(".voters-toggle").forEach(toggle => {
         if (toggle.dataset.bound) return;
         toggle.dataset.bound = "1";
         toggle.addEventListener("click", e => {
             e.stopPropagation();
-            const picker = toggle._picker || toggle.nextElementSibling;
-            if (!picker?.classList.contains("sort-picker")) return;
+            const picker = toggle._picker || createPicker(toggle);
+            if (!picker) return;
             toggle._picker = picker;
             const isOpen = picker.classList.contains("open");
             document.querySelectorAll(".sort-picker.open").forEach(p => {
@@ -3497,7 +3514,7 @@ function saveTableAsPng() {
     const section = block.querySelector(".ballot-section[style*='block'], .ballot-section:not([style])");
     const table = section ? section.querySelector("table") : null;
     if (!table) return;
-    html2canvas(table, {
+    loadHtml2canvas().then(() => html2canvas(table, {
         useCORS: true,
         scale: 2,
         // Even rows are transparent; html2canvas fills those with white by default,
@@ -3509,7 +3526,7 @@ function saveTableAsPng() {
             doc.body.classList.add("hide-veteran-tags");
             doc.querySelectorAll(".voter-cell-hover").forEach(el => el.classList.remove("voter-cell-hover"));
         },
-    }).then(canvas => {
+    })).then(canvas => {
         const link = document.createElement("a");
         const week = tab ? (weekTextLabel(tab) || padWeekNum(displayWeekNum(tab))) : _apCurrentWeekNum;
         const year = tab ? tab.dataset.year : _apCurrentYear;
@@ -3521,7 +3538,24 @@ function saveTableAsPng() {
         link.download = `${isAp ? "ap" : "cbb-poll"}-${year}-week${week}-${label}.png`;
         link.href = canvas.toDataURL("image/png");
         link.click();
-    });
+    }).catch(e => console.error("Save as PNG failed:", e));
+}
+
+// html2canvas (~200 KB) is only needed for Save as PNG, so fetch it on first
+// use instead of blocking page load with a <script> tag.
+let _html2canvasPromise = null;
+function loadHtml2canvas() {
+    if (typeof html2canvas !== "undefined") return Promise.resolve();
+    if (!_html2canvasPromise) {
+        _html2canvasPromise = new Promise((resolve, reject) => {
+            const s = document.createElement("script");
+            s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+            s.onload = resolve;
+            s.onerror = () => { _html2canvasPromise = null; reject(new Error("html2canvas failed to load")); };
+            document.head.appendChild(s);
+        });
+    }
+    return _html2canvasPromise;
 }
 
 // Delta feature

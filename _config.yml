@@ -1,0 +1,10 @@
+# GitHub Pages (legacy Jekyll build): keep build inputs out of the published site.
+# The site only loads *.html fragments, cbb-logos/ and thumbnail.png.
+exclude:
+  - "*.json"
+  - "*.py"
+  - __pycache__
+  - CLAUDE.md
+  - .claude
+  - .vscode
+  - "logos voters(png)"

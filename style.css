@@ -427,6 +427,12 @@ body.show-overall-row .overall-row {
 
 
 
+.voters-toggle {
+    cursor: pointer;
+    display: inline-block;
+    transition: transform 0.1s ease;
+}
+
 .voters-toggle:hover {
     transform: scale(1.05);
 }

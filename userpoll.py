@@ -1249,10 +1249,10 @@ def build_overall_row(voters, label):
     voter_cell = f'<div class="voter-cell" ><span class="voter-name">{label}</span></div>'
     return f'<tr class="voter-row"><td>{voter_cell}</td>{ballot_logo_cells}</tr>\n'
 
-RANK_HEADERS = "".join(f"<th><span class='rank-header-num'>{i+1}</span></th>" for i in range(25))
-THEAD_HTML = (
-    f"<thead><tr>"
-    f"<th><span class='voters-toggle' style='cursor:pointer; display:inline-block; transition:transform 0.1s ease;'>Functions</span>"
+# One Functions menu per page, in a <template>: script.js clones it next to a
+# table's Functions toggle the first time that toggle is clicked, so the ~60
+# tables in each fragment carry only the toggle instead of a full menu copy.
+PICKER_HTML = (
     f"<span class='sort-picker'>"
     f"<span class='picker-category'>Sort</span>"
     f"<span class='sort-option active' data-sort='alphabetic'>Alphabetic</span>"
@@ -1278,7 +1278,13 @@ THEAD_HTML = (
     f"<span class='sort-option settings-only' data-action='savePng'>Save as PNG</span>"
     f"<span class='sort-option settings-only' data-action='legend'>Keybinds</span>"
     f"<span class='credits-only credits-text'>Site reports &amp; analyzes the results of ballot votes from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span>"
-    f"</span></th>"
+    f"</span>"
+)
+
+RANK_HEADERS = "".join(f"<th><span class='rank-header-num'>{i+1}</span></th>" for i in range(25))
+THEAD_HTML = (
+    f"<thead><tr>"
+    f"<th><span class='voters-toggle'>Functions</span></th>"
     f"{RANK_HEADERS}</tr></thead>"
 )
 
@@ -1510,7 +1516,6 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
 </head>
 <body>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <div class="header">
   <h1>
     <span id="toggle-text">Official Ballots</span>
@@ -1575,6 +1580,8 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
     </div>
   </div>
 </div>
+
+<template id="picker-template">{PICKER_HTML}</template>
 
 <div id="pin-modal">
   <div id="pin-box">

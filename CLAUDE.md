@@ -5,6 +5,7 @@ Scraper + static site generator for college basketball poll ballots. `userpoll.p
 - **Live:** https://www.userpoll-landscape.com/ (custom domain via `CNAME`; `les-champs.github.io/cbb-ballots/` redirects there)
 - **Repo:** `les-champs/cbb-ballots`, branch `main` only. Push to `main` → GitHub Pages serves from root.
 - No build tooling, no tests, no package manager. Python 3 stdlib + PIL; vanilla JS.
+- `_config.yml` excludes build inputs (`*.json`, `*.py`, `CLAUDE.md`, …) from the Pages site; html2canvas is loaded on demand by `loadHtml2canvas()` (Save as PNG), not by a `<script>` tag.
 
 ## Golden rules
 
@@ -67,7 +68,7 @@ Local testing: `python3 -m http.server 8000` → http://localhost:8000. Opening 
 - **Logos:** `LOGO_NAME_MAP`, `canonical_logo_name`, `download_logos`, `download_dark_logos`, `download_missing_logos`, `convert_all_to_webp`.
 - **Legacy cbbpoll.com:** `CBBPOLL_SEASONS`, `CBBPOLL_NAME_OVERRIDES`, `CBBPOLL_ALT_OVERRIDES`, `cbbpoll_scrape_season`, `cbbpoll_build_season`.
 - **AP25:** `AP25_SITE_YEARS`, `AP25_NAME_OVERRIDES`, `_normalize_ap_team_name`, `ap25_fetch_grid`, `ap25_scrape_season`, `ap25_build_season`, `build_ap_week_block`, `build_appage_week_block`, `_update_ap_in_index`.
-- **HTML generation:** `build_week_block` (Official / Provisional / Aggregate sections; one `<tr>` per voter, 25 logo `<td>`s), `THEAD_HTML`, `build_full_html` (the main page template, incl. keybind legend modal), `build_ap_html`, `save_html`, `load_existing_weeks`, `split_data_by_year`, `write_year_fragments`.
+- **HTML generation:** `build_week_block` (Official / Provisional / Aggregate sections; one `<tr>` per voter, 25 logo `<td>`s), `THEAD_HTML` (only the Functions toggle + rank headers), `PICKER_HTML` (the Functions menu, emitted once per page as `<template id="picker-template">`; `createPicker()` in script.js clones it beside a toggle on first click — add menu items here, not to `THEAD_HTML`), `build_full_html` (the main page template, incl. keybind legend modal), `build_ap_html`, `save_html`, `load_existing_weeks`, `split_data_by_year`, `write_year_fragments`.
 - **Rebuild:** `rebuild_html` (also patches legacy markup via regex migrations, preserves AP tabs via `get_ap_info`, calls `rebuild_ap_html`).
 - **Markers in index.html:** `<!-- WEEK-TABS -->`, `<!-- WEEK-DATA -->`, `<!-- AP-TABS --> … <!-- /AP-TABS -->`.
 - Team logos are referenced by name only (`data-src="Duke"`); JS resolves to `cbb-logos/Duke.webp` or `Duke-dark.webp` (`logoSrc()`).
