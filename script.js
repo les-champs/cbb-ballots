@@ -2742,7 +2742,117 @@ document.getElementById("toggle-text").addEventListener("click", async () => {
 function injectWeightedRankingRow(activeTab, activeBlock) {
     const activeYear = activeTab.dataset.year;
     const yearTabs = getSortedTabs().filter(t => t.dataset.year === activeYear);
-    _injectRecencyRow(activeBlock, activeTab.dataset.week, yearTabs, buildDeltaData(true));
+    const deltaData = buildDeltaData(true);
+    _injectRecencyRow(activeBlock, activeTab.dataset.week, yearTabs, deltaData);
+    _injectConferenceRows(activeBlock, activeTab.dataset.week, activeYear, yearTabs, deltaData);
+}
+
+// ── Conference rankings (Data Ballots, 2025+) ────────────────────────────────
+// One row per Power conference, then Power and Mid-Major. Each one ranks only
+// that group's teams by Overall points (rank 1 = 25 pts … rank 25 = 1 pt, summed
+// over official ballots). Because it uses the full ballots, it lists every team
+// in the group that got votes, not only the ones in the Overall top 25.
+
+// [{label, teams:Set}] for a season, or null before conference data starts.
+function conferenceGroups(year) {
+    if (typeof CONFERENCE_DATA === "undefined") return null;
+    const seasons = Object.keys(CONFERENCE_DATA.seasons).map(Number).sort((a, b) => a - b);
+    year = Number(year);
+    if (!seasons.length || year < seasons[0]) return null;
+    const table = CONFERENCE_DATA.seasons[Math.min(year, seasons[seasons.length - 1])];
+    const power = CONFERENCE_DATA.power;
+    const groups = power.filter(c => table[c]).map(c => ({ label: c, teams: new Set(table[c]) }));
+    const all = conf => new Set(Object.keys(table).filter(conf).flatMap(c => table[c]));
+    groups.push({ label: "Power", teams: all(c => power.includes(c)) });
+    groups.push({ label: "Mid-Major", teams: all(c => !power.includes(c)) });
+    return groups;
+}
+
+// Overall points for one week's official ballots: {team: pts}.
+function weekBallotPoints(weekBallots) {
+    const pts = {};
+    Object.entries(weekBallots || {}).forEach(([user, teams]) => {
+        if (user === "Official Overall" || user === "AP Overall") return;
+        teams.slice(0, 25).forEach((t, i) => { pts[t] = (pts[t] || 0) + (25 - i); });
+    });
+    return pts;
+}
+
+// Top 25 teams of a group, ordered by points.
+function rankGroup(pts, group) {
+    const aliases = CONFERENCE_DATA.aliases || {};
+    return Object.keys(pts)
+        .filter(t => group.teams.has(aliases[t] || t))
+        .sort((a, b) => pts[b] - pts[a])
+        .slice(0, 25);
+}
+
+function _injectConferenceRows(block, weekId, year, yearTabs, deltaData) {
+    const aggTbody = block.querySelectorAll(".ballot-section")[2]?.querySelector("tbody");
+    if (!aggTbody) return;
+    const expanded = new Set();
+    aggTbody.querySelectorAll(".row-conference-ranking").forEach(r => {
+        if (r.classList.contains("row-delta")) expanded.add(r.dataset.group);
+        r.remove();
+    });
+
+    const groups = conferenceGroups(year);
+    if (!groups) return;
+    const pts = weekBallotPoints(deltaData[weekId]);
+    if (!Object.keys(pts).length) return;
+
+    const currIdx = yearTabs.findIndex(t => t.dataset.week === weekId);
+    const prevWeekId = currIdx + 1 < yearTabs.length ? yearTabs[currIdx + 1].dataset.week : null;
+    const prevPts = prevWeekId ? weekBallotPoints(deltaData[prevWeekId]) : {};
+    const hasPrev = Object.keys(prevPts).length > 0;
+
+    let anchor = aggTbody.querySelector(".row-weighted-ranking:not(.row-conference-ranking)")
+        || aggTbody.querySelector(".voter-row:not(.row-pinned-agg)");
+    groups.forEach((group, gi) => {
+        const ranked = rankGroup(pts, group);
+        const prevRankOf = {};
+        if (hasPrev) rankGroup(prevPts, group).forEach((t, i) => { prevRankOf[t] = i + 1; });
+
+        const tr = document.createElement("tr");
+        tr.className = "voter-row row-weighted-ranking row-conference-ranking";
+        if (gi === 0) tr.classList.add("row-conference-first");
+        tr.dataset.group = group.label;
+        const nameTd = document.createElement("td");
+        nameTd.innerHTML = `<div class="voter-cell"><span class="voter-name"></span></div>`;
+        nameTd.querySelector(".voter-name").textContent = group.label;
+        tr.appendChild(nameTd);
+
+        for (let i = 0; i < 25; i++) {
+            const td = document.createElement("td");
+            td.className = "logo-cell";
+            const team = ranked[i];
+            if (team) {
+                const label = document.createElement("span");
+                label.className = "delta-label";
+                if (!hasPrev) { label.textContent = "—"; label.classList.add("delta-same"); }
+                else if (!prevRankOf[team]) { label.textContent = "NEW"; label.classList.add("delta-new"); }
+                else setDeltaLabel(label, prevRankOf[team] - (i + 1));
+                td.appendChild(label);
+
+                const img = document.createElement("img");
+                img.className = "logo team-logo";
+                img.dataset.team = team;
+                img.src = logoSrc(team);
+                td.appendChild(img);
+
+                const ptsLabel = document.createElement("span");
+                ptsLabel.className = "avg-label";
+                ptsLabel.textContent = pts[team];
+                ptsLabel.title = "Overall points";
+                td.appendChild(ptsLabel);
+            }
+            tr.appendChild(td);
+        }
+        if (expanded.has(group.label)) tr.classList.add("row-delta");
+        if (anchor) anchor.after(tr); else aggTbody.appendChild(tr);
+        anchor = tr;
+    });
+    bindTeamLogos();
 }
 
 // Build the "Recency" (5-week weighted) ranking row into a week block's aggregate table.
@@ -2752,7 +2862,7 @@ function _injectRecencyRow(block, weekId, yearTabs, deltaData) {
     if (!aggTbody) return;
 
     // Remove any previously injected weighted row, remembering if it was expanded
-    const existingRow = aggTbody.querySelector(".row-weighted-ranking");
+    const existingRow = aggTbody.querySelector(".row-weighted-ranking:not(.row-conference-ranking)");
     const wasExpanded = existingRow?.classList.contains("row-delta") ?? false;
     existingRow?.remove();
 
@@ -2861,7 +2971,9 @@ function buildApDeltaData(year) {
 }
 
 function injectApWeightedRankingRow(apBlock, apWeekId, year) {
-    _injectRecencyRow(apBlock, apWeekId, apYearTabs(year), buildApDeltaData(year));
+    const yearTabs = apYearTabs(year), deltaData = buildApDeltaData(year);
+    _injectRecencyRow(apBlock, apWeekId, yearTabs, deltaData);
+    _injectConferenceRows(apBlock, apWeekId, year, yearTabs, deltaData);
 }
 
 function showAvgRankModal(weekId) {
@@ -3534,6 +3646,20 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
         if (deltaData[wid]?.[username]) deltaData[wid][username].forEach(t => priorTeams.add(t));
     }
 
+    // Overall row: below-logo label shows the team's points from this week's
+    // official ballots (25 for #1 … 1 for #25) instead of a consensus diff.
+    let overallPts = null;
+    if (row.classList.contains("overall-row")) {
+        overallPts = {};
+        const officialSection = row.closest(".week-block")?.querySelectorAll(".ballot-section")[0];
+        officialSection?.querySelectorAll(".voter-row:not(.row-weighted-ranking)").forEach(r => {
+            Array.from(r.querySelectorAll(".team-logo")).slice(0, 25).forEach((img, i) => {
+                const t = img.dataset.team;
+                overallPts[t] = (overallPts[t] || 0) + (25 - i);
+            });
+        });
+    }
+
     const logos = row.querySelectorAll(".team-logo");
     logos.forEach((logo, idx) => {
         const team = logo.dataset.team;
@@ -3557,8 +3683,16 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
         }
         wrapper.insertBefore(label, logo);
 
+        if (overallPts) {
+            const ptsLabel = document.createElement("span");
+            ptsLabel.className = "avg-label";
+            ptsLabel.textContent = String(overallPts[team] || 0);
+            wrapper.appendChild(ptsLabel);
+            return;
+        }
+
         // Below-logo label — skipped for aggregate section rows
-        const isAggSection = row.closest('.ballot-section')?.id?.endsWith('-aggregate') || row.classList.contains("overall-row");
+        const isAggSection = row.closest('.ballot-section')?.id?.endsWith('-aggregate');
         if (!isAggSection) {
             if (deltaSubMode === "recency") {
                 // Weighted avg label (linear weights: most recent=5, oldest=1, missing weeks skipped)
@@ -4113,7 +4247,82 @@ function showTenureModal() {
     modal.classList.add("open");
 }
 
-["precision-modal", "tenure-modal"].forEach(id => {
+// Conference table (Shift+K): every D1 school by conference for a season,
+// from CONFERENCE_DATA (built from conferences.py). Used to check makeups.
+function conferenceDisplayName(team) {
+    const names = CONFERENCE_DATA.names;
+    if (names[team]) return names[team];
+    return team.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2");
+}
+
+function showConferenceModal(year) {
+    const seasons = Object.keys(CONFERENCE_DATA.seasons).map(Number).sort((a, b) => a - b);
+    if (seasons.length === 0) return;
+    if (year === undefined) {
+        const activeTab = document.querySelector(".week-tab.active");
+        year = _apCurrentYear !== null ? Number(_apCurrentYear) : Number(activeTab?.dataset.year);
+    }
+    year = Number(year);
+    if (!seasons.includes(year)) year = year < seasons[0] ? seasons[0] : seasons[seasons.length - 1];
+
+    const table = CONFERENCE_DATA.seasons[year];
+    const power = CONFERENCE_DATA.power;
+    const confs = Object.keys(table);
+    const powerConfs = power.filter(c => table[c]);
+    const midConfs = confs.filter(c => !power.includes(c)).sort((a, b) => a.localeCompare(b));
+    const count = list => list.reduce((n, c) => n + table[c].length, 0);
+
+    document.getElementById("conference-title").textContent =
+        `${year - 1}–${String(year).slice(-2)} Conferences`;
+    document.getElementById("conference-years").innerHTML = seasons.map(y =>
+        `<button class="conference-year${y === year ? " active" : ""}" data-year="${y}">${y}</button>`
+    ).join("");
+
+    const block = conf => {
+        const teams = table[conf].slice().sort((a, b) =>
+            conferenceDisplayName(a).localeCompare(conferenceDisplayName(b)));
+        const cells = teams.map(t => {
+            const name = conferenceDisplayName(t);
+            return `<div class="conference-team" title="${t}">
+                <img class="conference-logo" data-team="${t}" alt="">
+                <span class="conference-team-name">${name}</span>
+            </div>`;
+        }).join("");
+        return `<div class="conference-block">
+            <h3>${conf} <span class="conference-count">${teams.length}</span></h3>
+            <div class="conference-grid">${cells}</div>
+        </div>`;
+    };
+
+    document.getElementById("conference-body").innerHTML =
+        `<div class="conference-tier"><h2>Power <span class="conference-count">${powerConfs.length} conferences · ${count(powerConfs)} schools</span></h2>${powerConfs.map(block).join("")}</div>` +
+        `<div class="conference-tier"><h2>Mid-Major <span class="conference-count">${midConfs.length} conferences · ${count(midConfs)} schools</span></h2>${midConfs.map(block).join("")}</div>`;
+
+    document.querySelectorAll("#conference-body img.conference-logo").forEach(img => {
+        img.addEventListener("error", () => {
+            if (img.dataset.fallback) {
+                // No logo file for this school: show a dashed placeholder instead.
+                const ph = document.createElement("span");
+                ph.className = "conference-logo missing";
+                ph.title = "No logo file";
+                img.replaceWith(ph);
+                return;
+            }
+            img.dataset.fallback = "1";
+            img.src = `cbb-logos/${img.dataset.team}.webp`;
+        });
+        setLogoSrc(img, img.dataset.team);
+    });
+
+    document.getElementById("conference-modal").classList.add("open");
+}
+
+document.getElementById("conference-years").addEventListener("click", e => {
+    const btn = e.target.closest(".conference-year");
+    if (btn) showConferenceModal(Number(btn.dataset.year));
+});
+
+["precision-modal", "tenure-modal", "conference-modal"].forEach(id => {
     document.getElementById(id).addEventListener("click", e => {
         if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
     });
@@ -4346,7 +4555,7 @@ document.getElementById("week-arrow-next").addEventListener("click", () => navig
 
 // ── PIN lock for the "Locked" keybinds (Shift+D/X/R/T/Y/G/U/H/P/?) ─────────────
 // Client-side only — a deterrent, not real security. Unlock is remembered.
-const LOCKED_KEYS = new Set(["D", "X", "R", "T", "Y", "G", "U", "H", "P", "?"]);
+const LOCKED_KEYS = new Set(["D", "X", "R", "T", "Y", "G", "U", "H", "K", "P", "?"]);
 const KEYBIND_PIN = "925289";
 let _keybindsUnlocked = false;
 try { _keybindsUnlocked = localStorage.getItem("keybindsUnlocked") === "1"; } catch (e) {}
@@ -4403,6 +4612,7 @@ document.addEventListener("keydown", e => {
         document.getElementById("season-stats-modal").classList.remove("open");
         document.getElementById("precision-modal").classList.remove("open");
         document.getElementById("tenure-modal").classList.remove("open");
+        document.getElementById("conference-modal").classList.remove("open");
         document.getElementById("heatmap-modal").classList.remove("open");
     }
     // Chord: Shift+V then X → toggle veteran tags
@@ -4482,6 +4692,12 @@ document.addEventListener("keydown", e => {
     if (e.key === "T" || e.key === "t") {
         e.preventDefault();
         showTenureModal();
+        return;
+    }
+
+    if (e.key === "K" || e.key === "k") {
+        e.preventDefault();
+        showConferenceModal();
         return;
     }
 

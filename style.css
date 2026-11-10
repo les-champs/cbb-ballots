@@ -390,7 +390,8 @@ body.show-overall-row .overall-row {
 
 .voter-row.row-delta .delta-label,
 .voter-row.row-delta .avg-label,
-.overall-row.row-delta .delta-label {
+.overall-row.row-delta .delta-label,
+.overall-row.row-delta .avg-label {
     display: block;
     text-align: center;
 }
@@ -1166,3 +1167,91 @@ body.dark .pin-btn.pinned {
 .header {
     z-index: 6;
 }
+
+/* Conference table (Shift+K) */
+#conference-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+#conference-modal.open { display: flex; }
+#conference-box {
+    background: var(--color-bg-modal);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    width: 95vw;
+    max-width: 770px;
+    max-height: 80vh;
+    overflow: auto;
+    padding: 14px 17px 11px;
+}
+#conference-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 5px;
+}
+#conference-title { margin: 0; font-size: 0.9rem; color: var(--color-modal-h2); }
+#conference-years { display: flex; gap: 4px; }
+.conference-year {
+    font: inherit;
+    font-size: 11px;
+    padding: 2px 7px;
+    border: 1px solid var(--color-border-tab);
+    border-radius: 4px;
+    background: var(--color-bg-tab);
+    color: var(--color-heading);
+    cursor: pointer;
+}
+.conference-year:hover { background: var(--color-bg-tab-hover); }
+.conference-year.active {
+    background: var(--color-bg-tab-active);
+    border-color: var(--color-border-tab-act);
+    color: var(--color-bg-modal);
+}
+.conference-tier > h2 {
+    font-size: 0.85rem;
+    margin: 12px 0 3px;
+    padding-bottom: 3px;
+    border-bottom: 2px solid var(--color-border-tab);
+    color: var(--color-modal-h2);
+}
+.conference-block h3 {
+    font-size: 0.78rem;
+    margin: 8px 0 4px;
+    color: var(--color-heading);
+}
+.conference-count { font-size: 10px; font-weight: normal; opacity: 0.6; margin-left: 4px; }
+.conference-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 5px 4px;
+}
+.conference-team {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 2px;
+}
+.conference-logo { width: 26px; height: 26px; object-fit: contain; }
+.conference-logo.missing {
+    display: block;
+    border: 1px dashed var(--color-border-tab);
+    border-radius: 50%;
+    box-sizing: border-box;
+}
+.conference-team-name {
+    font-size: 9px;
+    line-height: 1.15;
+    color: var(--color-heading);
+    word-break: break-word;
+}
+
+/* Conference ranking rows (Data Ballots, 2025+) */
+.voter-row.row-conference-first > td { border-top: 2px solid var(--color-border-tab); }

@@ -10,6 +10,8 @@ from io import BytesIO
 from urllib.parse import unquote
 from PIL import Image
 
+import conferences
+
 # Output directory for logos
 BASE_HTML_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_HTML_DIR, "cbb-logos")
@@ -288,6 +290,80 @@ def download_dark_logos():
 
     print(f"\n✓ Done. Downloaded {downloaded}, skipped {skipped} existing, "
           f"{no_dark} had no dark variant on ESPN, {failed} errors.")
+
+# ESPN team IDs for schools whose conferences.py key doesn't match ESPN's
+# location name (used by --missing-logos).
+ESPN_ID_OVERRIDES = {
+    "CSUBakersfield":  "2934",  # Cal State Bakersfield
+    "CSUN":            "2463",  # Cal State Northridge
+    "LouisianaMonroe": "2433",  # UL Monroe
+    "LoyolaMD":        "2352",  # Loyola Maryland
+    "NewOrleans":      "2443",  # LSU New Orleans
+    "Queens":          "2511",  # Queens University
+    "SaintFrancisPA":  "2598",  # left D1 in 2026, not in ESPN's current list
+    "Seattle":         "2547",  # Seattle U
+    "UTRGV":           "292",   # UT Rio Grande Valley
+}
+
+def download_missing_logos():
+    """Download ESPN logos (regular + dark) for conferences.py schools with no logo file."""
+    def norm(x):
+        return re.sub(r"[^a-z]", "", x.lower())
+
+    all_keys = {t for season in conferences.SEASONS.values() for t in season}
+    missing = sorted(t for t in all_keys
+                     if not os.path.exists(os.path.join(OUTPUT_DIR, f"{t}.webp")))
+    if not missing:
+        print("✓ Every school in conferences.py already has a logo.")
+        return
+    print(f"{len(missing)} schools have no logo file.")
+
+    api_url = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams?limit=1000"
+    req = urllib.request.Request(api_url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req) as resp:
+        data = json.loads(resp.read())
+    by_location = {}
+    for sport in data.get("sports", []):
+        for league in sport.get("leagues", []):
+            for entry in league.get("teams", []):
+                t = entry.get("team", {})
+                if t.get("location") and t.get("id"):
+                    by_location[norm(t["location"])] = t["id"]
+
+    def fetch(url, dest):
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req) as resp:
+            Image.open(BytesIO(resp.read())).save(dest, format="WEBP", lossless=True)
+
+    got = dark = 0
+    failed = []
+    for team in missing:
+        display = conferences.DISPLAY_NAMES.get(team, re.sub(r"([a-z])([A-Z])", r"\1 \2", team))
+        espn_id = (ESPN_ID_OVERRIDES.get(team)
+                   or by_location.get(norm(team))
+                   or by_location.get(norm(display)))
+        if not espn_id:
+            failed.append(f"{team} (no ESPN match)")
+            continue
+        try:
+            fetch(f"https://a.espncdn.com/i/teamlogos/ncaa/500/{espn_id}.png",
+                  os.path.join(OUTPUT_DIR, f"{team}.webp"))
+            got += 1
+        except Exception as e:
+            failed.append(f"{team} (id={espn_id}: {e})")
+            continue
+        try:
+            fetch(f"https://a.espncdn.com/i/teamlogos/ncaa/500-dark/{espn_id}.png",
+                  os.path.join(OUTPUT_DIR, f"{team}-dark.webp"))
+            dark += 1
+        except Exception:
+            pass  # no dark variant; the regular logo is used in dark mode
+        print(f"  ✓ {team} (ESPN id={espn_id})")
+        time.sleep(0.15)
+
+    print(f"\n✓ Done. Downloaded {got} logos ({dark} with dark variants).")
+    if failed:
+        print("  ✗ Failed: " + ", ".join(failed))
 
 def convert_all_to_webp():
     """One-time batch conversion of all existing PNGs to WebP."""
@@ -1406,6 +1482,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
     ap_tenure_counts_js = json.dumps(ap_tenure_counts or {})
     ap_fragment_years_js = json.dumps(ap_fragment_years or [])
     dark_logo_teams_js = "new Set(" + json.dumps(get_dark_logo_teams()) + ")"
+    conference_data_js = conferences.js_payload()
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -1490,6 +1567,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>G</kbd></span><span>Week rank spread chart</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>U</kbd></span><span>Season statistics</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>H</kbd></span><span>Season rank heatmap</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>K</kbd></span><span>Conference table</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>P</kbd></span><span>Save as PNG</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>?</kbd></span><span>Show legend</span></div>
     </div>
@@ -1531,6 +1609,16 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
   </div>
 </div>
 
+<div id="conference-modal">
+  <div id="conference-box">
+    <div id="conference-header">
+      <h2 id="conference-title"></h2>
+      <div id="conference-years"></div>
+    </div>
+    <div id="conference-body"></div>
+  </div>
+</div>
+
 <div id="tenure-modal">
   <div id="tenure-box">
     <h2 id="tenure-title"></h2>
@@ -1549,6 +1637,7 @@ const FRAGMENT_YEARS = {fragment_years_js};
 const TENURE_COUNTS = {tenure_counts_js};
 const AP_TENURE_COUNTS = {ap_tenure_counts_js};
 const DARK_LOGO_TEAMS = {dark_logo_teams_js};
+const CONFERENCE_DATA = {conference_data_js};
 {JS}
 </script>
 
@@ -1844,6 +1933,7 @@ def main():
     parser.add_argument("--official-only", action="store_true", dest="official_only",
                         help="Scrape only the Official section; store no provisional ballots for this week")
     parser.add_argument("--rebuild", action="store_true", help="Rebuild HTML from existing data without scraping")
+    parser.add_argument("--missing-logos", action="store_true", help="Download ESPN logos for conferences.py schools with no logo file and exit")
     parser.add_argument("--to-webp", action="store_true", help="Convert all existing PNG logos to WebP and exit")
     parser.add_argument("--dark-logos", action="store_true", help="Download ESPN dark-mode logos for all teams")
     parser.add_argument("--delete", action="store_true", help="Delete a specific week from the HTML")
@@ -1857,6 +1947,9 @@ def main():
         convert_all_to_webp()
         return
 
+    if args.missing_logos:
+        download_missing_logos()
+        return
     if args.dark_logos:
         download_dark_logos()
         return

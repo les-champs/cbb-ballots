@@ -22,6 +22,7 @@ userpoll.py            # Scrapers + HTML generator + CLI (source)
 script.js              # All client-side JS (source, inlined at build)
 style.css              # All CSS (source, inlined at build)
 poll_simulator.py      # Python mirror of the Précision formula for tuning
+conferences.py         # Season-dependent D1 conference + Power/Mid-Major mapping (2025+); injected as CONFERENCE_DATA
 index.html             # GENERATED — main site; only the current year's weeks are inline
 ap-ballots.html        # GENERATED — standalone AP page
 data-YEAR.html         # GENERATED — userpoll fragments for prior years
@@ -51,6 +52,7 @@ python3 userpoll.py --cbbpoll --year 2022              # Scrape legacy cbbpoll.c
 python3 userpoll.py --cbbpoll-build --year 2022        # Build legacy season HTML from cached JSON
 python3 userpoll.py --to-webp                          # Convert PNG logos → WebP
 python3 userpoll.py --dark-logos                       # Download ESPN dark-mode logos (ESPN_NAME_OVERRIDES)
+python3 userpoll.py --missing-logos                    # Download ESPN logos (+dark) for conferences.py schools with no logo (ESPN_ID_OVERRIDES)
 ```
 
 Local testing: `python3 -m http.server 8000` → http://localhost:8000. Opening via `file://` breaks prior-year and AP loading (fetch blocked).
@@ -62,7 +64,7 @@ Local testing: `python3 -m http.server 8000` → http://localhost:8000. Opening 
 - **cbbpoll.net scraping:** `fetch_page_html`, `split_voter_sections`, `extract_next_data`, `fetch_ballot_url_for_week`, `process_voters`. Fallback chain: seasons page (`/seasons/YEAR/WEEK`, ballot IDs from `__NEXT_DATA__`) → homepage (only if the seasons page has no voters yet) → user profile pages. The seasons page goes first because the homepage links ballots for the same week *number* from any season: for 2027 Week 2, 90 of its 129 ballots were from earlier seasons, and dropping them as stale lost 39 real voters. Regex-based parsing via `urllib.request`.
 - **Ballot cleanup in `main()` (every cbbpoll.net scrape):** (1) provisional voters whose username (case-insensitive) is also listed as official are dropped — the official entry wins; (2) `drop_stale_ballots()` drops any ballot created before `season_start(year)` (July 1 of year−1). Ballot IDs are MongoDB ObjectIds, so `ballot_created_at()` reads the creation time from the first 8 hex chars. `process_voters()` repeats the stale check on URLs found via fallbacks. Both steps print what they dropped. Background: on the 2027 pre-season page, cbbpoll.net's Provisional list held only prior seasons' (2022–2025) ballots, 44 of them duplicating official voters.
 - **`--official-only`:** skips the Provisional section entirely (stores 0 provisional ballots for that week). 2027 Pre-Season was scraped this way.
-- **Logos:** `LOGO_NAME_MAP`, `canonical_logo_name`, `download_logos`, `download_dark_logos`, `convert_all_to_webp`.
+- **Logos:** `LOGO_NAME_MAP`, `canonical_logo_name`, `download_logos`, `download_dark_logos`, `download_missing_logos`, `convert_all_to_webp`.
 - **Legacy cbbpoll.com:** `CBBPOLL_SEASONS`, `CBBPOLL_NAME_OVERRIDES`, `CBBPOLL_ALT_OVERRIDES`, `cbbpoll_scrape_season`, `cbbpoll_build_season`.
 - **AP25:** `AP25_SITE_YEARS`, `AP25_NAME_OVERRIDES`, `_normalize_ap_team_name`, `ap25_fetch_grid`, `ap25_scrape_season`, `ap25_build_season`, `build_ap_week_block`, `build_appage_week_block`, `_update_ap_in_index`.
 - **HTML generation:** `build_week_block` (Official / Provisional / Aggregate sections; one `<tr>` per voter, 25 logo `<td>`s), `THEAD_HTML`, `build_full_html` (the main page template, incl. keybind legend modal), `build_ap_html`, `save_html`, `load_existing_weeks`, `split_data_by_year`, `write_year_fragments`.
@@ -82,6 +84,8 @@ Local testing: `python3 -m http.server 8000` → http://localhost:8000. Opening 
 - **Highlighting/outliers:** `toggleTeamHighlight()` (5 color slots), `applyOutliers()` (unranked counts as 26; high outliers capped at #20).
 - **Charts/modals:** `showTeamRankChart()` (Shift+click logo), `showTeamSeasonDotPlot()`, `showWeekHighLowChart()` (modes `highlow` Range / `dots` Spread / `outlook` Outlook), `computeOutlookBands()` (Likely ~50% / Outlook ~77.5% bands; band-edge percentiles come from `BAND_PCT`, one row per rank tier #1–5…#21–25 with separate Userpoll and AP tables, fit so each tier hits its target with misses split evenly; also feeds the Likely/Outlook columns in `showAvgRankModal()`), `showAvgRankModal()`, `showSeasonStatsModal()` (incl. #1 Supporter / #1 Hater columns), `showHeatmapModal()`, `showPrecisionModal()`, `showTenureModal()`, `showVoterHistory()`, `saveTableAsPng()`.
 - **Précision:** `computeVoterAvg()`.
+- **Conferences:** `showConferenceModal(year)` (Shift+K) lists every D1 school by conference for a season (2025+) from `CONFERENCE_DATA`, which `build_full_html()` builds from `conferences.js_payload()`. Edit memberships only in `conferences.py` (`_BASE_2025` + per-season `_MOVES`), then `--rebuild`. `python3 conferences.py` checks every team on 2025+ ballots is mapped.
+- **Conference ranking rows (Data Ballots, 2025+):** `_injectConferenceRows()` (called from `injectWeightedRankingRow()` and `injectApWeightedRankingRow()`) adds rows after Recency: one per Power conference, then Power and Mid-Major. Each ranks only that group's teams by Overall points (25…1) over official ballots, top 25, with delta vs. the previous week's same-group ranking. Rows carry `row-weighted-ranking` (so sort/outliers/pins skip them) plus `row-conference-ranking`.
 - **Empty-week "N/A" overlay (end of file):** `#no-ballots-overlay` — a viewport-sized diagonal "N/A" in `--color-heading` shown when every visible `.week-block .ballot-section` lacks ballots (`sectionHasBallots()`: a `tr.voter-row` with a `.team-logo`, excluding `.row-weighted-ranking`/`.overall-row`). A `MutationObserver` on `style` changes of `.ballot-section`/`.week-block` triggers `updateNoBallotsOverlay()`, so no show/hide path needs to call it. `sizeNoBallotsOverlay()` fits the rotated text inside the viewport. Layering: overlay z-index 5 (`pointer-events: none`), `.header` z-index 6, modals 1000+.
 - **Keyboard:** single `keydown` handler near the end of the file. Legend HTML lives in `build_full_html()` in `userpoll.py` — **update both when adding a shortcut.**
 
@@ -99,10 +103,11 @@ Local testing: `python3 -m http.server 8000` → http://localhost:8000. Opening 
 | Y | Week avg-rank table | G | Week rank-spread chart |
 | U | Season stats | H | Season heatmap |
 | B | Bump/dot chart | P | Save PNG |
+| K | Conference table | | |
 | ? | Legend | Cmd+0 | Jump to Week 1 (pre-season) |
 | V then X | Toggle veteran tags (chord) | Esc | Close modal |
 
-**Locked keybinds:** Shift+D/X/R/T/Y/G/U/H/P/? require a 6-digit PIN (`LOCKED_KEYS` / `KEYBIND_PIN` above the `keydown` handler; `#pin-modal` in `build_full_html()`). Unlock persists via `localStorage.keybindsUnlocked`. Menu/click paths are not locked.
+**Locked keybinds:** Shift+D/X/R/T/Y/G/U/H/K/P/? require a 6-digit PIN (`LOCKED_KEYS` / `KEYBIND_PIN` above the `keydown` handler; `#pin-modal` in `build_full_html()`). Unlock persists via `localStorage.keybindsUnlocked`. Menu/click paths are not locked.
 
 ### Toggle states (`#toggle-text`)
 
