@@ -2741,48 +2741,98 @@ function applyTableSort(sort) {
             ? Array.from(aggRow.querySelectorAll(".team-logo")).map(img => img.dataset.team)
             : null;
         if (!consensus || !consensus.length) return;
-        const scoreFn = teams => {
-            if (!teams?.length) return Infinity;
-            let dist = 0;
-            for (let i = 0; i < 25; i++) {
-                const vr = teams.indexOf(consensus[i]);
-                dist += Math.abs(i - (vr === -1 ? 25 : vr));
+        const rowTeams = r => Array.from(r.querySelectorAll(".team-logo")).map(img => img.dataset.team);
+
+        // Leave-one-out: an official voter is scored against the consensus of every
+        // *other* official ballot, so their own ballot doesn't pull the target toward
+        // them. Points mirror _compute_aggregate_points() (rank 1 = 25 … rank 25 = 1).
+        // Provisional voters aren't in the consensus, so they use the full one.
+        const officialBallots = {};
+        sections[0]?.querySelectorAll("tbody .voter-row").forEach(r => {
+            if (r.classList.contains("row-weighted-ranking") || r.classList.contains("row-pinned-agg") ||
+                r.classList.contains("overall-row") || r.dataset.voterAlias) return;
+            const teams = rowTeams(r);
+            const u = getVoterName(r);
+            if (u && teams.length) officialBallots[u] = teams;
+        });
+        const totalPts = {};
+        Object.values(officialBallots).forEach(teams =>
+            teams.slice(0, 25).forEach((t, i) => { totalPts[t] = (totalPts[t] || 0) + (25 - i); }));
+        // Ties keep the rendered aggregate order, then fall back to name.
+        const aggIdx = {};
+        consensus.forEach((t, i) => { aggIdx[t] = i; });
+        const looCache = {};
+        const consensusFor = name => {
+            const own = officialBallots[name];
+            if (!own) return consensus;
+            if (looCache[name]) return looCache[name];
+            const pts = { ...totalPts };
+            own.slice(0, 25).forEach((t, i) => { pts[t] -= 25 - i; });
+            const order = Object.keys(pts).filter(t => pts[t] > 0).sort((a, b) =>
+                (pts[b] - pts[a]) || ((aggIdx[a] ?? 99) - (aggIdx[b] ?? 99)) || a.localeCompare(b));
+            return (looCache[name] = order.length ? order.slice(0, 25) : consensus);
+        };
+
+        // Per-team gaps between a ballot and its consensus top 25, counted both ways:
+        // (1) each consensus team vs. where the voter has it (unranked = #26), then
+        // (2) each team the voter ranks that's outside the consensus top 25, treated as
+        //     consensus #26. The cap means an off-consensus pick never costs more than a
+        //     ranked team moving up from #26 would; without (2) it was nearly free.
+        const gapsFn = (teams, cons) => {
+            const gaps = [];
+            for (let i = 0; i < cons.length; i++) {
+                const vr = teams.indexOf(cons[i]);
+                gaps.push(Math.abs(i - (vr === -1 ? 25 : vr)));
             }
-            return dist;
+            const consSet = new Set(cons);
+            teams.slice(0, 25).forEach((t, p) => { if (!consSet.has(t)) gaps.push(25 - p); });
+            return gaps;
+        };
+        const scoreFn = (teams, name) => {
+            if (!teams?.length) return Infinity;
+            return gapsFn(teams, consensusFor(name)).reduce((s, g) => s + g, 0);
         };
         // Get voter teams directly from visible rows
         const voterTeams = {};
-        rows.forEach(r => {
-            const u = getVoterName(r);
-            voterTeams[u] = Array.from(r.querySelectorAll(".team-logo")).map(img => img.dataset.team);
-        });
-        const tiebreakFn = (ta, tb) => {
+        rows.forEach(r => { voterTeams[getVoterName(r)] = rowTeams(r); });
+        const tiebreakFn = (ua, ub) => {
+            const ta = voterTeams[ua], tb = voterTeams[ub];
             if (!ta?.length || !tb?.length) return 0;
-            for (let i = 0; i < 25; i++) {
-                const team = consensus[i];
-                const ra = ta.indexOf(team), rb = tb.indexOf(team);
-                const da = Math.abs(i - (ra === -1 ? 25 : ra));
-                const db = Math.abs(i - (rb === -1 ? 25 : rb));
-                if (da !== db) return da - db;
+            const ga = gapsFn(ta, consensusFor(ua)), gb = gapsFn(tb, consensusFor(ub));
+            for (let i = 0; i < Math.min(ga.length, gb.length); i++) {
+                if (ga[i] !== gb[i]) return ga[i] - gb[i];
             }
             return 0;
         };
+        // Total for sorting, plus a trimmed per-team average in parentheses: drop the
+        // ballot's two largest gaps, divide the rest by 25. Forgives one or two big
+        // swings without hiding a ballot that differs from consensus everywhere.
+        const TRIM_TOP_GAPS = 2;
+        const distLabel = (dist, teams, name) => {
+            const gaps = gapsFn(teams, consensusFor(name)).sort((a, b) => b - a);
+            const trimmed = gaps.slice(TRIM_TOP_GAPS).reduce((s, g) => s + g, 0) / 25;
+            return `+${dist} (${trimmed.toFixed(2)})`;
+        };
+        const scores = {};
+        rows.forEach(r => { const u = getVoterName(r); scores[u] = scoreFn(voterTeams[u], u); });
         rows.sort((a, b) => {
             const ua = getVoterName(a), ub = getVoterName(b);
-            const sa = scoreFn(voterTeams[ua]), sb = scoreFn(voterTeams[ub]);
-            return sa !== sb ? sa - sb : tiebreakFn(voterTeams[ua], voterTeams[ub]);
+            const sa = scores[ua], sb = scores[ub];
+            return sa !== sb ? sa - sb : tiebreakFn(ua, ub);
         });
         pinnedFirst.forEach(r => {
             tbody.appendChild(r);
             if (userPinned.includes(r)) {
-                const dist = scoreFn(Array.from(r.querySelectorAll(".team-logo")).map(img => img.dataset.team));
-                if (dist !== Infinity) addVoterLabel(r, "+" + dist);
+                const teams = rowTeams(r), name = getVoterName(r);
+                const dist = scoreFn(teams, name);
+                if (dist !== Infinity) addVoterLabel(r, distLabel(dist, teams, name));
             }
         });
         rows.forEach(r => {
             tbody.appendChild(r);
-            const dist = scoreFn(voterTeams[getVoterName(r)]);
-            if (dist !== Infinity) addVoterLabel(r, "+" + dist);
+            const name = getVoterName(r);
+            const dist = scores[name];
+            if (dist !== Infinity) addVoterLabel(r, distLabel(dist, voterTeams[name], name));
         });
         return;
     }
