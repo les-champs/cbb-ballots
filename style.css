@@ -753,6 +753,33 @@ kbd {
 #voter-history-table.week-stats-table th:nth-child(8), #voter-history-table.week-stats-table td:nth-child(8),
 #voter-history-table.week-stats-table th:nth-child(10), #voter-history-table.week-stats-table td:nth-child(10) { border-right: 1px solid var(--color-border-strong); }
 
+
+/* Stats › Week › Conference tab (buildConferenceView() in script.js) */
+.conf-view { position: relative; width: min(980px, 94vw); margin: 0 auto; font-size: 12px; }
+.conf-empty { padding: 40px 0; text-align: center; color: var(--color-section-title); }
+.conf-section { margin-bottom: 14px; }
+/* Two equal halves; the pie is centered in the left one (right half reserved for a second chart) */
+.conf-pie-wrap { display: grid; grid-template-columns: 1fr 1fr; align-items: center; }
+.conf-pie { grid-column: 1; justify-self: center; width: 504px; max-width: 100%; height: auto; flex: none; }
+.conf-pie-labels { pointer-events: none; }
+.conf-pie-label { font-size: 11px; font-weight: 600; fill: #fff; font-variant-numeric: tabular-nums; }
+.conf-pie-label .conf-pie-val { font-size: 10px; font-weight: 500; }
+.conf-pie-label.outside { fill: var(--color-heading); }
+.conf-pie-label.outside .conf-pie-val { fill: var(--color-avg-label); }
+.conf-stats-table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 12px; font-variant-numeric: tabular-nums; }
+#voter-history-table .conf-stats-table th, #voter-history-table .conf-stats-table td { border-right: none; }
+#voter-history-table .conf-stats-table th { font-size: 11px; font-weight: normal; padding: 4px 6px; text-align: center; white-space: nowrap; vertical-align: bottom; }
+#voter-history-table .conf-stats-table td { padding: 3px 6px; text-align: center; border-bottom: 1px solid var(--color-border-subtle); white-space: nowrap; vertical-align: middle; }
+#voter-history-table .conf-stats-table .conf-teams { text-align: left; white-space: normal; line-height: 0; padding-top: 2px; padding-bottom: 2px; }
+#voter-history-table .conf-stats-table th.conf-teams { line-height: normal; }
+.conf-stats-table .conf-teams img { width: 20px; height: 20px; object-fit: contain; margin: 2px 4px; cursor: pointer; vertical-align: middle; }
+#voter-history-table .conf-stats-table .team-col { text-align: left; color: var(--color-table-team-col); overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 700px) {
+    .conf-view { overflow-x: auto; }
+    .conf-stats-table { min-width: 860px; }
+    .conf-pie-wrap { grid-template-columns: 1fr; }
+}
+
 #season-stats-modal {
     display: none;
     position: fixed;

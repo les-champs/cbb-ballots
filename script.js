@@ -1839,7 +1839,7 @@ function computeOutlookBands(weekId, teams) {
     });
 }
 
-// Title (week label + Stats / Range / Spread / Outlook tabs) of the Stats > Week window.
+// Title (week label + Stats / Range / Spread / Outlook / Conference tabs) of the Stats > Week window.
 function renderWeekChartTitle(weekId, mode) {
     const modal = document.getElementById("voter-history-modal");
     const title = document.getElementById("voter-history-title");
@@ -1860,6 +1860,7 @@ function renderWeekChartTitle(weekId, mode) {
         { key: 'highlow', label: 'Range' },
         { key: 'dots', label: 'Spread' },
         { key: 'outlook', label: 'Outlook' },
+        { key: 'conf', label: 'Conference' },
     ].map(m =>
         `<span class="modal-mode-tab${mode === m.key ? ' active' : ''}"
                onclick="showWeekHighLowChart('${escapedId}', '${m.key}')">${m.label}</span>`
@@ -1869,6 +1870,20 @@ function renderWeekChartTitle(weekId, mode) {
 }
 
 function showWeekHighLowChart(weekId, mode = "highlow") {
+    // Conference tab: charts + per-conference stats table (2025+)
+    if (mode === "conf") {
+        const view = buildConferenceView(weekId);
+        if (view === null) return;
+        const { modal, table } = renderWeekChartTitle(weekId, mode);
+        table.classList.remove("week-stats-table");
+        table.style.cssText = "display:block; white-space:normal; width:100%;";
+        table.innerHTML = "";
+        table.appendChild(view);
+        modal.dataset.chartType = "highlow";
+        modal.dataset.chartMode = mode;
+        modal.classList.add("open");
+        return;
+    }
     // Stats tab: the per-team week statistics table (formerly its own window)
     if (mode === "stats") {
         const html = buildWeekStatsTableHtml(weekId);
@@ -2817,12 +2832,18 @@ function injectWeightedRankingRow(activeTab, activeBlock) {
 // in the group that got votes, not only the ones in the Overall top 25.
 
 // [{label, teams:Set}] for a season, or null before conference data starts.
-function conferenceGroups(year) {
+// {conf: [teams]} for a season (later seasons reuse the last defined one), or null before 2025.
+function conferenceTable(year) {
     if (typeof CONFERENCE_DATA === "undefined") return null;
     const seasons = Object.keys(CONFERENCE_DATA.seasons).map(Number).sort((a, b) => a - b);
     year = Number(year);
     if (!seasons.length || year < seasons[0]) return null;
-    const table = CONFERENCE_DATA.seasons[Math.min(year, seasons[seasons.length - 1])];
+    return CONFERENCE_DATA.seasons[Math.min(year, seasons[seasons.length - 1])];
+}
+
+function conferenceGroups(year) {
+    const table = conferenceTable(year);
+    if (!table) return null;
     const power = CONFERENCE_DATA.power;
     const groups = power.filter(c => table[c]).map(c => ({ label: c, teams: new Set(table[c]) }));
     const all = conf => new Set(Object.keys(table).filter(conf).flatMap(c => table[c]));
@@ -3201,6 +3222,218 @@ function buildWeekStatsTableHtml(weekId) {
     }
     html += "</tbody>";
     return html;
+}
+
+// ── Stats › Week › Conference tab (2025+) ────────────────────────────────────
+// Pie of points share (Power conferences + Mid-Majors), then one stats row per
+// conference that received votes.
+// Official ballots only. Points: rank 1 = 25 … rank 25 = 1 (same as Overall).
+
+// Fixed hue per Power conference (validated categorical palette, slots 1–6, light and
+// dark steps); every Mid-Major conference shares one neutral gray.
+const CONF_COLORS = {
+    light: { "ACC": "#2a78d6", "Big Ten": "#eb6834", "Big 12": "#1baf7a", "SEC": "#eda100",
+             "Big East": "#e87ba4", "Pac-12": "#008300", "Mid-Major": "#a3a19b" },
+    dark:  { "ACC": "#3987e5", "Big Ten": "#d95926", "Big 12": "#199e70", "SEC": "#c98500",
+             "Big East": "#d55181", "Pac-12": "#008300", "Mid-Major": "#6f6e69" },
+};
+function confColor(conf) {
+    const set = CONF_COLORS[isDarkMode() ? "dark" : "light"];
+    return set[conf] || set["Mid-Major"];
+}
+
+// Every number the Conference tab shows for one week, or {year, noData: true} before 2025.
+function computeConferenceWeekStats(weekId) {
+    const isApWeek = weekId.startsWith("week-ap-");
+    const tabs = isApWeek ? getSortedApTabs() : getSortedTabs();
+    const idx = tabs.findIndex(t => t.dataset.week === weekId);
+    if (idx === -1) return null;
+    const year = tabs[idx].dataset.year;
+    const table = conferenceTable(year);
+    if (!table) return { year, noData: true };
+
+    const power = CONFERENCE_DATA.power;
+    const aliases = CONFERENCE_DATA.aliases || {};
+    const confOfTeam = {};
+    Object.entries(table).forEach(([c, ts]) => ts.forEach(t => { confOfTeam[t] = c; }));
+    const confOf = t => confOfTeam[aliases[t] || t] || "Unmapped";
+
+    const deltaData = buildDeltaData(true);
+    const ballotsOf = wid => Object.entries(deltaData[wid] || {})
+        .filter(([u]) => u !== "Official Overall" && u !== "AP Overall")
+        .map(([, ts]) => ts.slice(0, 25));
+    const ballots = ballotsOf(weekId);
+    if (!ballots.length) return null;
+    const pointsOf = bs => {
+        const pts = {};
+        bs.forEach(b => b.forEach((t, i) => { pts[t] = (pts[t] || 0) + (25 - i); }));
+        return pts;
+    };
+    // Same order as Official Overall / the Stats tab (points desc, ties in ballot order)
+    const orderOf = pts => Object.entries(pts).sort((a, b) => b[1] - a[1]).map(([t]) => t);
+
+    const pts = pointsOf(ballots);
+    const order = orderOf(pts);
+    const rankOf = {};
+    order.forEach((t, i) => { rankOf[t] = i + 1; });
+    const totalPts = Object.values(pts).reduce((s, p) => s + p, 0);
+
+    const prevTab = tabs[idx + 1];
+    const prevBallots = prevTab && prevTab.dataset.year === year ? ballotsOf(prevTab.dataset.week) : [];
+    const hasPrev = prevBallots.length > 0;
+    const prevPts = hasPrev ? pointsOf(prevBallots) : {};
+    const prevTop25 = orderOf(prevPts).slice(0, 25);
+    const prevTotal = Object.values(prevPts).reduce((s, p) => s + p, 0);
+
+    const groupStats = (label, isMember) => {
+        const teams = order.filter(t => isMember(confOf(t)));
+        const ranked = teams.filter(t => rankOf[t] <= 25);
+        const gPts = teams.reduce((s, t) => s + pts[t], 0);
+        const perBallot = ballots.map(b => b.filter(t => isMember(confOf(t))).length);
+        const share = totalPts ? gPts / totalPts : 0;
+        let prevShare = null, prevT25 = null;
+        if (hasPrev) {
+            const pPts = Object.entries(prevPts).filter(([t]) => isMember(confOf(t))).reduce((s, [, p]) => s + p, 0);
+            prevShare = prevTotal ? pPts / prevTotal : 0;
+            prevT25 = prevTop25.filter(t => isMember(confOf(t))).length;
+        }
+        return {
+            label, teams,
+            t25: ranked.length, prevT25,
+            pts: gPts, share, prevShare,
+            firstVotes: ballots.filter(b => b[0] && isMember(confOf(b[0]))).length,
+            perBallotAvg: perBallot.reduce((s, n) => s + n, 0) / ballots.length,
+            perBallotMin: Math.min(...perBallot),
+            perBallotMax: Math.max(...perBallot),
+        };
+    };
+
+    const confs = Object.keys(table).map(c => groupStats(c, x => x === c));
+    if (order.some(t => confOf(t) === "Unmapped")) confs.push(groupStats("Unmapped", x => x === "Unmapped"));
+    const voted = confs.filter(c => c.pts > 0).sort((a, b) => b.pts - a.pts);
+    // Pie slices: Power conferences in fixed palette order, then all Mid-Majors together
+    const slices = [
+        ...power.filter(c => table[c]).map(c => confs.find(x => x.label === c)),
+        groupStats("Mid-Major", c => !power.includes(c) && c !== "Unmapped"),
+    ].filter(s => s && s.pts > 0);
+
+    return { year, voted, slices, totalVoters: ballots.length };
+}
+
+// The Conference tab's content as a DOM node.
+function buildConferenceView(weekId) {
+    const root = document.createElement("div");
+    root.className = "conf-view";
+    const stats = computeConferenceWeekStats(weekId);
+    if (!stats) return null;
+    if (stats.noData) {
+        root.innerHTML = `<div class="conf-empty">Conference data starts with the 2025 season.</div>`;
+        return root;
+    }
+    const css = getComputedStyle(document.body);
+    const { circleStroke } = svgColors();
+    const surface = css.getPropertyValue("--color-bg-modal").trim() || circleStroke;
+    const pct = x => (x > 0 && x < 0.0005 ? "<0.1" : (x * 100).toFixed(1)) + "%";
+    const svgEl = (tag, attrs = {}) => {
+        const el = document.createElementNS(SVG_NS, tag);
+        Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+        return el;
+    };
+
+    // ── Pie: share of all ballot points ─────────────────────────────────────
+    const pieWrap = document.createElement("div");
+    pieWrap.className = "conf-pie-wrap";
+    // Labels sit inside their slice; Mid-Majors (and any slice too thin to hold
+    // text) get a label just outside the rim, so the viewBox pads for them.
+    const R = 100, PX = 78, PY = 26, CX = R + PX, CY = R + PY;
+    const pie = svgEl("svg", { viewBox: `0 0 ${2 * CX} ${2 * CY}`, class: "conf-pie" });
+    const labels = svgEl("g", { class: "conf-pie-labels" });
+    const pieTotal = stats.slices.reduce((s, g) => s + g.pts, 0);
+    let angle = -Math.PI / 2;
+    stats.slices.forEach(g => {
+        const frac = pieTotal ? g.pts / pieTotal : 0;
+        const name = g.label === "Mid-Major" ? "Mid-Majors" : g.label;
+        let shape, mid;
+        if (frac >= 0.9999) {
+            shape = svgEl("circle", { cx: CX, cy: CY, r: R });
+            mid = -Math.PI / 2;
+        } else {
+            const a2 = angle + frac * 2 * Math.PI;
+            const p = a => `${CX + R * Math.cos(a)},${CY + R * Math.sin(a)}`;
+            shape = svgEl("path", { d: `M${CX},${CY} L${p(angle)} A${R},${R} 0 ${frac > 0.5 ? 1 : 0} 1 ${p(a2)} Z` });
+            mid = (angle + a2) / 2;
+            angle = a2;
+        }
+        shape.setAttribute("fill", confColor(g.label));
+        shape.setAttribute("stroke", surface);
+        shape.setAttribute("stroke-width", "2");
+        shape.setAttribute("stroke-linejoin", "round");
+        pie.appendChild(shape);
+        if (g.share < 0.03) return;   // too small to label
+        const outside = g.label === "Mid-Major" || frac < 0.07;
+        const lr = frac >= 0.9999 ? 0 : outside ? R + 8 : R * 0.72;
+        const lx = CX + lr * Math.cos(mid), ly = CY + lr * Math.sin(mid);
+        const cos = Math.cos(mid);
+        const anchor = !outside || Math.abs(cos) < 0.2 ? "middle" : cos > 0 ? "start" : "end";
+        // Outside labels near the top/bottom shift off the rim vertically
+        const dy = outside ? Math.sin(mid) * 6 : 0;
+        const text = svgEl("text", {
+            x: lx, y: ly + dy, "text-anchor": anchor,
+            class: outside ? "conf-pie-label outside" : "conf-pie-label",
+        });
+        const t1 = svgEl("tspan", { x: lx, dy: "-0.15em", class: "conf-pie-name" });
+        t1.textContent = name;
+        const t2 = svgEl("tspan", { x: lx, dy: "1.15em", class: "conf-pie-val" });
+        t2.textContent = g.share >= 0.095 ? `${Math.round(g.share * 100)}%` : pct(g.share);
+        text.append(t1, t2);
+        labels.appendChild(text);
+    });
+    pie.appendChild(labels);
+    pieWrap.append(pie);
+
+
+    // ── Stats table ──────────────────────────────────────────────────────────
+    const deltaSpan = (d, fmt = x => x) => {
+        if (d === null) return "—";
+        if (Math.abs(+fmt(Math.abs(d))) === 0) return `<span class="delta-same">—</span>`;
+        return `<span class="${d > 0 ? "delta-up" : "delta-down"}">${d > 0 ? "+" : "−"}${fmt(Math.abs(d))}</span>`;
+    };
+    const row = g => `<tr>
+            <td class="team-col">${g.label}</td>
+            <td>${g.t25}</td>
+            <td>${g.prevT25 === null ? "—" : deltaSpan(g.t25 - g.prevT25)}</td>
+            <td>${g.pts.toLocaleString()}</td>
+            <td>${pct(g.share)}</td>
+            <td>${g.prevShare === null ? "—" : deltaSpan((g.share - g.prevShare) * 100, x => x.toFixed(1))}</td>
+            <td>${g.firstVotes}</td>
+            <td>${g.perBallotAvg.toFixed(1)}</td>
+            <td>${g.perBallotMin === g.perBallotMax ? g.perBallotMin : `${g.perBallotMin}–${g.perBallotMax}`}</td>
+            <td class="conf-teams">${g.teams.map(t =>
+                `<img class="logo-sm team-logo" data-team="${t}" src="${logoSrc(t)}" title="${formatTeamName(t)}">`).join("")}</td>
+        </tr>`;
+    const tbl = document.createElement("table");
+    tbl.className = "conf-stats-table";
+    tbl.innerHTML = `<colgroup><col style="width:130px"><col style="width:44px"><col style="width:40px"><col style="width:64px"><col style="width:60px"><col style="width:48px"><col style="width:64px"><col style="width:70px"><col style="width:56px"><col></colgroup><thead><tr>
+        <th class="team-col">Conference</th>
+        <th title="Teams in the consensus Top 25">T25</th>
+        <th title="Change in Top 25 teams from last week">Δ</th>
+        <th title="Total ballot points (rank 1 = 25 … rank 25 = 1)">Pts</th>
+        <th title="Share of all ballot points this week">Share</th>
+        <th title="Change in points share from last week (percentage points)">Δ</th>
+        <th title="First-place votes">#1 Votes</th>
+        <th title="Average number of its teams per ballot">Per Ballot</th>
+        <th title="Fewest–most of its teams on any single ballot">Range</th>
+        <th class="conf-teams" title="Teams receiving votes, most points first">Teams</th>
+    </tr></thead><tbody>
+        ${stats.voted.map(row).join("")}
+    </tbody>`;
+
+    pieWrap.classList.add("conf-section");
+    tbl.classList.add("conf-section");
+    tbl.querySelectorAll(".conf-teams img").forEach(img =>
+        img.addEventListener("click", () => toggleTeamHighlight(img.dataset.team)));
+    root.append(pieWrap, tbl);
+    return root;
 }
 
 function showAggregateSection() {
