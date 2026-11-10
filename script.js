@@ -689,6 +689,26 @@ function showRankHeaders(block) {
     block.querySelectorAll("table thead th:not(:first-child)").forEach(th => { th.style.color = th.dataset.consensusColor || ""; th.style.borderRight = ""; });
 }
 
+// Credits text runs on one line out to the table's right edge, shrinking its
+// font only when the full line would not fit (never grows past the picker font).
+function fitCreditsText(picker) {
+    const text = picker.querySelector(".credits-text");
+    const table = picker._toggle?.closest("table");
+    if (!text || !table) return;
+    text.style.fontSize = "";
+    // Fit to the table, not the viewport: once the table hits its minimum width
+    // and scrolls, the text stops shrinking with it.
+    const avail = table.getBoundingClientRect().right - picker.getBoundingClientRect().left;
+    const natural = text.scrollWidth;
+    if (avail > 0 && natural > avail) {
+        const base = parseFloat(getComputedStyle(text).fontSize);
+        text.style.fontSize = (base * avail / natural) + "px";
+    }
+}
+window.addEventListener("resize", () => {
+    document.querySelectorAll(".sort-picker.open.credits-mode").forEach(fitCreditsText);
+});
+
 function bindVotersToggle() {
     document.querySelectorAll(".voters-toggle").forEach(toggle => {
         if (toggle.dataset.bound) return;
@@ -722,7 +742,7 @@ function bindVotersToggle() {
                 const ts = getComputedStyle(toggle);
                 picker.style.font = ts.font;
                 toggle.style.display = "none";
-                picker.classList.remove("settings-mode");
+                picker.classList.remove("settings-mode", "credits-mode");
                 refreshSettingsLabels(picker);
                 syncDeltasMenu(picker);
                 picker.classList.add("open");
@@ -748,7 +768,7 @@ document.addEventListener("mousedown", e => {
     // row can reflow under the cursor, so swallow the click that follows this
     // mousedown — otherwise it can land outside the picker and close it.
     const showToggles = ["toggleOverall", "expandDeltas", "toggleOutliers"];
-    const inPlace = ["settings", "darkMode", "weekArrows", ...showToggles].includes(action);
+    const inPlace = ["settings", "credits", "darkMode", "weekArrows", ...showToggles].includes(action);
     if (inPlace) {
         const swallow = ev => ev.stopPropagation();
         window.addEventListener("click", swallow, { capture: true, once: true });
@@ -757,6 +777,11 @@ document.addEventListener("mousedown", e => {
     if (action === "settings") {
         picker.classList.add("settings-mode");
         refreshSettingsLabels(picker);
+        return;
+    }
+    if (action === "credits") {
+        picker.classList.add("credits-mode");
+        fitCreditsText(picker);
         return;
     }
     if (action === "darkMode") { toggleDarkMode(); return; }

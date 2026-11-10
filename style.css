@@ -473,6 +473,20 @@ body.show-overall-row .overall-row {
     display: none;
 }
 
+/* Credits mode: the picker's contents are replaced by the credits text */
+.sort-picker:not(.credits-mode) > .credits-only,
+.sort-picker.credits-mode > :not(.credits-only) {
+    display: none;
+}
+.credits-text {
+    white-space: nowrap;
+}
+.credits-text a {
+    color: inherit;
+    text-decoration: underline;
+}
+.credits-text a:hover { opacity: 0.7; }
+
 .sort-option.active {
     text-decoration: underline;
     color: inherit;
