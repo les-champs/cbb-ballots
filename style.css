@@ -531,7 +531,7 @@ thead th {
 .heatmap-table thead th {
     background: transparent;
 }
-#voter-history-table.week-stats-table thead th,
+#voter-history-table .week-stats-table thead th,
 #season-stats-table thead th {
     position: static;
 }
@@ -719,13 +719,13 @@ kbd {
     letter-spacing: 1px;
 }
 
-#voter-history-table.week-stats-table {
+#voter-history-table .week-stats-table {
     border-collapse: collapse;
     width: 100%;
     font-size: 13px;
     table-layout: auto;
 }
-#voter-history-table.week-stats-table th {
+#voter-history-table .week-stats-table th {
     font-size: 11px;
     font-weight: normal;
     padding: 4px 8px;
@@ -733,8 +733,8 @@ kbd {
     white-space: nowrap;
     vertical-align: bottom;
 }
-#voter-history-table.week-stats-table th.team-col { text-align: left; }
-#voter-history-table.week-stats-table td {
+#voter-history-table .week-stats-table th.team-col { text-align: left; }
+#voter-history-table .week-stats-table td {
     padding: 3px 6px;
     text-align: center;
     border-bottom: 1px solid var(--color-border-subtle);
@@ -742,16 +742,16 @@ kbd {
     white-space: nowrap;
     overflow: hidden;
 }
-#voter-history-table.week-stats-table td:first-child { font-size: 11px; }
-#voter-history-table.week-stats-table td.team-col { text-align: left; font-size: 12px; color: var(--color-table-team-col); white-space: normal; overflow: visible; min-width: 80px; }
-#voter-history-table.week-stats-table .logo-sm { height: 20px; width: 20px; object-fit: contain; vertical-align: middle; }
-#voter-history-table.week-stats-table tr.rv-divider td { padding: 6px 0 2px; color: var(--color-divider-text); font-size: 11px; text-align: left; border-bottom: none; }
-#voter-history-table.week-stats-table th:nth-child(5), #voter-history-table.week-stats-table td:nth-child(5),
-#voter-history-table.week-stats-table th:nth-child(9), #voter-history-table.week-stats-table td:nth-child(9),
-#voter-history-table.week-stats-table th:nth-child(11), #voter-history-table.week-stats-table td:nth-child(11),
-#voter-history-table.week-stats-table th:nth-child(12), #voter-history-table.week-stats-table td:nth-child(12) { border-right: none; }
-#voter-history-table.week-stats-table th:nth-child(8), #voter-history-table.week-stats-table td:nth-child(8),
-#voter-history-table.week-stats-table th:nth-child(10), #voter-history-table.week-stats-table td:nth-child(10) { border-right: 1px solid var(--color-border-strong); }
+#voter-history-table .week-stats-table td:first-child { font-size: 11px; }
+#voter-history-table .week-stats-table td.team-col { text-align: left; font-size: 12px; color: var(--color-table-team-col); white-space: normal; overflow: visible; min-width: 80px; }
+#voter-history-table .week-stats-table .logo-sm { height: 20px; width: 20px; object-fit: contain; vertical-align: middle; }
+#voter-history-table .week-stats-table tr.rv-divider td { padding: 6px 0 2px; color: var(--color-divider-text); font-size: 11px; text-align: left; border-bottom: none; }
+#voter-history-table .week-stats-table th:nth-child(5), #voter-history-table .week-stats-table td:nth-child(5),
+#voter-history-table .week-stats-table th:nth-child(9), #voter-history-table .week-stats-table td:nth-child(9),
+#voter-history-table .week-stats-table th:nth-child(11), #voter-history-table .week-stats-table td:nth-child(11),
+#voter-history-table .week-stats-table th:nth-child(12), #voter-history-table .week-stats-table td:nth-child(12) { border-right: none; }
+#voter-history-table .week-stats-table th:nth-child(8), #voter-history-table .week-stats-table td:nth-child(8),
+#voter-history-table .week-stats-table th:nth-child(10), #voter-history-table .week-stats-table td:nth-child(10) { border-right: 1px solid var(--color-border-strong); }
 
 
 /* Stats › Week › Conference tab (buildConferenceView() in script.js) */
@@ -1154,6 +1154,37 @@ body.dark {
 body.dark .pin-btn.pinned {
     filter: grayscale(100%) brightness(5);
 }
+
+/* Stats › Week tab: chart switcher + chart above the stats table */
+/* Same width as the chart SVG, so the switcher can sit inside the plot's top-right corner:
+   the plot starts mT/H = 28/380 = 7.37% from the top and ends mR/W = 16/900 = 1.78% from
+   the right of the chart. Styled like the window title's .modal-mode-tab, but smaller. */
+.week-chart-panel {
+    position: relative;
+    width: min(860px, 90vw);
+    margin: 0 auto 10px;
+}
+.week-chart-switch {
+    position: absolute;
+    top: calc(7.37% + 8px);
+    right: calc(1.78% + 10px);
+    font-size: 14px;
+    font-weight: bold;
+    line-height: 1;
+    user-select: none;
+    z-index: 1;
+}
+.week-chart-kind {
+    cursor: pointer;
+    color: var(--color-modal-h2);
+    opacity: 0.35;
+    margin-left: 0.55em;
+}
+.week-chart-kind:first-child { margin-left: 0; }
+.week-chart-kind.active { opacity: 1; cursor: default; }
+.week-chart-kind:not(.active):hover { opacity: 0.65; }
+#voter-history-table .week-stats-table tr[data-team] { cursor: pointer; }
+.week-stats-table tr[data-team]:hover td { background: var(--color-bg-spread-hover); }
 
 /* Week graph rank number below each logo (Range/Spread/Outlook): same font/color/weight
    as the Conference tab's .conf-team-rank badge */

@@ -247,6 +247,8 @@ function applyHighlightStyles() {
         rules.push(`.chart-logo-ring[data-team="${team}"] { display: inline; stroke: ${color}; fill: ${color}; filter: url(#chart-glow-${cls}); }`);
         rules.push(`.chart-stroke[data-team="${team}"] { stroke: ${color}; filter: url(#chart-glow-${cls}); }`);
         rules.push(`.chart-fill[data-team="${team}"] { fill: ${color}; filter: url(#chart-glow-${cls}); }`);
+        rules.push(`#voter-history-table .week-stats-table tr[data-team="${team}"] td { background: color-mix(in srgb, ${color} 22%, transparent); }`);
+        rules.push(`#voter-history-table .week-stats-table tr[data-team="${team}"] td:first-child { box-shadow: inset 3px 0 0 ${color}; }`);
     });
     el.textContent = rules.join(" ");
     updateChartGlowFilters();
@@ -1857,9 +1859,6 @@ function renderWeekChartTitle(weekId, mode) {
     const escapedId = weekId.replace(/'/g, "\\'");
     const modeTabs = [
         { key: 'stats', label: 'Stats' },
-        { key: 'highlow', label: 'Range' },
-        { key: 'dots', label: 'Spread' },
-        { key: 'outlook', label: 'Outlook' },
         { key: 'conf', label: 'Conference' },
     ].map(m =>
         `<span class="modal-mode-tab${mode === m.key ? ' active' : ''}"
@@ -1869,7 +1868,62 @@ function renderWeekChartTitle(weekId, mode) {
     return { modal, table };
 }
 
-function showWeekHighLowChart(weekId, mode = "highlow") {
+// Stats tab chart above the table: which one (Range / Spread / Outlook), remembered per
+// viewer in localStorage.
+const WEEK_CHART_KINDS = [
+    { key: "highlow", label: "Range" },
+    { key: "dots", label: "Spread" },
+    { key: "outlook", label: "Outlook" },
+];
+let _weekChartKind = "highlow";
+try {
+    const k = localStorage.getItem("weekStatsChart");
+    if (WEEK_CHART_KINDS.some(c => c.key === k)) _weekChartKind = k;
+    localStorage.removeItem("weekStatsChartOpen");  // from the removed collapse control
+} catch (e) {}
+function setWeekChartKind(kind) {
+    _weekChartKind = kind;
+    try { localStorage.setItem("weekStatsChart", kind); } catch (e) {}
+}
+
+// Chart for the top of the Stats tab, with its switcher (Range Spread Outlook, styled like
+// the window title's Stats / Conference tabs) inside the plot's top-right corner.
+// Re-renders in place, so the table keeps its scroll.
+function buildWeekChartPanel(weekId) {
+    const panel = document.createElement("div");
+    panel.className = "week-chart-panel";
+    const switcher = document.createElement("div");
+    switcher.className = "week-chart-switch";
+    const body = document.createElement("div");
+    body.className = "week-chart-body";
+
+    const labels = WEEK_CHART_KINDS.map(({ key, label }) => {
+        const s = document.createElement("span");
+        s.className = "week-chart-kind";
+        s.textContent = label;
+        s.addEventListener("click", () => { setWeekChartKind(key); render(); });
+        switcher.appendChild(s);
+        return { key, s };
+    });
+
+    const render = () => {
+        labels.forEach(({ key, s }) => s.classList.toggle("active", key === _weekChartKind));
+        body.innerHTML = "";
+        const svg = buildWeekChartSvg(weekId, _weekChartKind);
+        if (svg) body.appendChild(svg);
+    };
+    render();
+    panel.append(switcher, body);
+    return panel;
+}
+
+// Opens the Stats › Week window. mode: "stats" (chart + table) or "conf". The old chart
+// tab keys ("highlow" / "dots" / "outlook") still work: they open Stats with that chart shown.
+function showWeekHighLowChart(weekId, mode = "stats") {
+    if (WEEK_CHART_KINDS.some(c => c.key === mode)) {
+        setWeekChartKind(mode);
+        mode = "stats";
+    }
     // Conference tab: charts + per-conference stats table (2025+)
     if (mode === "conf") {
         const view = buildConferenceView(weekId);
@@ -1884,30 +1938,41 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
         modal.classList.add("open");
         return;
     }
-    // Stats tab: the per-team week statistics table (formerly its own window)
-    if (mode === "stats") {
-        const html = buildWeekStatsTableHtml(weekId);
-        if (html === null) return;
-        const { modal, table } = renderWeekChartTitle(weekId, mode);
-        table.style.cssText = "";
-        table.classList.add("week-stats-table");
-        table.innerHTML = html;
-        modal.dataset.chartType = "highlow";
-        modal.dataset.chartMode = mode;
-        modal.classList.add("open");
-        return;
-    }
+    // Stats tab: chart panel on top, per-team week statistics table below. Clicking a
+    // table row toggles that team's highlight, which also lights it up in the chart.
+    const html = buildWeekStatsTableHtml(weekId);
+    if (html === null) return;
+    const { modal, table } = renderWeekChartTitle(weekId, "stats");
+    table.classList.remove("week-stats-table");
+    table.style.cssText = "display:block; white-space:normal; width:100%;";
+    table.innerHTML = "";
+    table.appendChild(buildWeekChartPanel(weekId));
+    const statsTable = document.createElement("table");
+    statsTable.className = "week-stats-table";
+    statsTable.innerHTML = html;
+    statsTable.addEventListener("click", e => {
+        const row = e.target.closest("tr[data-team]");
+        if (row) toggleTeamHighlight(row.dataset.team);
+    });
+    table.appendChild(statsTable);
+    modal.dataset.chartType = "highlow";
+    modal.dataset.chartMode = "stats";
+    modal.classList.add("open");
+}
 
+// Range ("highlow") / Spread ("dots") / Outlook chart SVG for a week, or null without
+// official ballots. Logos and data marks click to toggle the team highlight.
+function buildWeekChartSvg(weekId, mode) {
     const block = document.getElementById(weekId);
-    if (!block) return;
+    if (!block) return null;
     const sections = block.querySelectorAll(".ballot-section");
     const officialSection = sections[0];
-    if (!officialSection) return;
+    if (!officialSection) return null;
 
     const voterRows = Array.from(officialSection.querySelectorAll(".voter-row"))
         .filter(r => getVoterName(r) !== "Official Overall");
     const totalVoters = voterRows.length;
-    if (totalVoters === 0) return;
+    if (totalVoters === 0) return null;
 
     const teamRankSum = {};
     const teamVoterCount = {};
@@ -1972,7 +2037,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
     //   ~50% and Outlook ~77-78% in every tier, misses split about evenly above and below.
     if (mode === "outlook") {
         const bands = computeOutlookBands(weekId, top25);
-        if (!bands) return;
+        if (!bands) return null;
         chartData = bands.map(b => ({ ...b, allRanks: [], rankVoters: {} }));
     }
 
@@ -2015,14 +2080,11 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
             .map(x => x.d);
     }
 
-    const { modal, table } = renderWeekChartTitle(weekId, mode);
-    table.classList.remove("week-stats-table");
-    table.innerHTML = "";
-    table.style.cssText = "display:block; white-space:normal; width:100%;";
-
     const svgNS = SVG_NS;
-    const W = 900, H = 460;
-    const mL = 44, mR = 16, mT = 28, mB = 52;
+    // Shorter than the old standalone chart (460) so the table below stays in view.
+    // No "Rank" axis title (the 1…25 / NR ticks speak for themselves), so mL only fits the ticks.
+    const W = 900, H = 380;
+    const mL = 28, mR = 16, mT = 28, mB = 52;
     const cW = W - mL - mR, cH = H - mT - mB;
 
     const svg = document.createElementNS(svgNS, "svg");
@@ -2062,16 +2124,11 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
     border.setAttribute("stroke-width", "1");
     svg.appendChild(border);
 
-    // Y-axis label
-    const yLbl = document.createElementNS(svgNS, "text");
-    yLbl.setAttribute("x", 10); yLbl.setAttribute("y", mT + cH / 2);
-    yLbl.setAttribute("text-anchor", "middle"); yLbl.setAttribute("font-size", "11");
-    yLbl.setAttribute("fill", axisColor);
-    yLbl.setAttribute("transform", `rotate(-90,10,${mT + cH / 2})`);
-    yLbl.textContent = "Rank";
-    svg.appendChild(yLbl);
-
     const logoSize = Math.min(20, slotW - 4);
+    const clickToHighlight = (el, team) => {
+        el.style.cursor = "pointer";
+        el.addEventListener("click", () => toggleTeamHighlight(team));
+    };
 
     // Clickable team logo below the x-axis; the ring behind it lights up via the
     // same highlight rules as ballot logos, so state stays in sync both ways.
@@ -2140,6 +2197,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
                     b.setAttribute("stroke-linecap", "butt");
                     b.setAttribute("stroke-opacity", opacity);
                     b.setAttribute("class", "chart-stroke"); b.dataset.team = team;
+                    clickToHighlight(b, team);
                     svg.insertBefore(b, tipG);
                 };
                 band(yHi, yLo, 0.3);
@@ -2154,6 +2212,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
                 vLine.setAttribute("stroke-width", "2.5");
                 vLine.setAttribute("stroke-linecap", "round");
                 vLine.setAttribute("class", "chart-stroke"); vLine.dataset.team = team;
+                clickToHighlight(vLine, team);
                 svg.insertBefore(vLine, tipG);
 
                 // Top cap (P90+)
@@ -2162,6 +2221,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
                 topCap.setAttribute("y1", yHi); topCap.setAttribute("y2", yHi);
                 topCap.setAttribute("stroke", color.fill); topCap.setAttribute("stroke-width", "2");
                 topCap.setAttribute("class", "chart-stroke"); topCap.dataset.team = team;
+                clickToHighlight(topCap, team);
                 svg.insertBefore(topCap, tipG);
 
                 // Bottom cap (P10-)
@@ -2170,6 +2230,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
                 botCap.setAttribute("y1", yLo); botCap.setAttribute("y2", yLo);
                 botCap.setAttribute("stroke", color.fill); botCap.setAttribute("stroke-width", "2");
                 botCap.setAttribute("class", "chart-stroke"); botCap.dataset.team = team;
+                clickToHighlight(botCap, team);
                 svg.insertBefore(botCap, tipG);
             }
 
@@ -2207,7 +2268,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
             circle.setAttribute("fill", circleStroke);
             circle.setAttribute("stroke", color.stroke); circle.setAttribute("stroke-width", "2.5");
             circle.setAttribute("class", "chart-stroke"); circle.dataset.team = team;
-            circle.style.cursor = "default";
+            clickToHighlight(circle, team);
 
             circle.addEventListener("mouseenter", () => showTip(avg.toFixed(1), x, yAvg, 4));
             circle.addEventListener("mouseleave", hideTip);
@@ -2219,7 +2280,9 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
         });
     } else {
         // Dot plot: one dot per (team, rank), sized by voter count at that rank
-        const maxR = Math.min(slotW * 0.46, 13);
+        // Dot radii scale with the plot height so overlap matches the original 460px chart.
+        const rScale = cH / 380;
+        const maxR = Math.min(slotW * 0.46, 13) * rScale;
 
         // Shared tooltip group
         const tipG = document.createElementNS(svgNS, "g");
@@ -2240,7 +2303,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
             allRanks.forEach(r => { rankCounts[r] = (rankCounts[r] || 0) + 1; });
 
             Object.entries(rankCounts).forEach(([r, cnt]) => {
-                const radius = Math.min(maxR, 2 + Math.sqrt(cnt) * 1.5);
+                const radius = Math.min(maxR, (2 + Math.sqrt(cnt) * 1.5) * rScale);
                 const circle = document.createElementNS(svgNS, "circle");
                 circle.setAttribute("cx", x);
                 circle.setAttribute("cy", yPos(Number(r)));
@@ -2248,7 +2311,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
                 circle.setAttribute("fill", color.fill);
                 circle.setAttribute("fill-opacity", "0.7");
                 circle.setAttribute("class", "chart-fill"); circle.dataset.team = team;
-                circle.style.cursor = "default";
+                clickToHighlight(circle, team);
 
                 circle.addEventListener("mouseenter", (e) => {
                     const voters = rankVoters[r] || [];
@@ -2299,10 +2362,7 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
         });
     }
 
-    table.appendChild(svg);
-    modal.dataset.chartType = "highlow";
-    modal.dataset.chartMode = mode;
-    modal.classList.add("open");
+    return svg;
 }
 
 let weekPickerPinned = false;
@@ -3165,7 +3225,8 @@ function buildWeekStatsTableHtml(weekId) {
         const band = outlookBands[team];
         const cellLikely = band ? `<td style="white-space:nowrap">${fmtBand(band.innerHi, band.innerLo)}</td>` : '<td>—</td>';
         const cellOutlook = band ? `<td style="white-space:nowrap">${fmtBand(band.hi, band.lo)}</td>` : '<td>—</td>';
-        return `<tr>
+        const teamAttr = team.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+        return `<tr data-team="${teamAttr}">
             <td>${rankDisplay}</td>
             <td style="padding:2px 4px;"><img class="logo-sm" src="${logoSrc(team)}"></td>
             <td class="team-col">${formatTeamName(team)}</td>
@@ -4995,10 +5056,10 @@ document.addEventListener("keydown", e => {
     if (e.key === "G" || e.key === "g") {
         e.preventDefault();
         if (_apCurrentYear !== null) {
-            showWeekHighLowChart(`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`);
+            showWeekHighLowChart(`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`, _weekChartKind);
         } else {
             const activeTab = document.querySelector(".week-tab.active");
-            if (activeTab) showWeekHighLowChart(activeTab.dataset.week);
+            if (activeTab) showWeekHighLowChart(activeTab.dataset.week, _weekChartKind);
         }
         return;
     }
