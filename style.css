@@ -1153,6 +1153,15 @@ body.dark .pin-btn.pinned {
     filter: grayscale(100%) brightness(5);
 }
 
+/* Week graph rank number below each logo (Range/Spread/Outlook): same font/color/weight
+   as the Conference tab's .conf-team-rank badge */
+.chart-logo-rank {
+    font-size: 9px;
+    font-weight: 700;
+    fill: var(--color-heading);
+    pointer-events: none;
+}
+
 /* Week graph logo highlight ring (shown via team highlight rules) */
 .chart-logo-ring {
     display: none;

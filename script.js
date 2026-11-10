@@ -2075,7 +2075,9 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
 
     // Clickable team logo below the x-axis; the ring behind it lights up via the
     // same highlight rules as ballot logos, so state stays in sync both ways.
-    const appendChartLogo = (team, x) => {
+    // Consensus rank (when given) is printed below the logo in the Conference tab's rank
+    // badge style (.chart-logo-rank mirrors .conf-team-rank's font/color/weight).
+    const appendChartLogo = (team, x, rank = null) => {
         const lx = x - logoSize / 2, ly = mT + cH + 6;
         const ring = document.createElementNS(svgNS, "rect");
         ring.setAttribute("class", "chart-logo-ring");
@@ -2095,6 +2097,15 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
         img.style.cursor = "pointer";
         img.addEventListener("click", () => toggleTeamHighlight(team));
         svg.appendChild(img);
+
+        if (rank !== null) {
+            const rankTxt = document.createElementNS(svgNS, "text");
+            rankTxt.setAttribute("class", "chart-logo-rank");
+            rankTxt.setAttribute("x", x); rankTxt.setAttribute("y", mT + cH + logoSize + 18);
+            rankTxt.setAttribute("text-anchor", "middle");
+            rankTxt.textContent = rank;
+            svg.appendChild(rankTxt);
+        }
     };
 
     if (mode === "highlow" || mode === "outlook") {
@@ -2203,20 +2214,8 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
 
             svg.insertBefore(circle, tipG);
 
-            appendChartLogo(team, x);
+            appendChartLogo(team, x, mode === "outlook" ? (top25.indexOf(team) + 1 || "NR") : i + 1);
 
-            // Consensus rank number below logo
-            const rankTxt = document.createElementNS(svgNS, "text");
-            rankTxt.setAttribute("x", x); rankTxt.setAttribute("y", mT + cH + logoSize + 18);
-            rankTxt.setAttribute("text-anchor", "middle"); rankTxt.setAttribute("font-size", "9");
-            rankTxt.setAttribute("fill", axisColor);
-            if (mode === "outlook") {
-                const op = top25.indexOf(team);
-                rankTxt.textContent = op === -1 ? "NR" : op + 1;
-            } else {
-                rankTxt.textContent = i + 1;
-            }
-            svg.appendChild(rankTxt);
         });
     } else {
         // Dot plot: one dot per (team, rank), sized by voter count at that rank
@@ -2295,15 +2294,8 @@ function showWeekHighLowChart(weekId, mode = "highlow") {
                 svg.insertBefore(circle, tipG);
             });
 
-            appendChartLogo(team, x);
+            appendChartLogo(team, x, i + 1);
 
-            // Consensus rank number below logo
-            const rankTxt = document.createElementNS(svgNS, "text");
-            rankTxt.setAttribute("x", x); rankTxt.setAttribute("y", mT + cH + logoSize + 18);
-            rankTxt.setAttribute("text-anchor", "middle"); rankTxt.setAttribute("font-size", "9");
-            rankTxt.setAttribute("fill", axisColor);
-            rankTxt.textContent = i + 1;
-            svg.appendChild(rankTxt);
         });
     }
 
