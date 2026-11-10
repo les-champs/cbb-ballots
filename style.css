@@ -756,11 +756,13 @@ kbd {
 
 /* Stats › Week › Conference tab (buildConferenceView() in script.js) */
 .conf-view { position: relative; width: min(833px, 94vw); margin: 0 auto; font-size: 12px; }
+/* Window ~10% shorter than its content (839px → 755px); the rest scrolls inside the box */
+#voter-history-box:has(.conf-view) { max-height: min(755px, 79vh); }
 .conf-empty { padding: 40px 0; text-align: center; color: var(--color-section-title); }
-.conf-section { margin-bottom: 10px; }
+.conf-section { margin-bottom: 14px; }
 /* Two equal halves; the pie is centered in the left one (right half reserved for a second chart) */
 .conf-pie-wrap { display: grid; grid-template-columns: 1fr 1fr; align-items: center; }
-.conf-pie { grid-column: 1; justify-self: center; width: 344px; max-width: 100%; height: auto; flex: none; }
+.conf-pie { grid-column: 1; justify-self: center; width: 428px; max-width: 100%; height: auto; flex: none; }
 .conf-pie-labels { pointer-events: none; }
 .conf-pie-label { font-size: 11px; font-weight: 600; fill: #fff; font-variant-numeric: tabular-nums; }
 .conf-pie-label .conf-pie-val { font-size: 10px; font-weight: 500; }
@@ -769,12 +771,12 @@ kbd {
 .conf-stats-table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 12px; font-variant-numeric: tabular-nums; }
 #voter-history-table .conf-stats-table th, #voter-history-table .conf-stats-table td { border-right: none; }
 #voter-history-table .conf-stats-table th { font-size: 11px; font-weight: normal; padding: 4px 6px; text-align: center; white-space: nowrap; vertical-align: bottom; }
-#voter-history-table .conf-stats-table td { padding: 2px 6px; text-align: center; border-bottom: 1px solid var(--color-border-subtle); white-space: nowrap; vertical-align: middle; }
+#voter-history-table .conf-stats-table td { padding: 3px 6px; text-align: center; border-bottom: 1px solid var(--color-border-subtle); white-space: nowrap; vertical-align: middle; }
 #voter-history-table .conf-stats-table .conf-teams { text-align: left; white-space: normal; line-height: 0; padding-top: 2px; padding-bottom: 2px; }
 #voter-history-table .conf-stats-table th.conf-teams { line-height: normal; }
 /* Rank badge: bold number on the logo's top-left corner, haloed in the modal background */
-.conf-stats-table .conf-team { position: relative; display: inline-block; margin: 3px 5px 1px 7px; vertical-align: middle; }
-.conf-stats-table .conf-team-rank { position: absolute; top: -4px; left: -6px; font-size: 9px; font-weight: 700; line-height: 1; color: var(--color-heading); pointer-events: none;
+.conf-stats-table .conf-team { position: relative; display: inline-block; margin: 5px 5px 2px 7px; vertical-align: middle; }
+.conf-stats-table .conf-team-rank { position: absolute; top: -5px; left: -6px; font-size: 9px; font-weight: 700; line-height: 1; color: var(--color-heading); pointer-events: none;
     text-shadow: 0 0 2px var(--color-bg-modal), 0 0 2px var(--color-bg-modal), 0 0 2px var(--color-bg-modal); }
 .conf-stats-table .conf-teams img { display: block; width: 20px; height: 20px; object-fit: contain; cursor: pointer; }
 #voter-history-table .conf-stats-table .team-col { text-align: left; color: var(--color-table-team-col); overflow: hidden; text-overflow: ellipsis; }
