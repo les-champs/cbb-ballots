@@ -2461,9 +2461,13 @@ function applyTableSort(sort) {
             teams.slice(0, 25).forEach((t, p) => { if (!consSet.has(t)) gaps.push(25 - p); });
             return gaps;
         };
+        // Halved so a swap of two adjacent teams counts as 1, not 2. Every place a team
+        // moves up is matched by one moving down (omitted and off-consensus teams both
+        // sit at #26), so the raw sum is always even and the half is a whole number:
+        // "how many places this ballot's teams moved up vs. consensus".
         const scoreFn = (teams, name) => {
             if (!teams?.length) return Infinity;
-            return gapsFn(teams, consensusFor(name)).reduce((s, g) => s + g, 0);
+            return gapsFn(teams, consensusFor(name)).reduce((s, g) => s + g, 0) / 2;
         };
         // Get voter teams directly from visible rows
         const voterTeams = {};
@@ -2478,12 +2482,12 @@ function applyTableSort(sort) {
             return 0;
         };
         // Total for sorting, plus a trimmed per-team average in parentheses: drop the
-        // ballot's two largest gaps, divide the rest by 25. Forgives one or two big
+        // ballot's two largest gaps, halve the rest like the total, divide by 25. Forgives one or two big
         // swings without hiding a ballot that differs from consensus everywhere.
         const TRIM_TOP_GAPS = 2;
         const distLabel = (dist, teams, name) => {
             const gaps = gapsFn(teams, consensusFor(name)).sort((a, b) => b - a);
-            const trimmed = gaps.slice(TRIM_TOP_GAPS).reduce((s, g) => s + g, 0) / 25;
+            const trimmed = gaps.slice(TRIM_TOP_GAPS).reduce((s, g) => s + g, 0) / 2 / 25;
             return `+${dist} (${trimmed.toFixed(2)})`;
         };
         const scores = {};
