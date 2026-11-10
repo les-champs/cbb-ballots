@@ -3289,7 +3289,6 @@ function computeConferenceWeekStats(weekId) {
         const teams = order.filter(t => isMember(confOf(t)));
         const ranked = teams.filter(t => rankOf[t] <= 25);
         const gPts = teams.reduce((s, t) => s + pts[t], 0);
-        const perBallot = ballots.map(b => b.filter(t => isMember(confOf(t))).length);
         const share = totalPts ? gPts / totalPts : 0;
         let prevShare = null, prevT25 = null;
         if (hasPrev) {
@@ -3301,10 +3300,6 @@ function computeConferenceWeekStats(weekId) {
             label, teams,
             t25: ranked.length, prevT25,
             pts: gPts, share, prevShare,
-            firstVotes: ballots.filter(b => b[0] && isMember(confOf(b[0]))).length,
-            perBallotAvg: perBallot.reduce((s, n) => s + n, 0) / ballots.length,
-            perBallotMin: Math.min(...perBallot),
-            perBallotMax: Math.max(...perBallot),
         };
     };
 
@@ -3317,7 +3312,7 @@ function computeConferenceWeekStats(weekId) {
         groupStats("Mid-Major", c => !power.includes(c) && c !== "Unmapped"),
     ].filter(s => s && s.pts > 0);
 
-    return { year, voted, slices, totalVoters: ballots.length };
+    return { year, voted, slices, rankOf, totalVoters: ballots.length };
 }
 
 // The Conference tab's content as a DOM node.
@@ -3405,25 +3400,21 @@ function buildConferenceView(weekId) {
             <td>${g.pts.toLocaleString()}</td>
             <td>${pct(g.share)}</td>
             <td>${g.prevShare === null ? "—" : deltaSpan((g.share - g.prevShare) * 100, x => x.toFixed(1))}</td>
-            <td>${g.firstVotes}</td>
-            <td>${g.perBallotAvg.toFixed(1)}</td>
-            <td>${g.perBallotMin === g.perBallotMax ? g.perBallotMin : `${g.perBallotMin}–${g.perBallotMax}`}</td>
-            <td class="conf-teams">${g.teams.map(t =>
-                `<img class="logo-sm team-logo" data-team="${t}" src="${logoSrc(t)}" title="${formatTeamName(t)}">`).join("")}</td>
+            <td class="conf-teams">${g.teams.map(t => {
+                const r = stats.rankOf[t];
+                return `<span class="conf-team">${r <= 25 ? `<span class="conf-team-rank">${r}</span>` : ""}<img class="logo-sm team-logo" data-team="${t}" src="${logoSrc(t)}" title="${formatTeamName(t)}${r <= 25 ? ` (#${r})` : ""}"></span>`;
+            }).join("")}</td>
         </tr>`;
     const tbl = document.createElement("table");
     tbl.className = "conf-stats-table";
-    tbl.innerHTML = `<colgroup><col style="width:130px"><col style="width:44px"><col style="width:40px"><col style="width:64px"><col style="width:60px"><col style="width:48px"><col style="width:64px"><col style="width:70px"><col style="width:56px"><col></colgroup><thead><tr>
+    tbl.innerHTML = `<colgroup><col style="width:130px"><col style="width:44px"><col style="width:40px"><col style="width:64px"><col style="width:60px"><col style="width:48px"><col></colgroup><thead><tr>
         <th class="team-col">Conference</th>
         <th title="Teams in the consensus Top 25">T25</th>
         <th title="Change in Top 25 teams from last week">Δ</th>
         <th title="Total ballot points (rank 1 = 25 … rank 25 = 1)">Pts</th>
         <th title="Share of all ballot points this week">Share</th>
         <th title="Change in points share from last week (percentage points)">Δ</th>
-        <th title="First-place votes">#1 Votes</th>
-        <th title="Average number of its teams per ballot">Per Ballot</th>
-        <th title="Fewest–most of its teams on any single ballot">Range</th>
-        <th class="conf-teams" title="Teams receiving votes, most points first">Teams</th>
+        <th class="conf-teams" title="Teams receiving votes, most points first (number = consensus rank)">Teams</th>
     </tr></thead><tbody>
         ${stats.voted.map(row).join("")}
     </tbody>`;

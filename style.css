@@ -772,11 +772,15 @@ kbd {
 #voter-history-table .conf-stats-table td { padding: 3px 6px; text-align: center; border-bottom: 1px solid var(--color-border-subtle); white-space: nowrap; vertical-align: middle; }
 #voter-history-table .conf-stats-table .conf-teams { text-align: left; white-space: normal; line-height: 0; padding-top: 2px; padding-bottom: 2px; }
 #voter-history-table .conf-stats-table th.conf-teams { line-height: normal; }
-.conf-stats-table .conf-teams img { width: 20px; height: 20px; object-fit: contain; margin: 2px 4px; cursor: pointer; vertical-align: middle; }
+/* Rank badge: bold number on the logo's top-left corner, haloed in the modal background */
+.conf-stats-table .conf-team { position: relative; display: inline-block; margin: 5px 5px 2px 7px; vertical-align: middle; }
+.conf-stats-table .conf-team-rank { position: absolute; top: -5px; left: -6px; font-size: 9px; font-weight: 700; line-height: 1; color: var(--color-heading); pointer-events: none;
+    text-shadow: 0 0 2px var(--color-bg-modal), 0 0 2px var(--color-bg-modal), 0 0 2px var(--color-bg-modal); }
+.conf-stats-table .conf-teams img { display: block; width: 20px; height: 20px; object-fit: contain; cursor: pointer; }
 #voter-history-table .conf-stats-table .team-col { text-align: left; color: var(--color-table-team-col); overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 700px) {
     .conf-view { overflow-x: auto; }
-    .conf-stats-table { min-width: 860px; }
+    .conf-stats-table { min-width: 680px; }
     .conf-pie-wrap { grid-template-columns: 1fr; }
 }
 
