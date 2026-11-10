@@ -1,0 +1,51 @@
+# Deploys the site to GitHub Pages on every push to main.
+# Requires Settings → Pages → Build and deployment → Source: "GitHub Actions".
+# Replaces the legacy "pages-build-deployment" (Jekyll) pipeline, whose deploy
+# step hard-codes a 10-minute timeout.
+name: Deploy Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; a newer push waits rather than cancelling one mid-sync.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Publish only what the site loads at runtime: the pages and data-*.html
+      # fragments, team logos, the social-card image, and the custom domain.
+      - name: Assemble site
+        run: |
+          mkdir _site
+          cp *.html thumbnail.png CNAME _site/
+          cp -r cbb-logos _site/
+          du -sh _site
+          ls _site | wc -l
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          timeout: 1800000   # 30 min (default 10 min)

@@ -3,9 +3,9 @@
 Scraper + static site generator for college basketball poll ballots. `userpoll.py` scrapes voter ballots (r/CollegeBasketball userpoll from cbbpoll.net / legacy cbbpoll.com, plus AP Top 25 from collegepolltracker.com) and generates `index.html` and `ap-ballots.html`, inlining `style.css` and `script.js` at build time.
 
 - **Live:** https://www.userpoll-landscape.com/ (custom domain via `CNAME`; `les-champs.github.io/cbb-ballots/` redirects there)
-- **Repo:** `les-champs/cbb-ballots`, branch `main` only. Push to `main` → GitHub Pages serves from root.
+- **Repo:** `les-champs/cbb-ballots`, branch `main` only. Push to `main` → `.github/workflows/pages.yml` ("Deploy Pages") publishes `*.html`, `cbb-logos/`, `thumbnail.png` and `CNAME` to GitHub Pages (Pages source: GitHub Actions; deploy timeout 30 min). Add any new runtime asset to its "Assemble site" step.
 - No build tooling, no tests, no package manager. Python 3 stdlib + PIL; vanilla JS.
-- `_config.yml` excludes build inputs (`*.json`, `*.py`, `CLAUDE.md`, …) from the Pages site; html2canvas is loaded on demand by `loadHtml2canvas()` (Save as PNG), not by a `<script>` tag.
+- `_config.yml` only matters to the old Jekyll Pages build (unused since the switch to the Actions workflow); html2canvas is loaded on demand by `loadHtml2canvas()` (Save as PNG), not by a `<script>` tag.
 
 ## Golden rules
 
