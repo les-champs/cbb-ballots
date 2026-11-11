@@ -4090,7 +4090,12 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
     });
 }
 
-function showSeasonStatsModal() {
+function showSeasonStatsModal(mode = "stats") {
+    // Voters tab is PIN-locked (same PIN and daily unlock as the locked keybinds)
+    if (mode === "voters" && !isKeybindsUnlocked()) {
+        requirePin(() => showSeasonStatsModal("voters"));
+        return;
+    }
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab) return;
     const currentYear = _apCurrentYear !== null ? _apCurrentYear : activeTab.dataset.year;
@@ -4132,7 +4137,8 @@ function showSeasonStatsModal() {
                 && !row.classList.contains("row-weighted-ranking")) {
                 const ranks = {};
                 teams.slice(0, 25).forEach((team, i) => { if (team) ranks[team] = i + 1; });
-                ballotsThisWeek.push({ voter: voterName, ranks });
+                const flair = row.querySelector(".voter-cell img.logo:not(.team-logo)")?.dataset.team || null;
+                ballotsThisWeek.push({ voter: voterName, ranks, flair });
             }
             if (voterName === "Official Overall") {
                 // Track best/worst consensus rank from the weekly aggregate (userpoll mode)
@@ -4254,7 +4260,23 @@ function showSeasonStatsModal() {
     const title = document.getElementById("season-stats-title");
     const table = document.getElementById("season-stats-table");
 
-    title.textContent = isApMode ? `${currentYear} AP Season Statistics` : `${currentYear} Season Statistics`;
+    // Title: "YEAR Season — Stats Voters", tabs styled like the Week window's Stats / Conference.
+    // Voters is hidden: its tab only shows while it's open (reached by Shift+W, PIN-locked).
+    const modeTabs = [
+        { key: "stats", label: "Stats" },
+        { key: "voters", label: "Voters", hidden: mode !== "voters" },
+    ].filter(m => !m.hidden).map(m =>
+        `<span class="modal-mode-tab${mode === m.key ? " active" : ""}"
+               onclick="showSeasonStatsModal('${m.key}')">${m.label}</span>`
+    ).join("");
+    title.innerHTML = `${currentYear}${isApMode ? " AP" : ""} Season — ${modeTabs}`;
+    table.classList.toggle("season-voters", mode === "voters");
+
+    if (mode === "voters") {
+        table.innerHTML = buildSeasonVotersTableHtml(weekBallots, devSum, voterWeeksVoted, minWeeksVoted, totalWeeks, esc);
+        modal.classList.add("open");
+        return;
+    }
 
     let html = `<colgroup>
         <col style="width:24px">
@@ -4300,6 +4322,99 @@ function showSeasonStatsModal() {
     html += `</tbody>`;
     table.innerHTML = html;
     modal.classList.add("open");
+}
+
+// Voters tab of the Year window: one row per voter on official ballots this season.
+//   Cons Δ   = mean over the voter's ballots of the average |voter rank − consensus rank| across
+//              the union of their 25 teams and that week's consensus top 25 (unranked = 26);
+//              lower = closer to consensus. Consensus = that week's official ballots by points.
+//   #1 Pick  = team the voter ranked #1 most often (ties: most recent).
+//   Favorite / Least Fav. = team with the largest positive / negative total deviation from the
+//              weekly consensus average rank (same measure as #1 Supporter / #1 Hater), divided
+//              by the weeks the voter voted, so season-long bias beats a one-week outlier.
+// Voters below the participation minimum sort after the rest, in italics.
+function buildSeasonVotersTableHtml(weekBallots, devSum, voterWeeksVoted, minWeeksVoted, totalWeeks, esc) {
+    const voters = {};
+    weekBallots.forEach(({ ballots }) => {
+        if (ballots.length === 0) return;
+        const pts = {};
+        ballots.forEach(b => Object.entries(b.ranks).forEach(([t, r]) => { pts[t] = (pts[t] || 0) + (26 - r); }));
+        const consensus = {};
+        Object.entries(pts).sort((a, b) => b[1] - a[1]).slice(0, 25).forEach(([t], i) => { consensus[t] = i + 1; });
+        ballots.forEach(b => {
+            const v = voters[b.voter] || (voters[b.voter] = { name: b.voter, flair: null, deltaSum: 0, ballots: 0, ones: {} });
+            if (b.flair) v.flair = b.flair;
+            const union = new Set([...Object.keys(b.ranks), ...Object.keys(consensus)]);
+            let d = 0;
+            union.forEach(t => { d += Math.abs((b.ranks[t] || 26) - (consensus[t] || 26)); });
+            v.deltaSum += d / union.size;
+            v.ballots++;
+            const one = Object.keys(b.ranks).find(t => b.ranks[t] === 1);
+            if (one) {
+                v.ones[one] = (v.ones[one] || 0) + 1;
+                v.lastOne = one;
+            }
+        });
+    });
+
+    // Favorite / least favorite per voter from the season's deviation sums
+    Object.entries(devSum).forEach(([team, byVoter]) => {
+        Object.entries(byVoter).forEach(([voter, sum]) => {
+            const v = voters[voter];
+            if (!v) return;
+            const d = sum / voterWeeksVoted[voter];
+            if (d > 0 && (!v.fav || d > v.fav.d)) v.fav = { team, d };
+            if (d < 0 && (!v.hate || d < v.hate.d)) v.hate = { team, d };
+        });
+    });
+
+    const rows = Object.values(voters).map(v => ({
+        ...v,
+        delta: v.deltaSum / v.ballots,
+        qualified: voterWeeksVoted[v.name] >= minWeeksVoted,
+    })).sort((a, b) => (b.qualified - a.qualified) || (a.delta - b.delta)
+        || a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+
+    const teamCell = (team, extra) => team
+        ? `<img class="logo-sm" src="${logoSrc(team)}"> ${formatTeamName(team)} ${extra}`
+        : "—";
+    const devSpan = d => `<span class="fan-dev">${d > 0 ? "+" : "−"}${Math.abs(d).toFixed(1)}</span>`;
+
+    let html = `<colgroup>
+        <col style="width:24px">
+        <col style="width:26px">
+        <col>
+        <col style="width:52px">
+        <col style="width:52px">
+        <col>
+        <col>
+        <col>
+    </colgroup><thead><tr>
+        <th>#</th><th></th>
+        <th class="team-col">Voter</th>
+        <th>Weeks</th>
+        <th title="Average distance from the weekly consensus ranking (lower = closer)">Cons Δ</th>
+        <th class="fan-col">#1 Pick</th>
+        <th class="fan-col">Favorite</th>
+        <th class="fan-col">Least Fav.</th>
+    </tr></thead><tbody>`;
+    rows.forEach((v, i) => {
+        let onePick = null, oneCount = 0;
+        Object.entries(v.ones).forEach(([t, c]) => {
+            if (c > oneCount || (c === oneCount && t === v.lastOne)) { onePick = t; oneCount = c; }
+        });
+        html += `<tr${v.qualified ? "" : ` class="fan-low-sample" title="Fewer than ${minWeeksVoted} ballots"`}>
+            <td>${i + 1}</td>
+            <td>${v.flair ? `<img class="logo-sm" src="${logoSrc(v.flair)}">` : ""}</td>
+            <td class="team-col">${esc(v.name)}</td>
+            <td>${voterWeeksVoted[v.name]}/${totalWeeks}</td>
+            <td>${v.delta.toFixed(2)}</td>
+            <td class="fan-col">${teamCell(onePick, `<span class="fan-dev">×${oneCount}</span>`)}</td>
+            <td class="fan-col">${v.fav ? teamCell(v.fav.team, devSpan(v.fav.d)) : "—"}</td>
+            <td class="fan-col">${v.hate ? teamCell(v.hate.team, devSpan(v.hate.d)) : "—"}</td>
+        </tr>`;
+    });
+    return html + `</tbody>`;
 }
 
 function showBumpChartModal() { showHeatmapModal('dots'); }
@@ -4896,18 +5011,34 @@ setWeekArrowsVisible(_showWeekArrows);
 document.getElementById("week-arrow-prev").addEventListener("click", () => navigateWeek(-1));
 document.getElementById("week-arrow-next").addEventListener("click", () => navigateWeek(1));
 
-// ── PIN lock for the "Locked" keybinds (Shift+D/X/R/T/Y/G/U/H/P/?) ─────────────
-// Client-side only — a deterrent, not real security. Unlock is remembered.
-const LOCKED_KEYS = new Set(["D", "X", "R", "T", "Y", "G", "U", "H", "K", "P", "?"]);
+// ── PIN lock for the "Locked" keybinds (Shift+D/X/R/T/Y/G/U/W/H/K/P/?) and the Year
+// window's Voters tab ──────────────────────────────────────────────────────────
+// Client-side only — a deterrent, not real security. An unlock lasts for the rest of the
+// viewer's local calendar day (localStorage `keybindsUnlockedDate`), checked each time a
+// locked action runs, so a tab left open past midnight locks again.
+const LOCKED_KEYS = new Set(["D", "X", "R", "T", "Y", "G", "U", "W", "H", "K", "P", "?"]);
 const KEYBIND_PIN = "925289";
-let _keybindsUnlocked = false;
-try { _keybindsUnlocked = localStorage.getItem("keybindsUnlocked") === "1"; } catch (e) {}
-let _pinPendingEvent = null;
+const _localDateStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+let _keybindsUnlockedDate = null;
+try {
+    _keybindsUnlockedDate = localStorage.getItem("keybindsUnlockedDate");
+    localStorage.removeItem("keybindsUnlocked");  // old never-expiring unlock flag
+} catch (e) {}
+function isKeybindsUnlocked() { return _keybindsUnlockedDate === _localDateStr(); }
+let _pinPendingAction = null;
 const _pinModal = document.getElementById("pin-modal");
 const _pinInput = document.getElementById("pin-input");
 
-function openPinModal(e) {
-    _pinPendingEvent = { key: e.key, code: e.code, shiftKey: true };
+// Runs `action` now if unlocked today, otherwise asks for the PIN and runs it on success.
+function requirePin(action) {
+    if (isKeybindsUnlocked()) { action(); return; }
+    openPinModal(action);
+}
+function openPinModal(action) {
+    _pinPendingAction = action;
     _pinInput.value = "";
     _pinInput.classList.remove("wrong");
     _pinModal.classList.add("open");
@@ -4916,18 +5047,18 @@ function openPinModal(e) {
 function closePinModal() {
     _pinModal.classList.remove("open");
     _pinInput.value = "";
-    _pinPendingEvent = null;
+    _pinPendingAction = null;
 }
 _pinInput.addEventListener("input", () => {
     _pinInput.value = _pinInput.value.replace(/\D/g, "").slice(0, 6);
     _pinInput.classList.remove("wrong");
     if (_pinInput.value.length < 6) return;
     if (_pinInput.value === KEYBIND_PIN) {
-        _keybindsUnlocked = true;
-        try { localStorage.setItem("keybindsUnlocked", "1"); } catch (e) {}
-        const pending = _pinPendingEvent;
+        _keybindsUnlockedDate = _localDateStr();
+        try { localStorage.setItem("keybindsUnlockedDate", _keybindsUnlockedDate); } catch (e) {}
+        const pending = _pinPendingAction;
         closePinModal();
-        if (pending) document.dispatchEvent(new KeyboardEvent("keydown", pending));
+        if (pending) pending();
     } else {
         _pinInput.value = "";
         void _pinInput.offsetWidth; // restart shake animation
@@ -4943,9 +5074,10 @@ _pinModal.addEventListener("click", e => { if (e.target === _pinModal) closePinM
 document.addEventListener("keydown", e => {
     if (_pinModal.classList.contains("open")) return;
     const _isVetChord = _chordPending === "v" && (e.key === "x" || e.key === "X");
-    if (e.shiftKey && !_keybindsUnlocked && !_isVetChord && LOCKED_KEYS.has(e.key.length === 1 ? e.key.toUpperCase() : e.key)) {
+    if (e.shiftKey && !isKeybindsUnlocked() && !_isVetChord && LOCKED_KEYS.has(e.key.length === 1 ? e.key.toUpperCase() : e.key)) {
         e.preventDefault();
-        openPinModal(e);
+        const replay = { key: e.key, code: e.code, shiftKey: true };
+        openPinModal(() => document.dispatchEvent(new KeyboardEvent("keydown", replay)));
         return;
     }
     if (e.key === "Escape") {
@@ -5068,6 +5200,13 @@ document.addEventListener("keydown", e => {
     if (e.key === "U" || e.key === "u") {
         e.preventDefault();
         showSeasonStatsModal();
+        return;
+    }
+
+    // Hidden Voters tab of the Year window (PIN-locked)
+    if (e.key === "W" || e.key === "w") {
+        e.preventDefault();
+        showSeasonStatsModal("voters");
         return;
     }
 

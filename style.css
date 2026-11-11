@@ -838,9 +838,10 @@ kbd {
 #season-stats-table td.team-col { text-align: left; font-size: 12px; color: var(--color-table-team-col); white-space: normal; min-width: 80px; }
 #season-stats-table td:first-child { font-size: 11px; }
 #season-stats-table .logo-sm { height: 20px; width: 20px; object-fit: contain; vertical-align: middle; }
-#season-stats-table th:nth-child(5), #season-stats-table td:nth-child(5) { border-right: none; }
-#season-stats-table th:nth-child(9), #season-stats-table td:nth-child(9) { border-right: none; }
-#season-stats-table th:nth-child(8), #season-stats-table td:nth-child(8) { border-right: 1px solid var(--color-border-nth); }
+#season-stats-table:not(.season-voters) th:nth-child(5), #season-stats-table:not(.season-voters) td:nth-child(5) { border-right: none; }
+#season-stats-table:not(.season-voters) th:nth-child(9), #season-stats-table:not(.season-voters) td:nth-child(9) { border-right: none; }
+#season-stats-table:not(.season-voters) th:nth-child(8), #season-stats-table:not(.season-voters) td:nth-child(8) { border-right: 1px solid var(--color-border-nth); }
+#season-stats-table.season-voters th:nth-child(5), #season-stats-table.season-voters td:nth-child(5) { border-right: 1px solid var(--color-border-nth); }
 #season-stats-table td.fan-col { text-align: left; font-size: 12px; padding-left: 10px; }
 #season-stats-table th.fan-col { text-align: left; padding-left: 10px; }
 #season-stats-table .fan-tie { cursor: help; text-decoration: underline dotted; text-underline-offset: 2px; }
