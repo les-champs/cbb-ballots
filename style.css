@@ -747,10 +747,11 @@ kbd {
 #voter-history-table .week-stats-table .logo-sm { height: 20px; width: 20px; object-fit: contain; vertical-align: middle; }
 #voter-history-table .week-stats-table tr.rv-divider td { padding: 6px 0 2px; color: var(--color-divider-text); font-size: 11px; text-align: left; border-bottom: none; }
 #voter-history-table .week-stats-table th:nth-child(5), #voter-history-table .week-stats-table td:nth-child(5),
+#voter-history-table .week-stats-table th:nth-child(7), #voter-history-table .week-stats-table td:nth-child(7),
 #voter-history-table .week-stats-table th:nth-child(9), #voter-history-table .week-stats-table td:nth-child(9),
 #voter-history-table .week-stats-table th:nth-child(11), #voter-history-table .week-stats-table td:nth-child(11),
 #voter-history-table .week-stats-table th:nth-child(12), #voter-history-table .week-stats-table td:nth-child(12) { border-right: none; }
-#voter-history-table .week-stats-table th:nth-child(8), #voter-history-table .week-stats-table td:nth-child(8),
+#voter-history-table .week-stats-table th:nth-child(6), #voter-history-table .week-stats-table td:nth-child(6),
 #voter-history-table .week-stats-table th:nth-child(10), #voter-history-table .week-stats-table td:nth-child(10) { border-right: 1px solid var(--color-border-strong); }
 
 

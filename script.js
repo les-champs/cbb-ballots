@@ -2082,7 +2082,7 @@ function buildWeekChartSvg(weekId, mode) {
 
     const svgNS = SVG_NS;
     // Shorter than the old standalone chart (460) so the table below stays in view.
-    // No "Rank" axis title (the 1…25 / NR ticks speak for themselves), so mL only fits the ticks.
+    // No "Rank" axis title (the 1…25 ticks speak for themselves), so mL only fits the ticks.
     const W = 900, H = 380;
     const mL = 28, mR = 16, mT = 28, mB = 52;
     const cW = W - mL - mR, cH = H - mT - mB;
@@ -2108,11 +2108,12 @@ function buildWeekChartSvg(weekId, mode) {
         line.setAttribute("stroke-width", "1");
         if (r === 26) line.setAttribute("stroke-dasharray", "3,3");
         svg.appendChild(line);
+        if (r === 26) return;  // unranked line has no label
         const txt = document.createElementNS(svgNS, "text");
         txt.setAttribute("x", mL - 6); txt.setAttribute("y", y + 4);
         txt.setAttribute("text-anchor", "end"); txt.setAttribute("font-size", "11");
         txt.setAttribute("fill", axisColor);
-        txt.textContent = r === 26 ? "NR" : r;
+        txt.textContent = r;
         svg.appendChild(txt);
     });
 
@@ -3176,7 +3177,7 @@ function buildWeekStatsTableHtml(weekId) {
         if (wTeams) wTeams.forEach(t => seasonTeamsSeen.add(t));
     }
 
-    // Outlook graph bands (inner ~50%, outer ~75%) for this week's top 25
+    // Outlook graph bands (inner ~50%, outer ~77.5%) for this week's top 25
     const outlookBands = {};
     (computeOutlookBands(weekId, top25) || []).forEach(b => { outlookBands[b.team] = b; });
     const fmtBandRank = r => { const n = Math.round(r); return n >= 26 ? "NR" : n; };
@@ -3231,14 +3232,14 @@ function buildWeekStatsTableHtml(weekId) {
             <td style="padding:2px 4px;"><img class="logo-sm" src="${logoSrc(team)}"></td>
             <td class="team-col">${formatTeamName(team)}</td>
             <td style="white-space:nowrap">${rankDelta}</td>
+            <td>${count}</td>
+            <td>${pts}</td>
             <td>${inTop25 ? (Number.isInteger(hi) ? hi : hi.toFixed(1)) : ""}</td>
             <td>${inTop25 ? avg.toFixed(1) : ""}</td>
             <td>${inTop25 ? (Number.isInteger(lo) ? lo : lo.toFixed(1)) : ""}</td>
             <td>${inTop25 ? (sdRaw != null ? sdRaw.toFixed(1) : "—") : ""}</td>
             ${inTop25 ? cellLikely : "<td></td>"}
             ${inTop25 ? cellOutlook : "<td></td>"}
-            <td>${count}</td>
-            <td>${pts}</td>
         </tr>`;
     };
 
@@ -3247,26 +3248,26 @@ function buildWeekStatsTableHtml(weekId) {
         <col style="width:28px">
         <col>
         <col style="width:52px">
+        <col style="width:36px">
+        <col style="width:64px">
         <col style="width:44px">
         <col style="width:52px">
         <col style="width:44px">
         <col style="width:48px">
         <col style="width:60px">
         <col style="width:60px">
-        <col style="width:36px">
-        <col style="width:64px">
     </colgroup><thead><tr>
         <th>#</th><th></th>
         <th class="team-col">Team</th>
         <th title="Rank change from previous week">Δ</th>
+        <th>Voters</th>
+        <th>Pts</th>
         <th title="10th percentile rank across all voters">P<sub>90+</sub></th>
         <th>Avg</th>
         <th title="90th percentile rank across all voters">P<sub>10−</sub></th>
         <th title="Standard deviation of ranks given by voters this week">Dev</th>
-        <th title="Outlook inner band: likely range (~50%) of this team's rank over the next few polls">Likely</th>
-        <th title="Outlook outer band: wider range (~75%) of this team's rank over the next few polls, from voters' best/worst ranks over the last 5 polls">Outlook</th>
-        <th>Voters</th>
-        <th>Pts</th>
+        <th title="Outlook inner band: likely range (~50%) of this team's rank over the next few polls">50%</th>
+        <th title="Outlook outer band: wider range (~77.5%) of this team's rank over the next few polls, from voters' best/worst ranks over the last 5 polls">77%</th>
     </tr></thead><tbody>`;
     top25.forEach((team, i) => { html += buildRow(team, i + 1); });
     if (receivingVotes.length > 0) {
