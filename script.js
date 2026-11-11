@@ -3234,6 +3234,7 @@ function buildWeekStatsTableHtml(weekId) {
             <td style="white-space:nowrap">${rankDelta}</td>
             <td>${count}</td>
             <td>${pts}</td>
+            <td title="Share of the maximum possible points (every voter ranking this team #1)">${Math.round(pts / (25 * totalVoters) * 100)}%</td>
             <td>${inTop25 ? (Number.isInteger(hi) ? hi : hi.toFixed(1)) : ""}</td>
             <td>${inTop25 ? avg.toFixed(1) : ""}</td>
             <td>${inTop25 ? (Number.isInteger(lo) ? lo : lo.toFixed(1)) : ""}</td>
@@ -3250,6 +3251,7 @@ function buildWeekStatsTableHtml(weekId) {
         <col style="width:52px">
         <col style="width:36px">
         <col style="width:64px">
+        <col style="width:56px">
         <col style="width:44px">
         <col style="width:52px">
         <col style="width:44px">
@@ -3262,6 +3264,7 @@ function buildWeekStatsTableHtml(weekId) {
         <th title="Rank change from previous week">Δ</th>
         <th>Voters</th>
         <th>Pts</th>
+        <th title="Share of the maximum possible points: 100% = ranked #1 (25 pts) by every voter">Pts%</th>
         <th title="10th percentile rank across all voters">P<sub>90+</sub></th>
         <th>Avg</th>
         <th title="90th percentile rank across all voters">P<sub>10−</sub></th>
@@ -3271,7 +3274,7 @@ function buildWeekStatsTableHtml(weekId) {
     </tr></thead><tbody>`;
     top25.forEach((team, i) => { html += buildRow(team, i + 1); });
     if (receivingVotes.length > 0) {
-        html += `<tr class="rv-divider"><td colspan="12">Receiving Votes</td></tr>`;
+        html += `<tr class="rv-divider"><td colspan="13">Receiving Votes</td></tr>`;
         receivingVotes.forEach((team, i) => { html += buildRow(team, 26 + i); });
     }
     html += "</tbody>";
