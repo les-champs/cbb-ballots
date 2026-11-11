@@ -142,6 +142,7 @@ Local testing: `python3 -m http.server 8000` → http://localhost:8000. Opening 
 - Grid: `https://collegepolltracker.com/basketball/grid/{site_year}/{week_slug}`; voter: `/basketball/pollster/{slug}/{site_year}/{week_slug}`.
 - `site_year` = our year − 1. **New season → add `site_year: our_year` to `AP25_SITE_YEARS`.**
 - Week slugs: `pre-season` (stored as 0), `week-2`…`week-19`, `final-rankings` (stored as 20). Week 1 doesn't exist; invalid weeks redirect to homepage.
+- **Site year 2026 (our 2027) starts at `week-1`:** the first poll after pre-season is `week-1` (`week-2` 302s to it). Site years listed in `AP25_WEEK1_SITE_YEARS` shift slugs so `week-N` is stored as week N+1, which keeps our week numbering unchanged. Add new seasons there if the site keeps this scheme.
 - Seasons: 2022–2026 complete; 2027 in progress.
 - `ap25_build_season` writes both fragment files and updates both pages **in one pass per year**. Do not reintroduce per-week `save_ap_html` — it caused O(n²) memory blowup.
 - Team names: `_normalize_ap_team_name()` → PascalCase, then `AP25_NAME_OVERRIDES` (e.g. "Pittsburgh" → "Pitt").

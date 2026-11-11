@@ -152,7 +152,7 @@ async function loadYear(year) {
     _loadingYears[year] = (async () => {
         try {
             document.body.classList.add('year-loading');
-            const resp = await fetch(`${typeof FRAG_PATH_PREFIX !== 'undefined' ? FRAG_PATH_PREFIX : 'data-'}${year}.html`);
+            const resp = await fetch(`${typeof FRAG_PATH_PREFIX !== 'undefined' ? FRAG_PATH_PREFIX : 'data-'}${year}.html`, { cache: "no-cache" });
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const html = await resp.text();
             const container = document.getElementById('year-data-container');
@@ -184,7 +184,7 @@ async function loadApYear(year) {
     }
     _loadingYears[key] = (async () => {
         try {
-            const resp = await fetch(`data-ap-${year}.html`);
+            const resp = await fetch(`data-ap-${year}.html`, { cache: "no-cache" });
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const html = await resp.text();
             const container = document.getElementById('year-data-container');

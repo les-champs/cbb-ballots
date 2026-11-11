@@ -942,10 +942,15 @@ AP25_BASE = "https://collegepolltracker.com/basketball/grid"
 # Available site years: 2021-2026 → our 2022-2027
 AP25_SITE_YEARS = {2021: 2022, 2022: 2023, 2023: 2024, 2024: 2025, 2025: 2026, 2026: 2027}
 
+# Site years whose in-season slugs start at week-1 instead of week-2 (the first
+# poll after pre-season is "week-1"). Our stored week = site week number + 1.
+AP25_WEEK1_SITE_YEARS = {2026}
+
 # AP-specific name overrides (title attributes from collegepolltracker.com)
 # Most names match cbbpoll overrides already; add AP-specific ones here.
 AP25_NAME_OVERRIDES = {
     "McNeese State": "McNeese",
+    "East Texas A&M": "TexasAMCommerce",
     "Pittsburgh": "Pitt",
 }
 
@@ -1025,7 +1030,8 @@ def ap25_scrape_season(our_year):
         data = {"year": our_year, "site_year": site_year, "weeks": {}}
 
     # Week slugs to try: pre-season, then week-2 through week-19, then final-rankings
-    week_slugs = ["pre-season"] + [f"week-{w}" for w in range(2, 20)] + ["final-rankings"]
+    shift = 1 if site_year in AP25_WEEK1_SITE_YEARS else 0
+    week_slugs = ["pre-season"] + [f"week-{w - shift}" for w in range(2, 20)] + ["final-rankings"]
     unmapped_names = set()
 
     for week_slug in week_slugs:
@@ -1035,7 +1041,7 @@ def ap25_scrape_season(our_year):
         elif week_slug == "final-rankings":
             week_num = 20
         else:
-            week_num = int(week_slug.split("-")[1])
+            week_num = int(week_slug.split("-")[1]) + shift
         week_key = str(week_num)
 
         # Skip already-cached weeks
