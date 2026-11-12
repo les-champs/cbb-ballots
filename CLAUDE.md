@@ -11,7 +11,7 @@ Scraper + static site generator for college basketball poll ballots. `userpoll.p
 
 ## Golden rules
 
-1. **Edit only source files:** `script.js`, `style.css`, `userpoll.py` (and `poll_simulator.py`). Everything else at the root is generated.
+1. **Edit only source files:** `script.js`, `style.css`, `userpoll.py`, and the Python modules it imports (`conferences.py`, `nond1_logos.py`, `net_rankings.py`, `quads.py`), plus `poll_simulator.py`. Everything else at the root is generated or scraped data (incl. `net-*.json` / `quads-*.json`, written by `--net` / `--quads`).
 2. **After any change to `script.js`, `style.css`, or HTML templates in `userpoll.py`, run `python3 userpoll.py --rebuild`.** This regenerates `index.html`, `ap-ballots.html`, and all fragment files. Commit source + regenerated output together.
 3. **Never read generated or data files whole.** They are huge (`index.html` ≈ 0.8 MB, each `data-*.html` 3–5 MB, `cbbpoll-*.json`/`ap25-*.json` ~1–2 MB, `ballots.json` 2 MB). Use `grep -n`/`grep -c`, `head`, or `python3 -c` with `json` to inspect specific pieces. Do not open `ballots.json` at all.
 4. **`script.js` is ~4,700 lines and `userpoll.py` ~2,000.** Locate code with `grep -n "function name"` and read targeted ranges rather than the whole file.
@@ -26,6 +26,8 @@ script.js              # All client-side JS (source, inlined at build)
 style.css              # All CSS (source, inlined at build)
 poll_simulator.py      # Python mirror of the Précision formula for tuning
 nond1_logos.py         # NCAA.com logos for non-D1 opponents ESPN has none for: NCAA_SLUGS (ESPN id → NCAA.com slug) + downloader (--ncaa-logos)
+quads.py               # Computed Q1–Q4 records (ESPN schedules + BPI or NET ranks → quads-YEAR.json, --quads); stopgap before NET is released
+net_rankings.py        # NCAA NET rankings + quadrant records scraper (NCAA.com → net-YEAR.json, --net); NCAA_NAME_OVERRIDES
 conferences.py         # Season-dependent D1 conference + Power/Mid-Major mapping (2025+) and ESPN_IDS (team → ESPN id); injected as CONFERENCE_DATA
 index.html             # GENERATED — main site; only the current year's weeks are inline
 ap-ballots.html        # GENERATED — standalone AP page
@@ -35,6 +37,8 @@ data-appage-YEAR.html  # GENERATED — AP fragments for ap-ballots.html (IDs wee
 data-2026.html etc.    # (userpoll fragments exist for 2016–2022, 2024–2026; index.html holds 2027 inline)
 cbbpoll-YEAR.json      # Cached legacy cbbpoll.com scrapes (2016–2022)
 ap25-YEAR.json         # Cached AP25 scrapes (2022–2027)
+quads-YEAR.json        # Computed quadrant records + per-game quads from --quads (not deployed or used by the site yet)
+net-YEAR.json          # NET + quadrant records snapshot from --net (not deployed or used by the site yet)
 cbbpoll-2024-recovery.json  # Output of the removed one-off 2024 Wayback recovery (in git history)
 ballots.json           # Browser-exported poll data for poll_simulator.py --from-json (do not read)
 .github/workflows/pages.yml  # GitHub Pages deploy (source)
@@ -56,6 +60,8 @@ python3 userpoll.py --ap25 --year 2027                 # Scrape AP25 season → 
 python3 userpoll.py --ap25-build --year 2027           # Build AP fragments + update both pages (0 = all)
 python3 userpoll.py --cbbpoll --year 2022              # Scrape legacy cbbpoll.com season (or --year all)
 python3 userpoll.py --cbbpoll-build --year 2022        # Build legacy season HTML from cached JSON
+python3 userpoll.py --net                              # Fetch NCAA NET + Q1–Q4 records → net-YEAR.json (YEAR from the page's "Through Games" date)
+python3 userpoll.py --quads [--year 2027] [--rank-source auto|bpi|net] [--check]   # Compute Q1–Q4 from ESPN schedules → quads-YEAR.json (~3 min; auto = NET if net-YEAR.json exists, else BPI; --check compares with net-YEAR.json)
 python3 userpoll.py --to-webp                          # Convert PNG logos → WebP
 python3 userpoll.py --dark-logos                       # Download ESPN dark-mode logos (ESPN_NAME_OVERRIDES)
 python3 userpoll.py --missing-logos                    # Download ESPN logos (+dark) for conferences.py schools with no logo (ESPN_ID_OVERRIDES)
@@ -133,7 +139,7 @@ Local testing: `python3 -m http.server 8000` → http://localhost:8000. Opening 
 
 ## ESPN data (W-L records and game results)
 
-Live team records and game-by-game results come from ESPN's public, **undocumented** site APIs: no key needed, CORS open, called **from the browser at view time** (nothing is fetched at build, and nothing is stored in the repo). First used by the Year window's **Records** tab; the data layer is built to be reused anywhere else.
+Live team records and game-by-game results come from ESPN's public, **undocumented** site APIs: no key needed, CORS open, called **from the browser at view time** (W-L records and schedules are never stored in the repo). Exception: `quads.py` (`--quads`) pulls every team's schedule + BPI rank at build time into `quads-YEAR.json`; see **NET rankings and quadrants**. First used by the Year window's **Records** tab; the data layer is built to be reused anywhere else.
 
 ### Endpoints (verified 2026-11-12)
 
@@ -191,6 +197,29 @@ The full contract is in the comment block at the top of that section. Summary:
 - If a feature must work without ESPN (offline or for an archive), add a build-time snapshot in `userpoll.py` (stdlib `urllib`, same URLs) and inline it like `CONFERENCE_DATA`, then prefer live data when it loads.
 - Headless browser testing: ESPN blocks the `HeadlessChrome` UA on `site.api.espn.com` (another reason for the web host). puppeteer-core with the system Chrome works (`executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'`). The user's `~/.npm` cache has root-owned files, so `npm i` needs `--cache <tmp dir>`.
 
+## NET rankings and quadrants (`net_rankings.py`)
+
+- Source: the NCAA.com NET page (`NET_URL`), one HTML table with every D1 team: Rank, School, Record, Conf, Road, Neutral, Home, Non-Div I, Prev, Quad 1–4. **Current season only** (no archive), and **no CORS header**, so it's fetched at build time (`--net`), never from the browser. ESPN has no NET or quadrant data (its power-index endpoint has BPI/SOR/SOS only).
+- Output `net-YEAR.json`: `{season, through (ISO date), fetched, source, teams: {ourKey: {rank, prev, record, road, neutral, home, nonD1, q1, q2, q3, q4}}}`, in rank order. W-L strings are D1 games only, so they can differ from ESPN's overall records. Each run overwrites that season's file (a snapshot, not a history).
+- Season comes from the page's "Through Games <date>" line (`season_of()`), not today's date: until the first NET release (usually early December) the page still shows last season's final rankings.
+- Names: `to_key()` checks `NCAA_NAME_OVERRIDES` first, then an exact (normalized) match against `ESPN_IDS` keys / `ALIASES` / `DISPLAY_NAMES`, then the same with "St." → "State" and a trailing "(XX)" dropped. An unmapped or duplicate name, a changed column list, or < 300 rows aborts without writing; teams missing vs. `conferences.py` are only printed.
+- Shown on the site in the Records tab (see **Quadrants on the site** below). `pages.yml` deploys every `net-*.json` / `quads-*.json`; after `--net` or `--quads`, run `--rebuild` so `QUAD_FILES` picks up a new season's file, then commit the JSON with the pages.
+
+### Computed quadrants (`quads.py`)
+
+- NET (and so official quads) only exists from about early December. Until then `--quads` computes quadrants itself: for every D1 school in `conferences.SEASONS[year]`, fetch its ESPN schedule (seasontype 2 + 3) and classify each game by the opponent's **current** rank and the site with the official cutoffs (`CUTOFFS`: upper rank bounds H / N / A: Q1 = 30 / 50 / 75; Q2 = 75 / 100 / 135; Q3 = 160 / 200 / 240; Q4 above). Non-D1 opponents count as `nonD1`, not a quadrant. All completed games count, incl. conference tournaments and postseason.
+- Ranks: `bpi` = ESPN BPI rank from `sports.core.api.espn.com/v2/sports/basketball/leagues/mens-college-basketball/seasons/YYYY/powerindex/{espnId}` (`stats[]` `name == "bpirank"`, `value`; one request per team; the list form of that endpoint returns only the top 25; BPI exists from the first week of the season). `net` = ranks from `net-YEAR.json`. `auto` (default) picks NET once `--net` has written that season's file, so the same command switches over in December.
+- Output `quads-YEAR.json` (compact, ~1.4 MB): `{season, rankSource, ranksAsOf, fetched, cutoffs, teams: {ourKey: {rank, q1, q2, q3, q4, nonD1, games: [{date, site H|A|N, opp (our key or null), oppId, oppRank, quad, result W|L|null, us, them}]}}}`. Upcoming games carry a quad too (null result).
+- Validated 2026-11-12 on 2026 with `--rank-source net --check`: **357/365 teams match the NCAA's official Q1–Q4 exactly**; each of the other 8 has one game one quadrant off, from ESPN's site label differing from the NCAA's (e.g. St. John's vs Providence in the Big East tournament at MSG: ESPN home, NCAA neutral). BPI-based quads will differ more, since BPI ≠ NET near the cutoffs; label them as unofficial.
+- ~1,100 requests, 8 at a time (`WORKERS`), ~3 min. Fails without writing if a schedule fetch fails or < 95% of teams get a rank.
+
+### Quadrants on the site (Records tab)
+
+- `get_quad_files()` (userpoll.py) scans for `net-YEAR.json` / `quads-YEAR.json` (skipping `EXCLUDED_YEARS`) and `build_full_html()` injects `QUAD_FILES = {year: {net, quads}}` on both pages. The files are fetched same-origin at view time, only when the Records tab opens.
+- JS (section "Quadrant data (NET / BPI)" above the Records tab): `quadsAvailable(season)` → `"net"` | `"bpi"` | null; `fetchQuads(season)` → totals from `net-YEAR.json` if present (official), else `quads-YEAR.json` (unofficial); per-game quads from `quads-YEAR.json` only when its `rankSource` matches the totals' source. The result is also stored in `_quadsData[season]` (`{error}` on failure) so renders stay synchronous; `showSeasonRecords()` re-renders once it arrives. `quadOfGame(season, key, game)` matches games by `date.slice(0, 10)` + opponent ESPN id.
+- Records table (Voted and All): **NET/BPI** rank + **Q1–Q4** columns after Conf (`records-quad-rank`, `records-quad`; Q1 bold; vertical line after Q4 when Won/Lost follow). Cells show "…" while loading and "—" if a team has no entry. Expanded game lists get a `Q1`–`Q4` tag column (`.rg-quad-tag`, strength by weight/opacity). The title note adds "Quads: BPI-based, unofficial (date)" or "Quads: NCAA NET through date", or "quads unavailable (…)".
+- Seasons without a file show no quad columns. Currently: 2027 (BPI, computed), 2026 (official NET totals, no per-game tags).
+
 ## Précision scoring (EXPERIMENTAL — still being tuned)
 
 `computeVoterAvg()` (JS) ≡ `score_voters()` (`poll_simulator.py`, params in `PARAMS` dict):
@@ -222,6 +251,7 @@ Different site from cbbpoll.net. Only needed if re-scraping.
 ## Common workflows
 
 - **Weekly update:** `python3 userpoll.py --week N --year YYYY` (and `--ap25 --year YYYY` + `--ap25-build --year YYYY` for AP), spot-check locally, commit, push.
+- **Quadrant refresh (any time, e.g. weekly):** `python3 userpoll.py --net` (once NET is out, ~December), then `--quads`, then `--rebuild`; commit `net-YEAR.json` / `quads-YEAR.json` with the pages. Before NET exists `--net` just rewrites last season's final file, which is harmless.
 - **New season:** add to `AP25_SITE_YEARS`; first userpoll week of the new year becomes the inline year in `index.html` and the previous year is split to `data-YEAR.html` automatically.
 - **UI/JS change:** edit `script.js`/`style.css` → `--rebuild` → test at localhost:8000 on both `index.html` and `ap-ballots.html` (incl. AP mode, prior year, dark mode, mobile width) → commit.
 
@@ -231,3 +261,4 @@ Different site from cbbpoll.net. Only needed if re-scraping.
 - Minor UI/layout polish
 - More analysis functions, graphs, and data analysis
 - More uses of ESPN records/game data (see **ESPN data › Limitations and ideas for reuse**), incl. record-as-of-poll-week
+- Optional: a scheduled GitHub Action that runs `--net` + `--quads` + `--rebuild` daily and commits (pushing it needs the `workflow` token scope)

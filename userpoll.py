@@ -1,4 +1,5 @@
 import os
+import sys
 import re
 import json
 import time
@@ -12,6 +13,8 @@ from PIL import Image
 
 import conferences
 import nond1_logos
+import net_rankings
+import quads
 
 # Output directory for logos
 BASE_HTML_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1635,6 +1638,19 @@ def compute_ap_tenure_counts():
                     counts[username] = counts.get(username, 0) + 1
     return counts
 
+def get_quad_files():
+    """{season: {"net": bool, "quads": bool}} for the net-YEAR.json / quads-YEAR.json files on disk.
+
+    The Records tab fetches them at view time (net_rankings.py = official NCAA quads,
+    quads.py = computed per-game quads); pages.yml deploys them."""
+    found = {}
+    for name in os.listdir(BASE_HTML_DIR):
+        m = re.fullmatch(r"(net|quads)-(\d{4})\.json", name)
+        if m and m.group(2) not in EXCLUDED_YEARS:
+            found.setdefault(m.group(2), {"net": False, "quads": False})[m.group(1)] = True
+    return dict(sorted(found.items()))
+
+
 def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_counts=None, ap_tabs_html="", ap_fragment_years=None, ap_tenure_counts=None):
     CSS = load_css()
     JS = load_js()
@@ -1647,6 +1663,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
     ncaa_logo_ids_js = "new Set(" + json.dumps(ncaa_light) + ")"
     ncaa_dark_logo_ids_js = "new Set(" + json.dumps(ncaa_dark) + ")"
     conference_data_js = conferences.js_payload()
+    quad_files_js = json.dumps(get_quad_files())
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -1799,6 +1816,7 @@ const DARK_LOGO_TEAMS = {dark_logo_teams_js};
 const NCAA_LOGO_IDS = {ncaa_logo_ids_js};
 const NCAA_DARK_LOGO_IDS = {ncaa_dark_logo_ids_js};
 const CONFERENCE_DATA = {conference_data_js};
+const QUAD_FILES = {quad_files_js};
 {JS}
 </script>
 
@@ -2096,6 +2114,10 @@ def main():
     parser.add_argument("--rebuild", action="store_true", help="Rebuild HTML from existing data without scraping")
     parser.add_argument("--missing-logos", action="store_true", help="Download ESPN logos for conferences.py schools with no logo file and exit")
     parser.add_argument("--ncaa-logos", action="store_true", help="Download NCAA.com logos for non-D1 opponents ESPN has none for (nond1_logos.NCAA_SLUGS), list unmapped ones, and exit. --year 0 = every shown season (default: current)")
+    parser.add_argument("--net", action="store_true", help="Fetch NCAA NET rankings + quadrant records from NCAA.com into net-YEAR.json and exit")
+    parser.add_argument("--quads", action="store_true", help="Compute Q1–Q4 records from ESPN schedules + BPI (or NET) ranks into quads-YEAR.json and exit (--year, default current)")
+    parser.add_argument("--rank-source", choices=["auto", "bpi", "net"], default="auto", dest="rank_source", help="With --quads: opponent ranking (auto = NET if net-YEAR.json exists, else BPI)")
+    parser.add_argument("--check", action="store_true", help="With --quads: compare computed quads with official ones in net-YEAR.json")
     parser.add_argument("--force", action="store_true", help="With --ncaa-logos: re-download files that already exist")
     parser.add_argument("--to-webp", action="store_true", help="Convert all existing PNG logos to WebP and exit")
     parser.add_argument("--dark-logos", action="store_true", help="Download ESPN dark-mode logos for all teams")
@@ -2112,6 +2134,16 @@ def main():
 
     if args.missing_logos:
         download_missing_logos()
+        return
+    if args.net:
+        if not net_rankings.run(BASE_HTML_DIR):
+            sys.exit(1)
+        return
+    if args.quads:
+        today = datetime.date.today()
+        season = args.year or today.year + (1 if today.month >= 7 else 0)
+        if not quads.run(BASE_HTML_DIR, season, args.rank_source, args.check):
+            sys.exit(1)
         return
     if args.ncaa_logos:
         today = datetime.date.today()

@@ -4480,6 +4480,57 @@ function summarizeGames(games, ctx = {}) {
     return s;
 }
 
+// ── Quadrant data (NET / BPI) ───────────────────────────────────────────────
+// Build-time JSON files, same origin (deployed by pages.yml; QUAD_FILES, injected by
+// get_quad_files() in userpoll.py, says which exist per season):
+//   net-YEAR.json    official NCAA NET rank + Q1–Q4 totals (net_rankings.py, --net)
+//   quads-YEAR.json  computed per-game quads from ESPN schedules (quads.py, --quads):
+//                    BPI ranks before NET is published, NET ranks after
+// Totals come from net-YEAR.json when it exists (official), else quads-YEAR.json (unofficial).
+// Per-game quads come from quads-YEAR.json only if it used the same ranking as the totals.
+//
+//   quadsAvailable(season)  → "net" | "bpi" | null (the ranking the columns will show)
+//   fetchQuads(season)      → Promise<{source, official, asOf, teams: {key: {rank, q1..q4}},
+//                              games: {key: {"YYYY-MM-DD:oppEspnId": 1-4}}}>; result also
+//                              kept in _quadsData[season] (or {error}) for synchronous renders
+//   quadOfGame(season, key, game)  → 1-4 | null, for a fetchTeamSchedule() game
+const _quadsPromise = {};
+const _quadsData = {};
+function quadsAvailable(season) {
+    const f = typeof QUAD_FILES !== "undefined" ? QUAD_FILES[season] : null;
+    return f ? (f.net ? "net" : f.quads ? "bpi" : null) : null;
+}
+function fetchQuads(season) {
+    if (_quadsPromise[season]) return _quadsPromise[season];
+    const f = QUAD_FILES[season];
+    const get = name => fetch(`${name}-${season}.json`).then(r => {
+        if (!r.ok) throw new Error(`${name}-${season}.json: HTTP ${r.status}`);
+        return r.json();
+    });
+    const p = Promise.all([f.net ? get("net") : null, f.quads ? get("quads") : null]).then(([net, q]) => {
+        const base = net || q;
+        const source = net ? "net" : q.rankSource;
+        const teams = {};
+        Object.entries(base.teams).forEach(([k, t]) => {
+            teams[k] = { rank: t.rank, q1: t.q1, q2: t.q2, q3: t.q3, q4: t.q4 };
+        });
+        const games = {};
+        if (q && q.rankSource === source) {
+            Object.entries(q.teams).forEach(([k, t]) => {
+                const m = games[k] = {};
+                t.games.forEach(g => { if (g.quad) m[`${g.date}:${g.oppId}`] = g.quad; });
+            });
+        }
+        return (_quadsData[season] = { source, official: !!net, asOf: net ? net.through : q.ranksAsOf, teams, games });
+    });
+    p.catch(err => { _quadsData[season] = { error: err.message }; delete _quadsPromise[season]; });
+    return (_quadsPromise[season] = p);
+}
+function quadOfGame(season, key, game) {
+    const m = _quadsData[season]?.games?.[key];
+    return (m && m[`${game.date.slice(0, 10)}:${game.opp.id}`]) || null;
+}
+
 // ── Records tab (Year window) ───────────────────────────────────────────────
 // Uses the ESPN data layer above. Sub-views: "week" = teams receiving votes in the
 // active week, in points order; "all" = every D1 team grouped by conference (ours for
@@ -4515,8 +4566,10 @@ function showSeasonRecords(currentYear, isApMode, activeTab) {
     const weekLabel = weekTextLabel(weekTab) || `Week ${displayWeekNum(weekTab)}`;
 
     const token = ++_recordsRenderToken;
+    let last = [null, null];   // latest ESPN result, so the quad data can re-render with it
     const render = (data, error) => {
         if (token !== _recordsRenderToken || !table.classList.contains("season-records")) return;
+        last = [data, error];
         table.innerHTML = buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error);
         const noteEl = title.querySelector(".records-title-note");
         if (noteEl) noteEl.innerHTML = recordsNoteHtml(currentYear, data);
@@ -4543,6 +4596,10 @@ function showSeasonRecords(currentYear, isApMode, activeTab) {
     const cached = espnCachedData(`records:${currentYear}`);
     render(cached, null);   // cached data (or a loading row) right away
     modal.classList.add("open");
+    if (quadsAvailable(currentYear) && (!_quadsData[currentYear] || _quadsData[currentYear].error)) {
+        const again = () => render(...last);
+        fetchQuads(currentYear).then(again, again);
+    }
     if (!cached || Date.now() - cached.at >= ESPN_TTL_MS) {
         fetchSeasonRecords(currentYear).then(d => render(d, null), err => render(null, err.message));
     }
@@ -4705,7 +4762,7 @@ function toggleTeamGames(tr, season, records, forceOpen = false) {
     const cell = row.firstElementChild;
     const load = () => fetchTeamSchedule(id, season).then(sched => {
         if (!row.isConnected) return;
-        cell.innerHTML = buildTeamGamesHtml(sched, id, records);
+        cell.innerHTML = buildTeamGamesHtml(sched, id, records, season);
         initRecordsLogos(cell);
     }, err => {
         if (!row.isConnected) return;
@@ -4717,7 +4774,7 @@ function toggleTeamGames(tr, season, records, forceOpen = false) {
 }
 
 // One team's games: split summary + one line per game (completed, live, then upcoming).
-function buildTeamGamesHtml(sched, teamId, records) {
+function buildTeamGamesHtml(sched, teamId, records, season) {
     const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const games = sched.games;
     if (!games.length) return `<div class="records-games-msg">No games listed by ESPN.</div>`;
@@ -4730,8 +4787,16 @@ function buildTeamGamesHtml(sched, teamId, records) {
         split("vs non-D1", s.nonD1),
     ].filter(Boolean).join("");
     const fmtDate = iso => new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
+    // Quadrant tag per game (only when per-game quads exist for this season; see fetchQuads()).
+    const teamKey = espnTeamKey(teamId);
+    const qd = _quadsData[season];
+    const showQuads = !!(teamKey && qd?.games?.[teamKey]);
+    const quadTip = qd ? `${qd.source === "net" ? "NET" : "BPI (unofficial)"} quadrant, by the opponent's current rank and the game site` : "";
     const lines = games.map(g => {
         const site = g.site === "H" ? "vs" : g.site === "A" ? "@" : "N";
+        const quad = showQuads ? quadOfGame(season, teamKey, g) : null;
+        const quadCell = showQuads
+            ? `<td class="rg-quad">${quad ? `<span class="rg-quad-tag rg-q${quad}" title="${quadTip}">Q${quad}</span>` : ""}</td>` : "";
         const logo = g.opp.key
             ? `<img class="records-games-logo records-logo" data-team="${esc(g.opp.key)}" data-espn="${g.opp.id}" alt="">`
             : oppLogoSrc(g.opp) ? `<img class="records-games-logo" src="${esc(oppLogoSrc(g.opp))}" data-filler="${esc(g.opp.name)}" alt="">`
@@ -4745,7 +4810,7 @@ function buildTeamGamesHtml(sched, teamId, records) {
         return `<tr class="${g.result ? "" : "records-game-pending"}">
             <td class="rg-date">${fmtDate(g.date)}</td>
             <td class="rg-site" title="${g.site === "N" ? "Neutral site" : g.site === "H" ? "Home" : "Away"}">${site}</td>
-            <td class="rg-opp">${logo}${g.oppRank ? `<span class="rg-rank" title="AP rank at game time">${g.oppRank}</span>` : ""}${g.oppSeed ? `<span class="rg-rank" title="Seed">(${g.oppSeed})</span>` : ""}${esc(name)}${nonD1}</td>
+            ${quadCell}<td class="rg-opp">${logo}${g.oppRank ? `<span class="rg-rank" title="AP rank at game time">${g.oppRank}</span>` : ""}${g.oppSeed ? `<span class="rg-rank" title="Seed">(${g.oppSeed})</span>` : ""}${esc(name)}${nonD1}</td>
             <td class="rg-res">${res}</td>
             <td class="rg-note">${esc(g.note)}${g.postseason && !g.note ? "Postseason" : ""}</td>
         </tr>`;
@@ -4772,6 +4837,16 @@ function recordsNoteHtml(currentYear, data) {
             : " · final";
         if (data.stale) note += ` · couldn't refresh (${esc(data.stale)})`;
     }
+    // Where the Q1–Q4 columns come from.
+    const qd = _quadsData[currentYear];
+    if (qd?.error) note += ` · quads unavailable (${esc(qd.error)})`;
+    else if (qd) {
+        const d = new Date(qd.official ? `${qd.asOf}T12:00:00` : qd.asOf)
+            .toLocaleDateString([], { month: "short", day: "numeric" });
+        note += qd.official
+            ? ` · Quads: NCAA NET through ${d}`
+            : ` · <span title="Computed from ESPN schedules with ESPN BPI ranks standing in for NET, using the NCAA quadrant cutoffs. Unofficial until NET is released.">Quads: BPI-based, unofficial (${d})</span>`;
+    }
     return note;
 }
 
@@ -4780,16 +4855,34 @@ function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
     const view = _recordsView;
     // Won / Lost opponent logos only in Voted; All stops at Conf.
     const opps = view !== "all";
-    const COLS = opps ? 8 : 6;
+    // Rank + Q1–Q4 columns after Conf when the season has NET / quad data (fetchQuads()).
+    const quadSrc = quadsAvailable(currentYear);
+    const qd = _quadsData[currentYear];
+    const COLS = (opps ? 8 : 6) + (quadSrc ? 5 : 0);
+    const rankLabel = quadSrc === "net" ? "NET" : "BPI";
+    const quadTip = quadSrc === "net"
+        ? "Official NCAA quadrant record (D1 games only)"
+        : "Unofficial: NCAA quadrant cutoffs with ESPN BPI ranks in place of NET (D1 games only)";
+    const quadHead = quadSrc
+        ? `<th title="${rankLabel} rank">${rankLabel}</th>${[1, 2, 3, 4].map(q =>
+            `<th class="records-quad-col${q === 4 ? " records-q4-col" : ""}" title="${quadTip}">Q${q}</th>`).join("")}` : "";
 
     const head = `<colgroup>
         <col style="width:28px"><col style="width:26px"><col>
         <col style="width:52px"><col style="width:44px"><col style="width:52px">
+        ${quadSrc ? `<col style="width:38px">${"<col style=\"width:40px\">".repeat(4)}` : ""}
         ${opps ? "<col><col>" : ""}
     </colgroup><thead><tr>
         <th>#</th><th></th><th class="team-col">Team</th>
-        <th>W-L</th><th>Pct</th><th>Conf</th>${opps ? `<th class="records-opps-col">Won</th><th class="records-opps-col">Lost</th>` : ""}
+        <th>W-L</th><th>Pct</th><th>Conf</th>${quadHead}${opps ? `<th class="records-opps-col">Won</th><th class="records-opps-col">Lost</th>` : ""}
     </tr></thead>`;
+    const quadCells = key => {
+        if (!quadSrc) return "";
+        const t = qd?.teams?.[(CONFERENCE_DATA.aliases || {})[key] || key];
+        const blank = qd ? "—" : "…";
+        return `<td class="records-quad-rank">${t?.rank ?? blank}</td>${[1, 2, 3, 4].map(q =>
+            `<td class="records-quad${q === 1 ? " records-q1" : ""}${q === 4 ? " records-q4" : ""}">${t ? esc(t[`q${q}`]) : blank}</td>`).join("")}`;
+    };
 
     if (!data) {
         const msg = error
@@ -4807,9 +4900,10 @@ function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
         const logo = key
             ? `<img class="logo-sm records-logo" data-team="${esc(key)}"${id ? ` data-espn="${id}"` : ""} alt="">`
             : id ? `<img class="logo-sm" src="${espnLogoUrl(id)}" data-filler="${esc(name)}" alt="">` : "";
-        const cells = r
+        const cells = (r
             ? `<td class="records-wl">${r.wins}-${r.losses}</td><td>${pct(r)}</td><td>${esc(r.confRecord || "—")}</td>`
-            : `<td colspan="3" class="records-missing">${id ? "Not in ESPN's standings" : "No ESPN ID"}</td>`;
+            : `<td colspan="3" class="records-missing">${id ? "Not in ESPN's standings" : "No ESPN ID"}</td>`)
+            + quadCells(key);
         // Opponent logos, filled in by fillRecordsOpponents() once the schedule loads.
         const oppCells = !opps ? ""
             : r ? `<td class="records-opps" data-result="W"><span class="records-opps-msg">…</span></td><td class="records-opps" data-result="L"><span class="records-opps-msg">…</span></td>`

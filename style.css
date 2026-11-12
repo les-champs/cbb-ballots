@@ -886,6 +886,19 @@ kbd {
 #season-stats-table.season-records td.records-missing { font-size: 11px; opacity: 0.55; }
 #season-stats-table.season-records td.records-missing:not(:last-child) { border-right: 1px solid var(--color-border-nth); }
 .records-retry { cursor: pointer; text-decoration: underline; }
+/* NET/BPI rank + Q1–Q4 columns (fetchQuads); a vertical line after Q4 when more columns follow */
+#season-stats-table.season-records td.records-quad-rank { font-size: 11px; opacity: 0.7; }
+#season-stats-table.season-records td.records-quad { font-size: 12px; }
+#season-stats-table.season-records td.records-q1 { font-weight: bold; }
+#season-stats-table.season-records > thead > tr > th.records-q4-col:not(:last-child),
+#season-stats-table.season-records > tbody > tr > td.records-q4:not(:last-child) { border-right: 1px solid var(--color-border-nth); }
+/* Per-game quadrant tag in the expanded game list; strength shown by weight, not color */
+#season-stats-table .records-games-table td.rg-quad { min-width: 0; }
+.rg-quad-tag { font-size: 9px; letter-spacing: 0.03em; border: 1px solid currentColor; border-radius: 3px; padding: 0 3px; }
+.rg-quad-tag.rg-q1 { font-weight: bold; }
+.rg-quad-tag.rg-q2 { opacity: 0.8; }
+.rg-quad-tag.rg-q3 { opacity: 0.55; }
+.rg-quad-tag.rg-q4 { opacity: 0.4; }
 /* Voted view: Won / Lost opponent logos (fillRecordsOpponents) */
 #season-stats-table.season-records > thead > tr > th.records-opps-col { text-align: left; padding-left: 10px; }
 #season-stats-table.season-records > tbody > tr > td.records-opps { text-align: left; white-space: normal; padding: 6px 6px 6px 10px; }
