@@ -112,7 +112,7 @@ Local testing: `python3 -m http.server 8000` → http://localhost:8000. Opening 
 | ? | Legend | Cmd+0 | Jump to Week 1 (pre-season) |
 | V then X | Toggle veteran tags (chord) | Esc | Close modal |
 
-**Locked keybinds:** Shift+D/X/R/T/Y/G/U/W/H/K/P/? require a 6-digit PIN (`LOCKED_KEYS` / `KEYBIND_PIN` above the `keydown` handler; `#pin-modal` in `build_full_html()`). The Year window's Voters tab is also locked, by any path (`showSeasonStatsModal("voters")` calls `requirePin()`). An unlock lasts for the viewer's local calendar day (`localStorage.keybindsUnlockedDate`, checked by `isKeybindsUnlocked()` on every locked action, so an open tab re-locks after midnight); the old `keybindsUnlocked` flag is removed on load. `requirePin(action)` gates any other action the same way. Other menu/click paths are not locked.
+**Locked keybinds:** Shift+D/X/R/T/Y/G/U/W/H/K/P/? require a 6-digit PIN (`LOCKED_KEYS` / `KEYBIND_PIN` above the `keydown` handler; `#pin-modal` in `build_full_html()`). The Year window's Voters tab is also locked, by any path (`showSeasonStatsModal("voters")` returns early while locked). **The PIN prompt opens only from Functions › Settings › Other › Dev Pin** (`data-action='devPin'` → `openPinModal()`); while locked, locked keybinds and the Voters tab silently do nothing (no prompt). An unlock lasts for the viewer's local calendar day (`localStorage.keybindsUnlockedDate`, checked by `isKeybindsUnlocked()` on every locked action, so an open tab re-locks after midnight); the old `keybindsUnlocked` flag is removed on load. Other menu/click paths are not locked.
 
 ### Toggle states (`#toggle-text`)
 

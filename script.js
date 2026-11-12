@@ -928,6 +928,9 @@ function handlePickerAction(action) {
         case "legend":
             document.getElementById("keybind-legend-modal").classList.toggle("open");
             break;
+        case "devPin":
+            openPinModal();
+            break;
     }
 }
 
@@ -4027,11 +4030,9 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
 }
 
 function showSeasonStatsModal(mode = "stats") {
-    // Voters tab is PIN-locked (same PIN and daily unlock as the locked keybinds)
-    if (mode === "voters" && !isKeybindsUnlocked()) {
-        requirePin(() => showSeasonStatsModal("voters"));
-        return;
-    }
+    // Voters tab is PIN-locked (same PIN and daily unlock as the locked keybinds).
+    // While locked it does nothing; the PIN is only entered via Settings › Other › Dev Pin.
+    if (mode === "voters" && !isKeybindsUnlocked()) return;
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab) return;
     const currentYear = _apCurrentYear !== null ? _apCurrentYear : activeTab.dataset.year;
@@ -4960,7 +4961,8 @@ document.getElementById("week-arrow-next").addEventListener("click", () => navig
 // window's Voters tab ──────────────────────────────────────────────────────────
 // Client-side only — a deterrent, not real security. An unlock lasts for the rest of the
 // viewer's local calendar day (localStorage `keybindsUnlockedDate`), checked each time a
-// locked action runs, so a tab left open past midnight locks again.
+// locked action runs, so a tab left open past midnight locks again. The PIN prompt opens
+// only from Settings › Other › Dev Pin; locked actions do nothing (no prompt) until then.
 const LOCKED_KEYS = new Set(["D", "X", "R", "T", "Y", "G", "U", "W", "H", "K", "P", "?"]);
 const KEYBIND_PIN = "925289";
 const _localDateStr = () => {
@@ -4973,17 +4975,10 @@ try {
     localStorage.removeItem("keybindsUnlocked");  // old never-expiring unlock flag
 } catch (e) {}
 function isKeybindsUnlocked() { return _keybindsUnlockedDate === _localDateStr(); }
-let _pinPendingAction = null;
 const _pinModal = document.getElementById("pin-modal");
 const _pinInput = document.getElementById("pin-input");
 
-// Runs `action` now if unlocked today, otherwise asks for the PIN and runs it on success.
-function requirePin(action) {
-    if (isKeybindsUnlocked()) { action(); return; }
-    openPinModal(action);
-}
-function openPinModal(action) {
-    _pinPendingAction = action;
+function openPinModal() {
     _pinInput.value = "";
     _pinInput.classList.remove("wrong");
     _pinModal.classList.add("open");
@@ -4992,7 +4987,6 @@ function openPinModal(action) {
 function closePinModal() {
     _pinModal.classList.remove("open");
     _pinInput.value = "";
-    _pinPendingAction = null;
 }
 _pinInput.addEventListener("input", () => {
     _pinInput.value = _pinInput.value.replace(/\D/g, "").slice(0, 6);
@@ -5001,9 +4995,7 @@ _pinInput.addEventListener("input", () => {
     if (_pinInput.value === KEYBIND_PIN) {
         _keybindsUnlockedDate = _localDateStr();
         try { localStorage.setItem("keybindsUnlockedDate", _keybindsUnlockedDate); } catch (e) {}
-        const pending = _pinPendingAction;
         closePinModal();
-        if (pending) pending();
     } else {
         _pinInput.value = "";
         void _pinInput.offsetWidth; // restart shake animation
@@ -5021,9 +5013,7 @@ document.addEventListener("keydown", e => {
     const _isVetChord = _chordPending === "v" && (e.key === "x" || e.key === "X");
     if (e.shiftKey && !isKeybindsUnlocked() && !_isVetChord && LOCKED_KEYS.has(e.key.length === 1 ? e.key.toUpperCase() : e.key)) {
         e.preventDefault();
-        const replay = { key: e.key, code: e.code, shiftKey: true };
-        openPinModal(() => document.dispatchEvent(new KeyboardEvent("keydown", replay)));
-        return;
+        return;  // locked: no prompt here — unlock via Settings › Other › Dev Pin
     }
     if (e.key === "Escape") {
         document.getElementById("voter-history-modal").classList.remove("open");
