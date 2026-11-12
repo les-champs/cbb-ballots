@@ -2289,6 +2289,70 @@ function expandAllDeltas() {
     });
 }
 
+// ── Distance from consensus (shared) ──────────────────────────────────────────
+// One measure used everywhere a ballot is compared to its week's consensus: the
+// homepage Consensus sort and the Year window's Voters tab.
+
+// Leave-one-out consensus: an official voter is scored against the consensus of every
+// *other* official ballot, so their own ballot doesn't pull the target toward them.
+// Points mirror _compute_aggregate_points() (rank 1 = 25 … rank 25 = 1); ties keep the
+// rendered aggregate order (aggOrder), then fall back to name. Voters not in
+// officialBallots (provisional) get the full aggregate order.
+//   officialBallots: { voter: [team, …] }   aggOrder: rendered Official Overall teams
+function makeLooConsensus(officialBallots, aggOrder) {
+    const totalPts = {};
+    Object.values(officialBallots).forEach(teams =>
+        teams.slice(0, 25).forEach((t, i) => { totalPts[t] = (totalPts[t] || 0) + (25 - i); }));
+    const aggIdx = {};
+    aggOrder.forEach((t, i) => { aggIdx[t] = i; });
+    const cache = {};
+    return name => {
+        const own = officialBallots[name];
+        if (!own) return aggOrder;
+        if (cache[name]) return cache[name];
+        const pts = { ...totalPts };
+        own.slice(0, 25).forEach((t, i) => { pts[t] -= 25 - i; });
+        const order = Object.keys(pts).filter(t => pts[t] > 0).sort((a, b) =>
+            (pts[b] - pts[a]) || ((aggIdx[a] ?? 99) - (aggIdx[b] ?? 99)) || a.localeCompare(b));
+        return (cache[name] = order.length ? order.slice(0, 25) : aggOrder);
+    };
+}
+
+// Signed per-team gaps between a ballot and its consensus top 25 (cons), counted both ways:
+// (1) each consensus team vs. where the voter has it (unranked = #26), then
+// (2) each team the voter ranks that's outside the consensus top 25, treated as
+//     consensus #26. The cap means an off-consensus pick never costs more than a
+//     ranked team moving up from #26 would; without (2) it was nearly free.
+// gap = consensus rank − voter rank, so positive = the voter has the team higher.
+function consensusTeamGaps(teams, cons) {
+    const out = [];
+    for (let i = 0; i < cons.length; i++) {
+        const vr = teams.indexOf(cons[i]);
+        out.push({ team: cons[i], gap: i - (vr === -1 ? 25 : vr) });
+    }
+    const consSet = new Set(cons);
+    teams.slice(0, 25).forEach((t, p) => { if (!consSet.has(t)) out.push({ team: t, gap: 25 - p }); });
+    return out;
+}
+function consensusGaps(teams, cons) {
+    return consensusTeamGaps(teams, cons).map(g => Math.abs(g.gap));
+}
+
+// Halved so a swap of two adjacent teams counts as 1, not 2. Every place a team
+// moves up is matched by one moving down (omitted and off-consensus teams both
+// sit at #26), so the raw sum is always even and the half is a whole number:
+// "how many places this ballot's teams moved up vs. consensus".
+function consensusDistance(teams, cons) {
+    if (!teams?.length) return Infinity;
+    return consensusGaps(teams, cons).reduce((s, g) => s + g, 0) / 2;
+}
+
+// Rendered Official Overall order from a week block's aggregate section.
+function renderedConsensusOrder(sections) {
+    const aggRow = sections[2]?.querySelector(".voter-row:not(.row-weighted-ranking):not(.row-pinned-agg)");
+    return aggRow ? Array.from(aggRow.querySelectorAll(".team-logo")).map(img => img.dataset.team) : null;
+}
+
 // ── Outlier highlighting ──────────────────────────────────────────────────────
 
 function getConsensusOrder(weekBlock) {
@@ -2690,17 +2754,11 @@ function applyTableSort(sort) {
         // Sort by deviation from official consensus (most conformist first)
         // Read consensus directly from the rendered aggregate row so it always
         // matches the Official Overall row exactly (avoids recompute divergence).
-        const aggRow = sections[2]?.querySelector(".voter-row:not(.row-weighted-ranking):not(.row-pinned-agg)");
-        const consensus = aggRow
-            ? Array.from(aggRow.querySelectorAll(".team-logo")).map(img => img.dataset.team)
-            : null;
+        const consensus = renderedConsensusOrder(sections);
         if (!consensus || !consensus.length) return;
         const rowTeams = r => Array.from(r.querySelectorAll(".team-logo")).map(img => img.dataset.team);
 
-        // Leave-one-out: an official voter is scored against the consensus of every
-        // *other* official ballot, so their own ballot doesn't pull the target toward
-        // them. Points mirror _compute_aggregate_points() (rank 1 = 25 … rank 25 = 1).
-        // Provisional voters aren't in the consensus, so they use the full one.
+        // Leave-one-out consensus per official voter (see makeLooConsensus()).
         const officialBallots = {};
         sections[0]?.querySelectorAll("tbody .voter-row").forEach(r => {
             if (r.classList.contains("row-weighted-ranking") || r.classList.contains("row-pinned-agg") ||
@@ -2709,47 +2767,9 @@ function applyTableSort(sort) {
             const u = getVoterName(r);
             if (u && teams.length) officialBallots[u] = teams;
         });
-        const totalPts = {};
-        Object.values(officialBallots).forEach(teams =>
-            teams.slice(0, 25).forEach((t, i) => { totalPts[t] = (totalPts[t] || 0) + (25 - i); }));
-        // Ties keep the rendered aggregate order, then fall back to name.
-        const aggIdx = {};
-        consensus.forEach((t, i) => { aggIdx[t] = i; });
-        const looCache = {};
-        const consensusFor = name => {
-            const own = officialBallots[name];
-            if (!own) return consensus;
-            if (looCache[name]) return looCache[name];
-            const pts = { ...totalPts };
-            own.slice(0, 25).forEach((t, i) => { pts[t] -= 25 - i; });
-            const order = Object.keys(pts).filter(t => pts[t] > 0).sort((a, b) =>
-                (pts[b] - pts[a]) || ((aggIdx[a] ?? 99) - (aggIdx[b] ?? 99)) || a.localeCompare(b));
-            return (looCache[name] = order.length ? order.slice(0, 25) : consensus);
-        };
-
-        // Per-team gaps between a ballot and its consensus top 25, counted both ways:
-        // (1) each consensus team vs. where the voter has it (unranked = #26), then
-        // (2) each team the voter ranks that's outside the consensus top 25, treated as
-        //     consensus #26. The cap means an off-consensus pick never costs more than a
-        //     ranked team moving up from #26 would; without (2) it was nearly free.
-        const gapsFn = (teams, cons) => {
-            const gaps = [];
-            for (let i = 0; i < cons.length; i++) {
-                const vr = teams.indexOf(cons[i]);
-                gaps.push(Math.abs(i - (vr === -1 ? 25 : vr)));
-            }
-            const consSet = new Set(cons);
-            teams.slice(0, 25).forEach((t, p) => { if (!consSet.has(t)) gaps.push(25 - p); });
-            return gaps;
-        };
-        // Halved so a swap of two adjacent teams counts as 1, not 2. Every place a team
-        // moves up is matched by one moving down (omitted and off-consensus teams both
-        // sit at #26), so the raw sum is always even and the half is a whole number:
-        // "how many places this ballot's teams moved up vs. consensus".
-        const scoreFn = (teams, name) => {
-            if (!teams?.length) return Infinity;
-            return gapsFn(teams, consensusFor(name)).reduce((s, g) => s + g, 0) / 2;
-        };
+        const consensusFor = makeLooConsensus(officialBallots, consensus);
+        const gapsFn = consensusGaps;
+        const scoreFn = (teams, name) => consensusDistance(teams, consensusFor(name));
         // Get voter teams directly from visible rows
         const voterTeams = {};
         rows.forEach(r => { voterTeams[getVoterName(r)] = rowTeams(r); });
@@ -5784,7 +5804,7 @@ function showSeasonStatsModal(mode = "stats") {
                 const ranks = {};
                 teams.slice(0, 25).forEach((team, i) => { if (team) ranks[team] = i + 1; });
                 const flair = row.querySelector(".voter-cell img.logo:not(.team-logo)")?.dataset.team || null;
-                ballotsThisWeek.push({ voter: voterName, ranks, flair });
+                ballotsThisWeek.push({ voter: voterName, ranks, flair, teams });
             }
             if (voterName === "Official Overall") {
                 // Track best/worst consensus rank from the weekly aggregate (userpoll mode)
@@ -5807,7 +5827,7 @@ function showSeasonStatsModal(mode = "stats") {
             });
         });
         totalVoterWeekSlots += weekVoterCount;
-        weekBallots.push({ ballots: ballotsThisWeek, teams: seenThisWeek });
+        weekBallots.push({ ballots: ballotsThisWeek, teams: seenThisWeek, consensusOrder: renderedConsensusOrder(sections) });
         seenThisWeek.forEach(team => {
             teamWeeksRanked[team] = (teamWeeksRanked[team] || 0) + 1;
         });
@@ -5919,7 +5939,7 @@ function showSeasonStatsModal(mode = "stats") {
     table.classList.toggle("season-voters", mode === "voters");
 
     if (mode === "voters") {
-        table.innerHTML = buildSeasonVotersTableHtml(weekBallots, devSum, voterWeeksVoted, minWeeksVoted, totalWeeks, esc);
+        table.innerHTML = buildSeasonVotersTableHtml(weekBallots, voterWeeksVoted, minWeeksVoted, totalWeeks, esc);
         modal.classList.add("open");
         return;
     }
@@ -5971,30 +5991,42 @@ function showSeasonStatsModal(mode = "stats") {
 }
 
 // Voters tab of the Year window: one row per voter on official ballots this season.
-//   Cons Δ   = mean over the voter's ballots of the average |voter rank − consensus rank| across
-//              the union of their 25 teams and that week's consensus top 25 (unranked = 26);
-//              lower = closer to consensus. Consensus = that week's official ballots by points.
+// Uses the same distance-from-consensus measure as the homepage Consensus sort: each
+// ballot is compared with that week's leave-one-out consensus (makeLooConsensus(), seeded
+// with the rendered Official Overall order), via consensusTeamGaps() / consensusDistance().
+//   Cons Δ   = mean over the voter's ballots of consensusDistance() (the "+N" on the
+//              homepage sort: places the ballot's teams moved up vs. consensus); lower = closer.
 //   #1 Pick  = team the voter ranked #1 most often (ties: most recent).
-//   Favorite / Least Fav. = team with the largest positive / negative total deviation from the
-//              weekly consensus average rank (same measure as #1 Supporter / #1 Hater), divided
-//              by the weeks the voter voted, so season-long bias beats a one-week outlier.
+//   Favorite / Least Fav. = team with the largest positive / negative total signed gap
+//              (consensus rank − voter rank, from consensusTeamGaps()), divided by the weeks
+//              the voter voted, so season-long bias beats a one-week outlier.
 // Voters below the participation minimum sort after the rest, in italics.
-function buildSeasonVotersTableHtml(weekBallots, devSum, voterWeeksVoted, minWeeksVoted, totalWeeks, esc) {
+function buildSeasonVotersTableHtml(weekBallots, voterWeeksVoted, minWeeksVoted, totalWeeks, esc) {
     const voters = {};
-    weekBallots.forEach(({ ballots }) => {
+    weekBallots.forEach(({ ballots, consensusOrder }) => {
         if (ballots.length === 0) return;
-        const pts = {};
-        ballots.forEach(b => Object.entries(b.ranks).forEach(([t, r]) => { pts[t] = (pts[t] || 0) + (26 - r); }));
-        const consensus = {};
-        Object.entries(pts).sort((a, b) => b[1] - a[1]).slice(0, 25).forEach(([t], i) => { consensus[t] = i + 1; });
+        const officialBallots = {};
+        ballots.forEach(b => { if (b.teams.length) officialBallots[b.voter] = b.teams; });
+        // Fallback when a week has no rendered aggregate row: points order (same as Python).
+        let aggOrder = consensusOrder;
+        if (!aggOrder?.length) {
+            const pts = {};
+            Object.values(officialBallots).forEach(teams =>
+                teams.slice(0, 25).forEach((t, i) => { pts[t] = (pts[t] || 0) + (25 - i); }));
+            aggOrder = Object.keys(pts).sort((a, b) => pts[b] - pts[a]).slice(0, 25);
+        }
+        const consensusFor = makeLooConsensus(officialBallots, aggOrder);
         ballots.forEach(b => {
-            const v = voters[b.voter] || (voters[b.voter] = { name: b.voter, flair: null, deltaSum: 0, ballots: 0, ones: {} });
+            const v = voters[b.voter] || (voters[b.voter] = { name: b.voter, flair: null, deltaSum: 0, ballots: 0, ones: {}, teamDev: {} });
             if (b.flair) v.flair = b.flair;
-            const union = new Set([...Object.keys(b.ranks), ...Object.keys(consensus)]);
-            let d = 0;
-            union.forEach(t => { d += Math.abs((b.ranks[t] || 26) - (consensus[t] || 26)); });
-            v.deltaSum += d / union.size;
-            v.ballots++;
+            if (b.teams.length) {
+                const cons = consensusFor(b.voter);
+                v.deltaSum += consensusDistance(b.teams, cons);
+                v.ballots++;
+                consensusTeamGaps(b.teams, cons).forEach(({ team, gap }) => {
+                    v.teamDev[team] = (v.teamDev[team] || 0) + gap;
+                });
+            }
             const one = Object.keys(b.ranks).find(t => b.ranks[t] === 1);
             if (one) {
                 v.ones[one] = (v.ones[one] || 0) + 1;
@@ -6003,12 +6035,10 @@ function buildSeasonVotersTableHtml(weekBallots, devSum, voterWeeksVoted, minWee
         });
     });
 
-    // Favorite / least favorite per voter from the season's deviation sums
-    Object.entries(devSum).forEach(([team, byVoter]) => {
-        Object.entries(byVoter).forEach(([voter, sum]) => {
-            const v = voters[voter];
-            if (!v) return;
-            const d = sum / voterWeeksVoted[voter];
+    // Favorite / least favorite per voter from the season's signed gap sums
+    Object.values(voters).forEach(v => {
+        Object.entries(v.teamDev).forEach(([team, sum]) => {
+            const d = sum / voterWeeksVoted[v.name];
             if (d > 0 && (!v.fav || d > v.fav.d)) v.fav = { team, d };
             if (d < 0 && (!v.hate || d < v.hate.d)) v.hate = { team, d };
         });
@@ -6016,7 +6046,7 @@ function buildSeasonVotersTableHtml(weekBallots, devSum, voterWeeksVoted, minWee
 
     const rows = Object.values(voters).map(v => ({
         ...v,
-        delta: v.deltaSum / v.ballots,
+        delta: v.ballots ? v.deltaSum / v.ballots : Infinity,
         qualified: voterWeeksVoted[v.name] >= minWeeksVoted,
     })).sort((a, b) => (b.qualified - a.qualified) || (a.delta - b.delta)
         || a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
@@ -6039,7 +6069,7 @@ function buildSeasonVotersTableHtml(weekBallots, devSum, voterWeeksVoted, minWee
         <th>#</th><th></th>
         <th class="team-col">Voter</th>
         <th>Weeks</th>
-        <th title="Average distance from the weekly consensus ranking (lower = closer)">Cons Δ</th>
+        <th title="Average distance from the weekly consensus, same as the homepage Consensus sort: places this voter's teams moved up vs. consensus per ballot (lower = closer)">Cons Δ</th>
         <th class="fan-col">#1 Pick</th>
         <th class="fan-col">Favorite</th>
         <th class="fan-col">Least Fav.</th>
@@ -6054,7 +6084,7 @@ function buildSeasonVotersTableHtml(weekBallots, devSum, voterWeeksVoted, minWee
             <td>${v.flair ? `<img class="logo-sm" src="${logoSrc(v.flair)}">` : ""}</td>
             <td class="team-col">${esc(v.name)}</td>
             <td>${voterWeeksVoted[v.name]}/${totalWeeks}</td>
-            <td>${v.delta.toFixed(2)}</td>
+            <td>${Number.isFinite(v.delta) ? v.delta.toFixed(1) : "—"}</td>
             <td class="fan-col">${teamCell(onePick, `<span class="fan-dev">×${oneCount}</span>`)}</td>
             <td class="fan-col">${v.fav ? teamCell(v.fav.team, devSpan(v.fav.d)) : "—"}</td>
             <td class="fan-col">${v.hate ? teamCell(v.hate.team, devSpan(v.hate.d)) : "—"}</td>
