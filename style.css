@@ -606,7 +606,7 @@ body:has([id$="-modal"].open) {
 }
 #pin-box h2 {
     margin: 0 0 12px;
-    font-size: 1.05rem;
+    font-size: 1.1rem;
     color: var(--color-modal-h2);
 }
 #pin-input {
@@ -804,7 +804,7 @@ kbd {
 }
 #season-stats-box h2 {
     margin: 0 0 12px;
-    font-size: 1.05rem;
+    font-size: 1.1rem;
     color: var(--color-modal-h2);
 }
 #season-stats-table {
@@ -832,8 +832,8 @@ kbd {
 #season-stats-table td:first-child { font-size: 11px; }
 #season-stats-table .logo-sm { height: 20px; width: 20px; object-fit: contain; vertical-align: middle; }
 #season-stats-table:not(.season-voters):not(.season-records) th:nth-child(5), #season-stats-table:not(.season-voters):not(.season-records) td:nth-child(5) { border-right: none; }
-#season-stats-table:not(.season-voters):not(.season-records) th:nth-child(9), #season-stats-table:not(.season-voters):not(.season-records) td:nth-child(9) { border-right: none; }
-#season-stats-table:not(.season-voters):not(.season-records) th:nth-child(8), #season-stats-table:not(.season-voters):not(.season-records) td:nth-child(8) { border-right: 1px solid var(--color-border-nth); }
+#season-stats-table:not(.season-voters):not(.season-records) th:nth-child(8), #season-stats-table:not(.season-voters):not(.season-records) td:nth-child(8) { border-right: none; }
+#season-stats-table:not(.season-voters):not(.season-records) th:nth-child(7), #season-stats-table:not(.season-voters):not(.season-records) td:nth-child(7) { border-right: 1px solid var(--color-border-nth); }
 #season-stats-table.season-voters th:nth-child(5), #season-stats-table.season-voters td:nth-child(5) { border-right: 1px solid var(--color-border-nth); }
 #season-stats-table td.fan-col { text-align: left; font-size: 12px; padding-left: 10px; }
 #season-stats-table th.fan-col { text-align: left; padding-left: 10px; }
@@ -842,7 +842,7 @@ kbd {
 #season-stats-table .fan-dev { font-size: 11px; opacity: 0.6; font-variant-numeric: tabular-nums; }
 
 /* Year window › Records tab */
-.records-switch { font-size: 14px; font-weight: bold; line-height: 1; user-select: none; white-space: nowrap; margin-left: 1.1em; }
+.records-switch { user-select: none; white-space: nowrap; }
 .records-view { cursor: pointer; color: var(--color-modal-h2); opacity: 0.35; margin-left: 0.55em; }
 .records-view:first-child { margin-left: 0; }
 .records-view.active { opacity: 1; cursor: default; }
@@ -889,16 +889,15 @@ kbd {
 /* NET/BPI rank + Q1–Q4 columns (fetchQuads); a vertical line after Q4 when more columns follow */
 #season-stats-table.season-records td.records-quad-rank { font-size: 11px; opacity: 0.7; }
 #season-stats-table.season-records td.records-quad { font-size: 12px; }
-#season-stats-table.season-records td.records-q1 { font-weight: bold; }
+#season-stats-table.season-records td.records-bpi { font-size: 12px; font-variant-numeric: tabular-nums; }
 #season-stats-table.season-records > thead > tr > th.records-q4-col:not(:last-child),
 #season-stats-table.season-records > tbody > tr > td.records-q4:not(:last-child) { border-right: 1px solid var(--color-border-nth); }
-/* Per-game quadrant tag in the expanded game list; strength shown by weight, not color */
+/* Line between the BPI columns and Q1 */
+#season-stats-table.season-records > thead > tr > th.records-bpi-col + th.records-q1-col,
+#season-stats-table.season-records > tbody > tr > td.records-bpi + td.records-q1 { border-left: 1px solid var(--color-border-nth); }
+/* Per-game quadrant tag in the expanded game list */
 #season-stats-table .records-games-table td.rg-quad { min-width: 0; }
 .rg-quad-tag { font-size: 9px; letter-spacing: 0.03em; border: 1px solid currentColor; border-radius: 3px; padding: 0 3px; }
-.rg-quad-tag.rg-q1 { font-weight: bold; }
-.rg-quad-tag.rg-q2 { opacity: 0.8; }
-.rg-quad-tag.rg-q3 { opacity: 0.55; }
-.rg-quad-tag.rg-q4 { opacity: 0.4; }
 /* Voted view: Won / Lost opponent logos (fillRecordsOpponents) */
 #season-stats-table.season-records > thead > tr > th.records-opps-col { text-align: left; padding-left: 10px; }
 #season-stats-table.season-records > tbody > tr > td.records-opps { text-align: left; white-space: normal; padding: 6px 6px 6px 10px; }
@@ -939,7 +938,7 @@ kbd {
 }
 #precision-box h2, #tenure-box h2 {
     margin: 0 0 12px;
-    font-size: 1.05rem;
+    font-size: 1.1rem;
     color: var(--color-modal-h2);
 }
 #precision-table, #tenure-table {
@@ -1002,14 +1001,13 @@ body.year-loading::after {
 
 .modal-mode-tab {
     cursor: pointer;
-    font-size: 1.1rem;
+    font-size: inherit;
     color: var(--color-modal-h2);
     opacity: 0.35;
-    margin-left: 0.55em;
     user-select: none;
 }
-.modal-mode-tab:first-of-type {
-    margin-left: 0;
+.modal-mode-tab + .modal-mode-tab {
+    margin-left: 0.55em;
 }
 .modal-mode-tab.active {
     opacity: 1;
@@ -1053,7 +1051,7 @@ body.year-loading::after {
 }
 #heatmap-title {
     margin: 0 0 12px;
-    font-size: 1.05rem;
+    font-size: 1.1rem;
     color: var(--color-heatmap-title);
     text-align: center;
     flex-shrink: 0;

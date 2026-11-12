@@ -1888,11 +1888,11 @@ function renderWeekChartTitle(weekId, mode) {
     const weekLabel = weekTextLabel(titleTab);
     const weekLabelText = weekLabel
         ? `${year} ${weekLabel}`
-        : `${year} Week ${String(weekNum).padStart(2, "0")}`;
+        : `${year} ${String(weekNum).padStart(2, "0")}`;
     const escapedId = weekId.replace(/'/g, "\\'");
     const modeTabs = [
         { key: 'stats', label: 'Stats' },
-        { key: 'conf', label: 'Conference' },
+        { key: 'conf', label: 'Conferences' },
     ].map(m =>
         `<span class="modal-mode-tab${mode === m.key ? ' active' : ''}"
                onclick="showWeekHighLowChart('${escapedId}', '${m.key}')">${m.label}</span>`
@@ -4040,7 +4040,9 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
     });
 }
 
-function showSeasonStatsModal(mode = "stats") {
+// Default is Records. The Stats tab (per-team season table) is kept but nothing opens it:
+// its title tab is hidden and every entry point uses the default; call with "stats" to reach it.
+function showSeasonStatsModal(mode = "records") {
     // Voters tab is PIN-locked (same PIN and daily unlock as the locked keybinds).
     // While locked it does nothing; the PIN is only entered via Settings › Other › Dev.
     if (mode === "voters" && !isKeybindsUnlocked()) return;
@@ -4066,7 +4068,6 @@ function showSeasonStatsModal(mode = "stats") {
     const teamVoterWeeks = {};  // voter-ballot appearances where team was ranked
     let totalVoterWeekSlots = 0; // total (voter × week) slots across all weeks
     const teamWeeksRanked = {}; // distinct weeks the team appeared in any ballot
-    const teamFirstPlaceVotes = {};
     const teamBestRank = {};
     const teamBestConsensusRank = {};  // best (lowest #) consensus rank across weeks
     const teamWorstConsensusRank = {}; // worst (highest #) consensus rank across weeks
@@ -4109,7 +4110,6 @@ function showSeasonStatsModal(mode = "stats") {
                 teamRankSum[team] = (teamRankSum[team] || 0) + rank;
                 teamVoterWeeks[team] = (teamVoterWeeks[team] || 0) + 1;
                 seenThisWeek.add(team);
-                if (rank === 1) teamFirstPlaceVotes[team] = (teamFirstPlaceVotes[team] || 0) + 1;
                 if (!teamBestRank[team] || rank < teamBestRank[team]) teamBestRank[team] = rank;
             });
         });
@@ -4230,7 +4230,6 @@ function showSeasonStatsModal(mode = "stats") {
         <col style="width:52px">
         <col style="width:44px">
         <col style="width:60px">
-        <col style="width:52px">
         <col style="width:36px">
         <col>
         <col>
@@ -4240,7 +4239,6 @@ function showSeasonStatsModal(mode = "stats") {
         <th>Weeks</th>
         <th>Pts</th>
         <th>Avg Rank</th>
-        <th>#1 Votes</th>
         <th>Best</th>
         <th class="fan-col">#1 Supporter</th>
         <th class="fan-col">#1 Hater</th>
@@ -4249,7 +4247,6 @@ function showSeasonStatsModal(mode = "stats") {
     allTeams.forEach((team, i) => {
         const unrankedSlots = totalVoterWeekSlots - (teamVoterWeeks[team] || 0);
         const avgRank = ((teamRankSum[team] + unrankedSlots * 26) / totalVoterWeekSlots).toFixed(2);
-        const firstPlace = teamFirstPlaceVotes[team] || 0;
         html += `<tr>
             <td>${i + 1}</td>
             <td><img class="logo-sm" src="${logoSrc(team)}"></td>
@@ -4257,7 +4254,6 @@ function showSeasonStatsModal(mode = "stats") {
             <td>${teamWeeksRanked[team]}/${totalWeeks}</td>
             <td>${teamTotalPts[team]}</td>
             <td>${avgRank}</td>
-            <td>${firstPlace || "—"}</td>
             <td>${teamBestConsensusRank[team] || "—"}</td>
             <td class="fan-col">${fmtFan(teamSupporter[team])}</td>
             <td class="fan-col">${i < 50 ? fmtFan(teamHater[team]) : "—"}</td>
@@ -4269,12 +4265,12 @@ function showSeasonStatsModal(mode = "stats") {
     modal.classList.add("open");
 }
 
-// Year window title: "YEAR Season — Stats Records Voters", tabs styled like the Week
+// Year window title: "YEAR Season — Records Voters", tabs styled like the Week
 // window's Stats / Conference. Voters is hidden: its tab only shows while it's open
 // (reached by Shift+W, PIN-locked).
 function seasonModalTitleHtml(currentYear, isApMode, mode) {
     const modeTabs = [
-        { key: "stats", label: "Stats" },
+        { key: "stats", label: "Stats", hidden: true },  // unused; kept for showSeasonStatsModal("stats")
         { key: "records", label: "Records" },
         { key: "voters", label: "Voters", hidden: mode !== "voters" },
     ].filter(m => !m.hidden).map(m =>
@@ -4490,7 +4486,8 @@ function summarizeGames(games, ctx = {}) {
 // Per-game quads come from quads-YEAR.json only if it used the same ranking as the totals.
 //
 //   quadsAvailable(season)  → "net" | "bpi" | null (the ranking the columns will show)
-//   fetchQuads(season)      → Promise<{source, official, asOf, teams: {key: {rank, q1..q4}},
+//   fetchQuads(season)      → Promise<{source, official, asOf, teams: {key: {rank, q1..q4,
+//                              bpi, off, def}},  (BPI scores from quads-YEAR.json when present)
 //                              games: {key: {"YYYY-MM-DD:oppEspnId": 1-4}}}>; result also
 //                              kept in _quadsData[season] (or {error}) for synchronous renders
 //   quadOfGame(season, key, game)  → 1-4 | null, for a fetchTeamSchedule() game
@@ -4513,6 +4510,12 @@ function fetchQuads(season) {
         const teams = {};
         Object.entries(base.teams).forEach(([k, t]) => {
             teams[k] = { rank: t.rank, q1: t.q1, q2: t.q2, q3: t.q3, q4: t.q4 };
+        });
+        // BPI score / offense / defense (quads.py fetches them whatever the rank source).
+        if (q) Object.entries(q.teams).forEach(([k, t]) => {
+            if (t.bpi == null) return;
+            const m = teams[k] || (teams[k] = {});
+            m.bpi = t.bpi; m.off = t.off; m.def = t.def;
         });
         const games = {};
         if (q && q.rankSource === source) {
@@ -4544,10 +4547,10 @@ function showSeasonRecords(currentYear, isApMode, activeTab) {
     const modal = document.getElementById("season-stats-modal");
     const title = document.getElementById("season-stats-title");
     const table = document.getElementById("season-stats-table");
-    // Voted / All switch sits in the title, after the Stats / Records tabs (Records only).
+    // Title: "YYYY Records — Voted All", the Voted / All switch styled like the Week window's tabs.
     const switcher = `<span class="records-switch">${[["week", "Voted"], ["all", "All"]].map(([k, l]) =>
         `<span class="records-view${_recordsView === k ? " active" : ""}" data-view="${k}">${l}</span>`).join("")}</span>`;
-    title.innerHTML = `<span class="records-title-main">${seasonModalTitleHtml(currentYear, isApMode, "records")}${switcher}</span>`
+    title.innerHTML = `<span class="records-title-main">${currentYear}${isApMode ? " AP" : ""} Records — ${switcher}</span>`
         + `<span class="records-note records-title-note"></span>`;
     title.querySelectorAll(".records-view").forEach(el => el.addEventListener("click", () => {
         if (el.classList.contains("active")) return;
@@ -4810,7 +4813,7 @@ function buildTeamGamesHtml(sched, teamId, records, season) {
         return `<tr class="${g.result ? "" : "records-game-pending"}">
             <td class="rg-date">${fmtDate(g.date)}</td>
             <td class="rg-site" title="${g.site === "N" ? "Neutral site" : g.site === "H" ? "Home" : "Away"}">${site}</td>
-            ${quadCell}<td class="rg-opp">${logo}${g.oppRank ? `<span class="rg-rank" title="AP rank at game time">${g.oppRank}</span>` : ""}${g.oppSeed ? `<span class="rg-rank" title="Seed">(${g.oppSeed})</span>` : ""}${esc(name)}${nonD1}</td>
+            <td class="rg-opp">${logo}${g.oppRank ? `<span class="rg-rank" title="AP rank at game time">${g.oppRank}</span>` : ""}${g.oppSeed ? `<span class="rg-rank" title="Seed">(${g.oppSeed})</span>` : ""}${esc(name)}${nonD1}</td>${quadCell}
             <td class="rg-res">${res}</td>
             <td class="rg-note">${esc(g.note)}${g.postseason && !g.note ? "Postseason" : ""}</td>
         </tr>`;
@@ -4845,7 +4848,7 @@ function recordsNoteHtml(currentYear, data) {
             .toLocaleDateString([], { month: "short", day: "numeric" });
         note += qd.official
             ? ` · Quads: NCAA NET through ${d}`
-            : ` · <span title="Computed from ESPN schedules with ESPN BPI ranks standing in for NET, using the NCAA quadrant cutoffs. Unofficial until NET is released.">Quads: BPI-based, unofficial (${d})</span>`;
+            : "";
     }
     return note;
 }
@@ -4855,22 +4858,33 @@ function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
     const view = _recordsView;
     // Won / Lost opponent logos only in Voted; All stops at Conf.
     const opps = view !== "all";
-    // Rank + Q1–Q4 columns after Conf when the season has NET / quad data (fetchQuads()).
+    // Quad columns after Conf when the season has NET / quad data (fetchQuads()): NET rank
+    // (once NET is out), then ESPN BPI score + offense + defense (when quads-YEAR.json
+    // exists), then Q1–Q4.
     const quadSrc = quadsAvailable(currentYear);
     const qd = _quadsData[currentYear];
-    const COLS = (opps ? 8 : 6) + (quadSrc ? 5 : 0);
-    const rankLabel = quadSrc === "net" ? "NET" : "BPI";
+    const showNet = quadSrc === "net";
+    const showBpi = !!quadSrc && !!QUAD_FILES[currentYear]?.quads;
+    const COLS = (opps ? 8 : 6) + (quadSrc ? 4 : 0) + (showNet ? 1 : 0) + (showBpi ? 3 : 0);
     const quadTip = quadSrc === "net"
         ? "Official NCAA quadrant record (D1 games only)"
         : "Unofficial: NCAA quadrant cutoffs with ESPN BPI ranks in place of NET (D1 games only)";
+    const bpiCols = [
+        ["bpi", "BPI", "ESPN BPI: points better than an average D1 team per 70 possessions, neutral court"],
+        ["off", "Off", "ESPN BPI offense component (points per 70 possessions above average)"],
+        ["def", "Def", "ESPN BPI defense component (points per 70 possessions above average)"],
+    ];
     const quadHead = quadSrc
-        ? `<th title="${rankLabel} rank">${rankLabel}</th>${[1, 2, 3, 4].map(q =>
-            `<th class="records-quad-col${q === 4 ? " records-q4-col" : ""}" title="${quadTip}">Q${q}</th>`).join("")}` : "";
+        ? (showNet ? `<th title="NET rank">NET</th>` : "")
+            + (showBpi ? bpiCols.map(([, l, tip]) => `<th class="records-bpi-col" title="${tip}">${l}</th>`).join("") : "")
+            + [1, 2, 3, 4].map(q =>
+                `<th class="records-quad-col${q === 1 ? " records-q1-col" : ""}${q === 4 ? " records-q4-col" : ""}" title="${quadTip}">Q${q}</th>`).join("") : "";
 
     const head = `<colgroup>
         <col style="width:28px"><col style="width:26px"><col>
         <col style="width:52px"><col style="width:44px"><col style="width:52px">
-        ${quadSrc ? `<col style="width:38px">${"<col style=\"width:40px\">".repeat(4)}` : ""}
+        ${showNet ? `<col style="width:38px">` : ""}${showBpi ? "<col style=\"width:42px\">".repeat(3) : ""}
+        ${quadSrc ? "<col style=\"width:40px\">".repeat(4) : ""}
         ${opps ? "<col><col>" : ""}
     </colgroup><thead><tr>
         <th>#</th><th></th><th class="team-col">Team</th>
@@ -4880,7 +4894,11 @@ function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
         if (!quadSrc) return "";
         const t = qd?.teams?.[(CONFERENCE_DATA.aliases || {})[key] || key];
         const blank = qd ? "—" : "…";
-        return `<td class="records-quad-rank">${t?.rank ?? blank}</td>${[1, 2, 3, 4].map(q =>
+        const num = v => v == null ? blank : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(1);
+        return (showNet ? `<td class="records-quad-rank">${t?.rank ?? blank}</td>` : "")
+            + (showBpi ? bpiCols.map(([k]) =>
+                `<td class="records-bpi${k === "bpi" ? " records-bpi-main" : ""}">${num(t?.[k])}</td>`).join("") : "")
+            + `${[1, 2, 3, 4].map(q =>
             `<td class="records-quad${q === 1 ? " records-q1" : ""}${q === 4 ? " records-q4" : ""}">${t ? esc(t[`q${q}`]) : blank}</td>`).join("")}`;
     };
 

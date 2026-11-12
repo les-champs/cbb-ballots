@@ -626,7 +626,7 @@ body:has([id$="-modal"].open) {
 }
 #pin-box h2 {
     margin: 0 0 12px;
-    font-size: 1.05rem;
+    font-size: 1.1rem;
     color: var(--color-modal-h2);
 }
 #pin-input {
@@ -824,7 +824,7 @@ kbd {
 }
 #season-stats-box h2 {
     margin: 0 0 12px;
-    font-size: 1.05rem;
+    font-size: 1.1rem;
     color: var(--color-modal-h2);
 }
 #season-stats-table {
@@ -852,8 +852,8 @@ kbd {
 #season-stats-table td:first-child { font-size: 11px; }
 #season-stats-table .logo-sm { height: 20px; width: 20px; object-fit: contain; vertical-align: middle; }
 #season-stats-table:not(.season-voters):not(.season-records) th:nth-child(5), #season-stats-table:not(.season-voters):not(.season-records) td:nth-child(5) { border-right: none; }
-#season-stats-table:not(.season-voters):not(.season-records) th:nth-child(9), #season-stats-table:not(.season-voters):not(.season-records) td:nth-child(9) { border-right: none; }
-#season-stats-table:not(.season-voters):not(.season-records) th:nth-child(8), #season-stats-table:not(.season-voters):not(.season-records) td:nth-child(8) { border-right: 1px solid var(--color-border-nth); }
+#season-stats-table:not(.season-voters):not(.season-records) th:nth-child(8), #season-stats-table:not(.season-voters):not(.season-records) td:nth-child(8) { border-right: none; }
+#season-stats-table:not(.season-voters):not(.season-records) th:nth-child(7), #season-stats-table:not(.season-voters):not(.season-records) td:nth-child(7) { border-right: 1px solid var(--color-border-nth); }
 #season-stats-table.season-voters th:nth-child(5), #season-stats-table.season-voters td:nth-child(5) { border-right: 1px solid var(--color-border-nth); }
 #season-stats-table td.fan-col { text-align: left; font-size: 12px; padding-left: 10px; }
 #season-stats-table th.fan-col { text-align: left; padding-left: 10px; }
@@ -862,7 +862,7 @@ kbd {
 #season-stats-table .fan-dev { font-size: 11px; opacity: 0.6; font-variant-numeric: tabular-nums; }
 
 /* Year window › Records tab */
-.records-switch { font-size: 14px; font-weight: bold; line-height: 1; user-select: none; white-space: nowrap; margin-left: 1.1em; }
+.records-switch { user-select: none; white-space: nowrap; }
 .records-view { cursor: pointer; color: var(--color-modal-h2); opacity: 0.35; margin-left: 0.55em; }
 .records-view:first-child { margin-left: 0; }
 .records-view.active { opacity: 1; cursor: default; }
@@ -909,16 +909,15 @@ kbd {
 /* NET/BPI rank + Q1–Q4 columns (fetchQuads); a vertical line after Q4 when more columns follow */
 #season-stats-table.season-records td.records-quad-rank { font-size: 11px; opacity: 0.7; }
 #season-stats-table.season-records td.records-quad { font-size: 12px; }
-#season-stats-table.season-records td.records-q1 { font-weight: bold; }
+#season-stats-table.season-records td.records-bpi { font-size: 12px; font-variant-numeric: tabular-nums; }
 #season-stats-table.season-records > thead > tr > th.records-q4-col:not(:last-child),
 #season-stats-table.season-records > tbody > tr > td.records-q4:not(:last-child) { border-right: 1px solid var(--color-border-nth); }
-/* Per-game quadrant tag in the expanded game list; strength shown by weight, not color */
+/* Line between the BPI columns and Q1 */
+#season-stats-table.season-records > thead > tr > th.records-bpi-col + th.records-q1-col,
+#season-stats-table.season-records > tbody > tr > td.records-bpi + td.records-q1 { border-left: 1px solid var(--color-border-nth); }
+/* Per-game quadrant tag in the expanded game list */
 #season-stats-table .records-games-table td.rg-quad { min-width: 0; }
 .rg-quad-tag { font-size: 9px; letter-spacing: 0.03em; border: 1px solid currentColor; border-radius: 3px; padding: 0 3px; }
-.rg-quad-tag.rg-q1 { font-weight: bold; }
-.rg-quad-tag.rg-q2 { opacity: 0.8; }
-.rg-quad-tag.rg-q3 { opacity: 0.55; }
-.rg-quad-tag.rg-q4 { opacity: 0.4; }
 /* Voted view: Won / Lost opponent logos (fillRecordsOpponents) */
 #season-stats-table.season-records > thead > tr > th.records-opps-col { text-align: left; padding-left: 10px; }
 #season-stats-table.season-records > tbody > tr > td.records-opps { text-align: left; white-space: normal; padding: 6px 6px 6px 10px; }
@@ -959,7 +958,7 @@ kbd {
 }
 #precision-box h2, #tenure-box h2 {
     margin: 0 0 12px;
-    font-size: 1.05rem;
+    font-size: 1.1rem;
     color: var(--color-modal-h2);
 }
 #precision-table, #tenure-table {
@@ -1022,14 +1021,13 @@ body.year-loading::after {
 
 .modal-mode-tab {
     cursor: pointer;
-    font-size: 1.1rem;
+    font-size: inherit;
     color: var(--color-modal-h2);
     opacity: 0.35;
-    margin-left: 0.55em;
     user-select: none;
 }
-.modal-mode-tab:first-of-type {
-    margin-left: 0;
+.modal-mode-tab + .modal-mode-tab {
+    margin-left: 0.55em;
 }
 .modal-mode-tab.active {
     opacity: 1;
@@ -1073,7 +1071,7 @@ body.year-loading::after {
 }
 #heatmap-title {
     margin: 0 0 12px;
-    font-size: 1.05rem;
+    font-size: 1.1rem;
     color: var(--color-heatmap-title);
     text-align: center;
     flex-shrink: 0;
@@ -1795,7 +1793,7 @@ h1 span, .week-arrow, .picker-btn, .week-tab, .voter-name, .pin-btn, .history-bt
   </div>
 </div>
 
-<template id="picker-template"><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Show</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Deltas</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='picker-category'>Stats</span><span class='sort-option' data-action='dotPlot'>Week</span><span class='sort-option' data-action='yearlyStats'>Year</span><span class='sort-option' data-action='results'>Results</span><span class='picker-category'>&bull;</span><span class='sort-option' data-action='settings'>Settings</span><span class='sort-option' data-action='credits'>Credits</span><span class='picker-category settings-only'>Settings</span><span class='sort-option settings-only' data-action='darkMode'>Dark Mode</span><span class='sort-option settings-only' data-action='weekArrows'>Nav Arrows ON</span><span class='picker-category settings-only'>Other</span><span class='sort-option settings-only' data-action='savePng'>Save as PNG</span><span class='sort-option settings-only' data-action='legend'>Keybinds</span><span class='sort-option settings-only' data-action='devPin'>Dev</span><span class='credits-only credits-text'>Site displays &amp; analyzes the results of ballot votes from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span></span></template>
+<template id="picker-template"><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Show</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Deltas</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='picker-category'>Stats</span><span class='sort-option' data-action='dotPlot'>Week</span><span class='sort-option' data-action='yearlyStats'>Records</span><span class='sort-option' data-action='results'>Results</span><span class='picker-category'>&bull;</span><span class='sort-option' data-action='settings'>Settings</span><span class='sort-option' data-action='credits'>Credits</span><span class='picker-category settings-only'>Settings</span><span class='sort-option settings-only' data-action='darkMode'>Dark Mode</span><span class='sort-option settings-only' data-action='weekArrows'>Nav Arrows ON</span><span class='picker-category settings-only'>Other</span><span class='sort-option settings-only' data-action='savePng'>Save as PNG</span><span class='sort-option settings-only' data-action='legend'>Keybinds</span><span class='sort-option settings-only' data-action='devPin'>Dev</span><span class='credits-only credits-text'>Site displays &amp; analyzes the results of ballot votes from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span></span></template>
 
 <div id="pin-modal">
   <div id="pin-box">
@@ -3645,11 +3643,11 @@ const year=titleTab?.dataset.year||"";
 const weekLabel=weekTextLabel(titleTab);
 const weekLabelText=weekLabel
 ?`${year} ${weekLabel}`
-:`${year} Week ${String(weekNum).padStart(2,"0")}`;
+:`${year} ${String(weekNum).padStart(2,"0")}`;
 const escapedId=weekId.replace(/'/g,"\\'");
 const modeTabs=[
 {key:'stats',label:'Stats'},
-{key:'conf',label:'Conference'},
+{key:'conf',label:'Conferences'},
 ].map(m=>
 `<span class="modal-mode-tab${mode===m.key?' active':''}"
                onclick="showWeekHighLowChart('${escapedId}', '${m.key}')">${m.label}</span>`
@@ -5422,7 +5420,7 @@ wrapper.appendChild(avgLabel);
 }
 });
 }
-function showSeasonStatsModal(mode="stats"){
+function showSeasonStatsModal(mode="records"){
 if(mode==="voters"&&!isKeybindsUnlocked())return;
 const activeTab=document.querySelector(".week-tab.active");
 if(!activeTab)return;
@@ -5441,7 +5439,6 @@ const teamRankSum={};
 const teamVoterWeeks={};
 let totalVoterWeekSlots=0;
 const teamWeeksRanked={};
-const teamFirstPlaceVotes={};
 const teamBestRank={};
 const teamBestConsensusRank={};
 const teamWorstConsensusRank={};
@@ -5481,7 +5478,6 @@ teamTotalPts[team]=(teamTotalPts[team]||0)+(25 - i);
 teamRankSum[team]=(teamRankSum[team]||0)+ rank;
 teamVoterWeeks[team]=(teamVoterWeeks[team]||0)+ 1;
 seenThisWeek.add(team);
-if(rank===1)teamFirstPlaceVotes[team]=(teamFirstPlaceVotes[team]||0)+ 1;
 if(!teamBestRank[team]||rank<teamBestRank[team])teamBestRank[team]=rank;
 });
 });
@@ -5586,7 +5582,6 @@ let html=`<colgroup>
         <col style="width:52px">
         <col style="width:44px">
         <col style="width:60px">
-        <col style="width:52px">
         <col style="width:36px">
         <col>
         <col>
@@ -5596,7 +5591,6 @@ let html=`<colgroup>
         <th>Weeks</th>
         <th>Pts</th>
         <th>Avg Rank</th>
-        <th>#1 Votes</th>
         <th>Best</th>
         <th class="fan-col">#1 Supporter</th>
         <th class="fan-col">#1 Hater</th>
@@ -5604,7 +5598,6 @@ let html=`<colgroup>
 allTeams.forEach((team,i)=>{
 const unrankedSlots=totalVoterWeekSlots -(teamVoterWeeks[team]||0);
 const avgRank=((teamRankSum[team]+ unrankedSlots*26)/ totalVoterWeekSlots).toFixed(2);
-const firstPlace=teamFirstPlaceVotes[team]||0;
 html +=`<tr>
             <td>${i + 1}</td>
             <td><img class="logo-sm" src="${logoSrc(team)}"></td>
@@ -5612,7 +5605,6 @@ html +=`<tr>
             <td>${teamWeeksRanked[team]}/${totalWeeks}</td>
             <td>${teamTotalPts[team]}</td>
             <td>${avgRank}</td>
-            <td>${firstPlace||"—"}</td>
             <td>${teamBestConsensusRank[team]||"—"}</td>
             <td class="fan-col">${fmtFan(teamSupporter[team])}</td>
             <td class="fan-col">${i<50?fmtFan(teamHater[team]):"—"}</td>
@@ -5624,7 +5616,7 @@ modal.classList.add("open");
 }
 function seasonModalTitleHtml(currentYear,isApMode,mode){
 const modeTabs=[
-{key:"stats",label:"Stats"},
+{key:"stats",label:"Stats",hidden:true},
 {key:"records",label:"Records"},
 {key:"voters",label:"Voters",hidden:mode!=="voters"},
 ].filter(m=>!m.hidden).map(m=>
@@ -5804,6 +5796,11 @@ const teams={};
 Object.entries(base.teams).forEach(([k,t])=>{
 teams[k]={rank:t.rank,q1:t.q1,q2:t.q2,q3:t.q3,q4:t.q4};
 });
+if(q)Object.entries(q.teams).forEach(([k,t])=>{
+if(t.bpi==null)return;
+const m=teams[k]||(teams[k]={});
+m.bpi=t.bpi;m.off=t.off;m.def=t.def;
+});
 const games={};
 if(q&&q.rankSource===source){
 Object.entries(q.teams).forEach(([k,t])=>{
@@ -5829,7 +5826,7 @@ const title=document.getElementById("season-stats-title");
 const table=document.getElementById("season-stats-table");
 const switcher=`<span class="records-switch">${[["week","Voted"],["all","All"]].map(([k,l])=>
 `<span class="records-view${_recordsView===k?" active":""}" data-view="${k}">${l}</span>`).join("")}</span>`;
-title.innerHTML=`<span class="records-title-main">${seasonModalTitleHtml(currentYear,isApMode,"records")}${switcher}</span>`
+title.innerHTML=`<span class="records-title-main">${currentYear}${isApMode?" AP":""} Records — ${switcher}</span>`
 + `<span class="records-note records-title-note"></span>`;
 title.querySelectorAll(".records-view").forEach(el=>el.addEventListener("click",()=>{
 if(el.classList.contains("active"))return;
@@ -6061,7 +6058,7 @@ else res=`<span class="records-upcoming">${esc(g.status.replace(/^\d+\/\d+\s*-\s
 return `<tr class="${g.result?"":"records-game-pending"}">
             <td class="rg-date">${fmtDate(g.date)}</td>
             <td class="rg-site" title="${g.site==="N"?"Neutral site":g.site==="H"?"Home":"Away"}">${site}</td>
-            ${quadCell}<td class="rg-opp">${logo}${g.oppRank?`<span class="rg-rank" title="AP rank at game time">${g.oppRank}</span>`:""}${g.oppSeed?`<span class="rg-rank" title="Seed">(${g.oppSeed})</span>`:""}${esc(name)}${nonD1}</td>
+            <td class="rg-opp">${logo}${g.oppRank?`<span class="rg-rank" title="AP rank at game time">${g.oppRank}</span>`:""}${g.oppSeed?`<span class="rg-rank" title="Seed">(${g.oppSeed})</span>`:""}${esc(name)}${nonD1}</td>${quadCell}
             <td class="rg-res">${res}</td>
             <td class="rg-note">${esc(g.note)}${g.postseason&&!g.note?"Postseason":""}</td>
         </tr>`;
@@ -6092,7 +6089,7 @@ const d=new Date(qd.official?`${qd.asOf}T12:00:00`:qd.asOf)
 .toLocaleDateString([],{month:"short",day:"numeric"});
 note +=qd.official
 ?` · Quads: NCAA NET through ${d}`
-:` · <span title="Computed from ESPN schedules with ESPN BPI ranks standing in for NET, using the NCAA quadrant cutoffs. Unofficial until NET is released.">Quads: BPI-based, unofficial (${d})</span>`;
+:"";
 }
 return note;
 }
@@ -6102,18 +6099,27 @@ const view=_recordsView;
 const opps=view!=="all";
 const quadSrc=quadsAvailable(currentYear);
 const qd=_quadsData[currentYear];
-const COLS=(opps?8:6)+(quadSrc?5:0);
-const rankLabel=quadSrc==="net"?"NET":"BPI";
+const showNet=quadSrc==="net";
+const showBpi=!!quadSrc&&!!QUAD_FILES[currentYear]?.quads;
+const COLS=(opps?8:6)+(quadSrc?4:0)+(showNet?1:0)+(showBpi?3:0);
 const quadTip=quadSrc==="net"
 ?"Official NCAA quadrant record (D1 games only)"
 :"Unofficial: NCAA quadrant cutoffs with ESPN BPI ranks in place of NET (D1 games only)";
+const bpiCols=[
+["bpi","BPI","ESPN BPI: points better than an average D1 team per 70 possessions, neutral court"],
+["off","Off","ESPN BPI offense component (points per 70 possessions above average)"],
+["def","Def","ESPN BPI defense component (points per 70 possessions above average)"],
+];
 const quadHead=quadSrc
-?`<th title="${rankLabel} rank">${rankLabel}</th>${[1,2,3,4].map(q=>
-`<th class="records-quad-col${q===4?" records-q4-col":""}" title="${quadTip}">Q${q}</th>`).join("")}`:"";
+?(showNet?`<th title="NET rank">NET</th>`:"")
++(showBpi?bpiCols.map(([,l,tip])=>`<th class="records-bpi-col" title="${tip}">${l}</th>`).join(""):"")
++[1,2,3,4].map(q=>
+`<th class="records-quad-col${q===1?" records-q1-col":""}${q===4?" records-q4-col":""}" title="${quadTip}">Q${q}</th>`).join(""):"";
 const head=`<colgroup>
         <col style="width:28px"><col style="width:26px"><col>
         <col style="width:52px"><col style="width:44px"><col style="width:52px">
-        ${quadSrc?`<col style="width:38px">${"<col style=\"width:40px\">".repeat(4)}`:""}
+        ${showNet?`<col style="width:38px">`:""}${showBpi?"<col style=\"width:42px\">".repeat(3):""}
+        ${quadSrc?"<col style=\"width:40px\">".repeat(4):""}
         ${opps?"<col><col>":""}
     </colgroup><thead><tr>
         <th>#</th><th></th><th class="team-col">Team</th>
@@ -6123,7 +6129,11 @@ const quadCells=key=>{
 if(!quadSrc)return "";
 const t=qd?.teams?.[(CONFERENCE_DATA.aliases||{})[key]||key];
 const blank=qd?"—":"…";
-return `<td class="records-quad-rank">${t?.rank??blank}</td>${[1,2,3,4].map(q=>
+const num=v=>v==null?blank:(v>0?"+":v<0?"−":"")+ Math.abs(v).toFixed(1);
+return(showNet?`<td class="records-quad-rank">${t?.rank??blank}</td>`:"")
++(showBpi?bpiCols.map(([k])=>
+`<td class="records-bpi${k==="bpi"?" records-bpi-main":""}">${num(t?.[k])}</td>`).join(""):"")
++ `${[1,2,3,4].map(q=>
 `<td class="records-quad${q===1?" records-q1":""}${q===4?" records-q4":""}">${t?esc(t[`q${q}`]):blank}</td>`).join("")}`;
 };
 if(!data){

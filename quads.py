@@ -21,6 +21,8 @@ Rank sources (--rank-source):
     net   NET ranks from net-YEAR.json (run --net first). Used to check this module against
           the NCAA's official quadrant counts, and to compute game-level quads after NET is out
     auto  (default) net if net-YEAR.json exists for the season, else bpi
+Each team also gets its BPI score and offense / defense components (bpi, off, def), fetched
+whatever the rank source (the Records tab shows them).
 
 Data: ESPN schedules (site.web.api.espn.com, seasontype 2 and 3) for every D1 school in
 conferences.SEASONS[year], i.e. ~730 schedule requests + ~365 BPI requests, 8 at a time.
@@ -97,24 +99,30 @@ def d1_teams(season):
 
 
 def bpi_ranks(season, ids):
-    """{espnId: BPI rank}, plus the latest lastUpdated seen."""
+    """{espnId: BPI rank}, {espnId: {bpi, off, def}} (scores, 1 decimal), the latest
+    lastUpdated seen, and [(espnId, error)] for teams without a rank."""
     def one(i):
         d = _get_json(BPI_URL.format(season=season, id=i))
         if not d:
             return None
-        stat = next((s for s in d.get("stats", []) if s.get("name") == "bpirank"), None)
-        rank = stat and stat.get("value")
-        return (int(rank), d.get("lastUpdated")) if rank else None
+        stats = {s.get("name"): s.get("value") for s in d.get("stats", [])}
+        rank = stats.get("bpirank")
+        if not rank:
+            return None
+        score = {k: round(stats[n], 1) for k, n in
+                 (("bpi", "bpi"), ("off", "bpioffense"), ("def", "bpidefense"))
+                 if stats.get(n) is not None}
+        return int(rank), score, d.get("lastUpdated")
     got = _pmap(one, list(ids))
-    ranks, stamps, bad = {}, [], []
+    ranks, scores, stamps, bad = {}, {}, [], []
     for i, r in got.items():
         if isinstance(r, tuple):
-            ranks[i] = r[0]
-            if r[1]:
-                stamps.append(r[1])
+            ranks[i], scores[i] = r[0], r[1]
+            if r[2]:
+                stamps.append(r[2])
         else:
             bad.append((i, r))
-    return ranks, max(stamps) if stamps else None, bad
+    return ranks, scores, max(stamps) if stamps else None, bad
 
 
 def net_ranks(season, base_dir, key_to_id):
@@ -168,13 +176,14 @@ def build(season, base_dir, rank_source="auto"):
         rank_source = "net" if os.path.exists(net_path) else "bpi"
 
     print(f"  Ranks: {rank_source.upper()} for {len(id_to_key)} D1 teams...")
+    # BPI scores (BPI / Off / Def) are fetched with either rank source.
+    bpi_rank, bpi_scores, bpi_as_of, bad = bpi_ranks(season, id_to_key)
     if rank_source == "net":
         ranks, ranks_as_of, _ = net_ranks(season, base_dir, key_to_id)
-        bad = []
     else:
-        ranks, ranks_as_of, bad = bpi_ranks(season, id_to_key)
+        ranks, ranks_as_of = bpi_rank, bpi_as_of
     for i, err in bad:
-        print(f"    ⚠ no {rank_source} rank for {id_to_key[i]} ({err or 'not listed'})")
+        print(f"    ⚠ no BPI for {id_to_key[i]} ({err or 'not listed'})")
     if len(ranks) < 0.95 * len(id_to_key):
         raise ValueError(f"only {len(ranks)} of {len(id_to_key)} teams have a rank")
 
@@ -203,6 +212,7 @@ def build(season, base_dir, rank_source="auto"):
                 "result": g["result"], "us": g["us"], "them": g["them"],
             })
         entry = {"rank": ranks.get(team_id)}
+        entry.update(bpi_scores.get(team_id, {}))
         entry.update({k: f"{w}-{l}" for k, (w, l) in rec.items()})
         entry["games"] = out
         teams[id_to_key[team_id]] = entry
@@ -211,6 +221,7 @@ def build(season, base_dir, rank_source="auto"):
         "season": season,
         "rankSource": rank_source,
         "ranksAsOf": ranks_as_of,
+        "bpiAsOf": bpi_as_of,
         "fetched": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "cutoffs": CUTOFFS,
         "teams": dict(sorted(teams.items(), key=lambda kv: kv[1]["rank"] or 9999)),

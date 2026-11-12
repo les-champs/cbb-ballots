@@ -1274,7 +1274,7 @@ PICKER_HTML = (
     f"<span class='sort-option' data-action='toggleOutliers'>Outliers</span>"
     f"<span class='picker-category'>Stats</span>"
     f"<span class='sort-option' data-action='dotPlot'>Week</span>"
-    f"<span class='sort-option' data-action='yearlyStats'>Year</span>"
+    f"<span class='sort-option' data-action='yearlyStats'>Records</span>"
     f"<span class='sort-option' data-action='results'>Results</span>"
     f"<span class='picker-category'>&bull;</span>"
     f"<span class='sort-option' data-action='settings'>Settings</span>"
