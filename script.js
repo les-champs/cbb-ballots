@@ -4031,7 +4031,7 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
 
 function showSeasonStatsModal(mode = "stats") {
     // Voters tab is PIN-locked (same PIN and daily unlock as the locked keybinds).
-    // While locked it does nothing; the PIN is only entered via Settings › Other › Dev Pin.
+    // While locked it does nothing; the PIN is only entered via Settings › Other › Dev.
     if (mode === "voters" && !isKeybindsUnlocked()) return;
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab) return;
@@ -4962,9 +4962,23 @@ document.getElementById("week-arrow-next").addEventListener("click", () => navig
 // Client-side only — a deterrent, not real security. An unlock lasts for the rest of the
 // viewer's local calendar day (localStorage `keybindsUnlockedDate`), checked each time a
 // locked action runs, so a tab left open past midnight locks again. The PIN prompt opens
-// only from Settings › Other › Dev Pin; locked actions do nothing (no prompt) until then.
+// only from Settings › Other › Dev; locked actions do nothing (no prompt) until then.
 const LOCKED_KEYS = new Set(["D", "X", "R", "T", "Y", "G", "U", "W", "H", "K", "P", "?"]);
-const KEYBIND_PIN = "925289";
+// Only a salted PBKDF2-SHA256 hash of the PIN ships in the page, never the PIN itself.
+// To change the PIN: python3 -c "import hashlib;print(hashlib.pbkdf2_hmac('sha256',b'NEWPIN',bytes.fromhex('<salt>'),300000).hex())"
+const PIN_SALT = "3257a8d4b7c69c8ae5b2dd12961baa35";
+const PIN_HASH = "20588ee36e7cdd384e92ceef66b5382d45fb006d4fea1d93059a20d679aa9a22";
+const PIN_LENGTH = 9;
+const PIN_ITERATIONS = 300000;
+async function _pinMatches(pin) {
+    try {
+        const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(pin), "PBKDF2", false, ["deriveBits"]);
+        const salt = new Uint8Array(PIN_SALT.match(/../g).map(h => parseInt(h, 16)));
+        const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: PIN_ITERATIONS }, key, 256);
+        const hex = Array.from(new Uint8Array(bits), b => b.toString(16).padStart(2, "0")).join("");
+        return hex === PIN_HASH;
+    } catch (e) { return false; }  // crypto.subtle needs https or localhost
+}
 const _localDateStr = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -4978,28 +4992,52 @@ function isKeybindsUnlocked() { return _keybindsUnlockedDate === _localDateStr()
 const _pinModal = document.getElementById("pin-modal");
 const _pinInput = document.getElementById("pin-input");
 
+// One wrong attempt locks the PIN window for 10 minutes (localStorage `pinLockedUntil`,
+// epoch ms); while locked, Dev shows a large lock instead of the PIN box.
+const PIN_LOCKOUT_MS = 10 * 60 * 1000;
+let _pinLockedUntil = 0;
+try { _pinLockedUntil = Number(localStorage.getItem("pinLockedUntil")) || 0; } catch (e) {}
+let _pinLockTimer = null;
+function _pinLockedOut() { return Date.now() < _pinLockedUntil; }
+function _showPinLockState() {
+    const locked = _pinLockedOut();
+    _pinModal.classList.toggle("locked-out", locked);
+    clearTimeout(_pinLockTimer);
+    if (locked) {
+        _pinInput.blur();
+        _pinLockTimer = setTimeout(() => {   // lockout expired while the window is open
+            if (_pinModal.classList.contains("open")) { _showPinLockState(); }
+        }, _pinLockedUntil - Date.now() + 50);
+    } else {
+        _pinInput.focus();
+    }
+}
+
 function openPinModal() {
     _pinInput.value = "";
-    _pinInput.classList.remove("wrong");
     _pinModal.classList.add("open");
-    _pinInput.focus();
+    _showPinLockState();
 }
 function closePinModal() {
     _pinModal.classList.remove("open");
     _pinInput.value = "";
+    clearTimeout(_pinLockTimer);
 }
-_pinInput.addEventListener("input", () => {
-    _pinInput.value = _pinInput.value.replace(/\D/g, "").slice(0, 6);
-    _pinInput.classList.remove("wrong");
-    if (_pinInput.value.length < 6) return;
-    if (_pinInput.value === KEYBIND_PIN) {
+_pinInput.addEventListener("input", async () => {
+    _pinInput.value = _pinInput.value.replace(/\D/g, "").slice(0, PIN_LENGTH);
+    if (_pinInput.value.length < PIN_LENGTH || _pinLockedOut()) return;
+    const entered = _pinInput.value;
+    const ok = await _pinMatches(entered);
+    if (_pinInput.value !== entered || !_pinModal.classList.contains("open")) return;  // changed while hashing
+    if (ok) {
         _keybindsUnlockedDate = _localDateStr();
         try { localStorage.setItem("keybindsUnlockedDate", _keybindsUnlockedDate); } catch (e) {}
         closePinModal();
     } else {
         _pinInput.value = "";
-        void _pinInput.offsetWidth; // restart shake animation
-        _pinInput.classList.add("wrong");
+        _pinLockedUntil = Date.now() + PIN_LOCKOUT_MS;
+        try { localStorage.setItem("pinLockedUntil", String(_pinLockedUntil)); } catch (e) {}
+        _showPinLockState();
     }
 });
 _pinInput.addEventListener("keydown", e => {
@@ -5009,11 +5047,14 @@ _pinInput.addEventListener("keydown", e => {
 _pinModal.addEventListener("click", e => { if (e.target === _pinModal) closePinModal(); });
 
 document.addEventListener("keydown", e => {
-    if (_pinModal.classList.contains("open")) return;
+    if (_pinModal.classList.contains("open")) {
+        if (e.key === "Escape") closePinModal();  // the input's own handler covers it unless locked out
+        return;
+    }
     const _isVetChord = _chordPending === "v" && (e.key === "x" || e.key === "X");
     if (e.shiftKey && !isKeybindsUnlocked() && !_isVetChord && LOCKED_KEYS.has(e.key.length === 1 ? e.key.toUpperCase() : e.key)) {
         e.preventDefault();
-        return;  // locked: no prompt here — unlock via Settings › Other › Dev Pin
+        return;  // locked: no prompt here — unlock via Settings › Other › Dev
     }
     if (e.key === "Escape") {
         document.getElementById("voter-history-modal").classList.remove("open");

@@ -625,7 +625,7 @@ body:has([id$="-modal"].open) {
     color: var(--color-modal-h2);
 }
 #pin-input {
-    width: 9.5em;
+    width: 12em;
     padding: 6px 8px;
     font-size: 20px;
     letter-spacing: 0.4em;
@@ -637,12 +637,11 @@ body:has([id$="-modal"].open) {
     border-radius: 6px;
     outline: none;
 }
-#pin-input.wrong { animation: pin-shake 0.3s; border-color: #d33; }
-@keyframes pin-shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-6px); }
-    75% { transform: translateX(6px); }
-}
+/* 10-minute lockout after a wrong PIN: the lock replaces the PIN box */
+#pin-lockout { display: none; pointer-events: none; }
+#pin-lockout svg { width: min(40vmin, 260px); height: auto; fill: rgba(255,255,255,0.82); filter: drop-shadow(0 6px 24px rgba(0,0,0,0.35)); }
+#pin-modal.locked-out #pin-box { display: none; }
+#pin-modal.locked-out #pin-lockout { display: block; }
 .keybind-section {
     margin-bottom: 12px;
 }
@@ -1506,12 +1505,15 @@ body.dark .pin-btn.pinned {
   </div>
 </div>
 
-<template id="picker-template"><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Show</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Deltas</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='picker-category'>Stats</span><span class='sort-option' data-action='dotPlot'>Week</span><span class='sort-option' data-action='yearlyStats'>Year</span><span class='sort-option' data-action='results'>Results</span><span class='picker-category'>&bull;</span><span class='sort-option' data-action='settings'>Settings</span><span class='sort-option' data-action='credits'>Credits</span><span class='picker-category settings-only'>Settings</span><span class='sort-option settings-only' data-action='darkMode'>Dark Mode</span><span class='sort-option settings-only' data-action='weekArrows'>Nav Arrows ON</span><span class='picker-category settings-only'>Other</span><span class='sort-option settings-only' data-action='savePng'>Save as PNG</span><span class='sort-option settings-only' data-action='legend'>Keybinds</span><span class='sort-option settings-only' data-action='devPin'>Dev Pin</span><span class='credits-only credits-text'>Site displays &amp; analyzes the results of ballot votes from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span></span></template>
+<template id="picker-template"><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Show</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Deltas</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='picker-category'>Stats</span><span class='sort-option' data-action='dotPlot'>Week</span><span class='sort-option' data-action='yearlyStats'>Year</span><span class='sort-option' data-action='results'>Results</span><span class='picker-category'>&bull;</span><span class='sort-option' data-action='settings'>Settings</span><span class='sort-option' data-action='credits'>Credits</span><span class='picker-category settings-only'>Settings</span><span class='sort-option settings-only' data-action='darkMode'>Dark Mode</span><span class='sort-option settings-only' data-action='weekArrows'>Nav Arrows ON</span><span class='picker-category settings-only'>Other</span><span class='sort-option settings-only' data-action='savePng'>Save as PNG</span><span class='sort-option settings-only' data-action='legend'>Keybinds</span><span class='sort-option settings-only' data-action='devPin'>Dev</span><span class='credits-only credits-text'>Site displays &amp; analyzes the results of ballot votes from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span></span></template>
 
 <div id="pin-modal">
   <div id="pin-box">
     <h2>Enter PIN</h2>
-    <input id="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="6-digit PIN">
+    <input id="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="9" autocomplete="off" aria-label="9-digit PIN">
+  </div>
+  <div id="pin-lockout" role="img" aria-label="Locked">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5a5.5 5.5 0 0 0-5.5 5.5v3H5.25A1.75 1.75 0 0 0 3.5 11.75v9A1.75 1.75 0 0 0 5.25 22.5h13.5a1.75 1.75 0 0 0 1.75-1.75v-9A1.75 1.75 0 0 0 18.75 10H17.5V7A5.5 5.5 0 0 0 12 1.5Zm-3.5 5.5a3.5 3.5 0 0 1 7 0v3h-7V7Zm3.5 7a2 2 0 0 1 1 3.73V19.5h-2v-1.77A2 2 0 0 1 12 14Z"/></svg>
   </div>
 </div>
 
@@ -5761,7 +5763,7 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
 
 function showSeasonStatsModal(mode = "stats") {
     // Voters tab is PIN-locked (same PIN and daily unlock as the locked keybinds).
-    // While locked it does nothing; the PIN is only entered via Settings › Other › Dev Pin.
+    // While locked it does nothing; the PIN is only entered via Settings › Other › Dev.
     if (mode === "voters" && !isKeybindsUnlocked()) return;
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab) return;
@@ -6692,9 +6694,23 @@ document.getElementById("week-arrow-next").addEventListener("click", () => navig
 // Client-side only — a deterrent, not real security. An unlock lasts for the rest of the
 // viewer's local calendar day (localStorage `keybindsUnlockedDate`), checked each time a
 // locked action runs, so a tab left open past midnight locks again. The PIN prompt opens
-// only from Settings › Other › Dev Pin; locked actions do nothing (no prompt) until then.
+// only from Settings › Other › Dev; locked actions do nothing (no prompt) until then.
 const LOCKED_KEYS = new Set(["D", "X", "R", "T", "Y", "G", "U", "W", "H", "K", "P", "?"]);
-const KEYBIND_PIN = "925289";
+// Only a salted PBKDF2-SHA256 hash of the PIN ships in the page, never the PIN itself.
+// To change the PIN: python3 -c "import hashlib;print(hashlib.pbkdf2_hmac('sha256',b'NEWPIN',bytes.fromhex('<salt>'),300000).hex())"
+const PIN_SALT = "3257a8d4b7c69c8ae5b2dd12961baa35";
+const PIN_HASH = "20588ee36e7cdd384e92ceef66b5382d45fb006d4fea1d93059a20d679aa9a22";
+const PIN_LENGTH = 9;
+const PIN_ITERATIONS = 300000;
+async function _pinMatches(pin) {
+    try {
+        const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(pin), "PBKDF2", false, ["deriveBits"]);
+        const salt = new Uint8Array(PIN_SALT.match(/../g).map(h => parseInt(h, 16)));
+        const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: PIN_ITERATIONS }, key, 256);
+        const hex = Array.from(new Uint8Array(bits), b => b.toString(16).padStart(2, "0")).join("");
+        return hex === PIN_HASH;
+    } catch (e) { return false; }  // crypto.subtle needs https or localhost
+}
 const _localDateStr = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -6708,28 +6724,52 @@ function isKeybindsUnlocked() { return _keybindsUnlockedDate === _localDateStr()
 const _pinModal = document.getElementById("pin-modal");
 const _pinInput = document.getElementById("pin-input");
 
+// One wrong attempt locks the PIN window for 10 minutes (localStorage `pinLockedUntil`,
+// epoch ms); while locked, Dev shows a large lock instead of the PIN box.
+const PIN_LOCKOUT_MS = 10 * 60 * 1000;
+let _pinLockedUntil = 0;
+try { _pinLockedUntil = Number(localStorage.getItem("pinLockedUntil")) || 0; } catch (e) {}
+let _pinLockTimer = null;
+function _pinLockedOut() { return Date.now() < _pinLockedUntil; }
+function _showPinLockState() {
+    const locked = _pinLockedOut();
+    _pinModal.classList.toggle("locked-out", locked);
+    clearTimeout(_pinLockTimer);
+    if (locked) {
+        _pinInput.blur();
+        _pinLockTimer = setTimeout(() => {   // lockout expired while the window is open
+            if (_pinModal.classList.contains("open")) { _showPinLockState(); }
+        }, _pinLockedUntil - Date.now() + 50);
+    } else {
+        _pinInput.focus();
+    }
+}
+
 function openPinModal() {
     _pinInput.value = "";
-    _pinInput.classList.remove("wrong");
     _pinModal.classList.add("open");
-    _pinInput.focus();
+    _showPinLockState();
 }
 function closePinModal() {
     _pinModal.classList.remove("open");
     _pinInput.value = "";
+    clearTimeout(_pinLockTimer);
 }
-_pinInput.addEventListener("input", () => {
-    _pinInput.value = _pinInput.value.replace(/\D/g, "").slice(0, 6);
-    _pinInput.classList.remove("wrong");
-    if (_pinInput.value.length < 6) return;
-    if (_pinInput.value === KEYBIND_PIN) {
+_pinInput.addEventListener("input", async () => {
+    _pinInput.value = _pinInput.value.replace(/\D/g, "").slice(0, PIN_LENGTH);
+    if (_pinInput.value.length < PIN_LENGTH || _pinLockedOut()) return;
+    const entered = _pinInput.value;
+    const ok = await _pinMatches(entered);
+    if (_pinInput.value !== entered || !_pinModal.classList.contains("open")) return;  // changed while hashing
+    if (ok) {
         _keybindsUnlockedDate = _localDateStr();
         try { localStorage.setItem("keybindsUnlockedDate", _keybindsUnlockedDate); } catch (e) {}
         closePinModal();
     } else {
         _pinInput.value = "";
-        void _pinInput.offsetWidth; // restart shake animation
-        _pinInput.classList.add("wrong");
+        _pinLockedUntil = Date.now() + PIN_LOCKOUT_MS;
+        try { localStorage.setItem("pinLockedUntil", String(_pinLockedUntil)); } catch (e) {}
+        _showPinLockState();
     }
 });
 _pinInput.addEventListener("keydown", e => {
@@ -6739,11 +6779,14 @@ _pinInput.addEventListener("keydown", e => {
 _pinModal.addEventListener("click", e => { if (e.target === _pinModal) closePinModal(); });
 
 document.addEventListener("keydown", e => {
-    if (_pinModal.classList.contains("open")) return;
+    if (_pinModal.classList.contains("open")) {
+        if (e.key === "Escape") closePinModal();  // the input's own handler covers it unless locked out
+        return;
+    }
     const _isVetChord = _chordPending === "v" && (e.key === "x" || e.key === "X");
     if (e.shiftKey && !isKeybindsUnlocked() && !_isVetChord && LOCKED_KEYS.has(e.key.length === 1 ? e.key.toUpperCase() : e.key)) {
         e.preventDefault();
-        return;  // locked: no prompt here — unlock via Settings › Other › Dev Pin
+        return;  // locked: no prompt here — unlock via Settings › Other › Dev
     }
     if (e.key === "Escape") {
         document.getElementById("voter-history-modal").classList.remove("open");

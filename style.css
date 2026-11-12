@@ -605,7 +605,7 @@ body:has([id$="-modal"].open) {
     color: var(--color-modal-h2);
 }
 #pin-input {
-    width: 9.5em;
+    width: 12em;
     padding: 6px 8px;
     font-size: 20px;
     letter-spacing: 0.4em;
@@ -617,12 +617,11 @@ body:has([id$="-modal"].open) {
     border-radius: 6px;
     outline: none;
 }
-#pin-input.wrong { animation: pin-shake 0.3s; border-color: #d33; }
-@keyframes pin-shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-6px); }
-    75% { transform: translateX(6px); }
-}
+/* 10-minute lockout after a wrong PIN: the lock replaces the PIN box */
+#pin-lockout { display: none; pointer-events: none; }
+#pin-lockout svg { width: min(40vmin, 260px); height: auto; fill: rgba(255,255,255,0.82); filter: drop-shadow(0 6px 24px rgba(0,0,0,0.35)); }
+#pin-modal.locked-out #pin-box { display: none; }
+#pin-modal.locked-out #pin-lockout { display: block; }
 .keybind-section {
     margin-bottom: 12px;
 }

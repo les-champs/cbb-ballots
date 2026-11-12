@@ -1281,7 +1281,7 @@ PICKER_HTML = (
     f"<span class='picker-category settings-only'>Other</span>"
     f"<span class='sort-option settings-only' data-action='savePng'>Save as PNG</span>"
     f"<span class='sort-option settings-only' data-action='legend'>Keybinds</span>"
-    f"<span class='sort-option settings-only' data-action='devPin'>Dev Pin</span>"
+    f"<span class='sort-option settings-only' data-action='devPin'>Dev</span>"
     f"<span class='credits-only credits-text'>Site displays &amp; analyzes the results of ballot votes from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span>"
     f"</span>"
 )
@@ -1592,7 +1592,10 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
 <div id="pin-modal">
   <div id="pin-box">
     <h2>Enter PIN</h2>
-    <input id="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="6-digit PIN">
+    <input id="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="9" autocomplete="off" aria-label="9-digit PIN">
+  </div>
+  <div id="pin-lockout" role="img" aria-label="Locked">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5a5.5 5.5 0 0 0-5.5 5.5v3H5.25A1.75 1.75 0 0 0 3.5 11.75v9A1.75 1.75 0 0 0 5.25 22.5h13.5a1.75 1.75 0 0 0 1.75-1.75v-9A1.75 1.75 0 0 0 18.75 10H17.5V7A5.5 5.5 0 0 0 12 1.5Zm-3.5 5.5a3.5 3.5 0 0 1 7 0v3h-7V7Zm3.5 7a2 2 0 0 1 1 3.73V19.5h-2v-1.77A2 2 0 0 1 12 14Z"/></svg>
   </div>
 </div>
 
