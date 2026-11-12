@@ -472,6 +472,11 @@ body.show-overall-row .overall-row {
 .sort-option:hover {
     opacity: 0.7;
 }
+/* Dev stays dimmed until the PIN is entered (still clickable unless locked out) */
+.sort-option.dimmed,
+.sort-option.dimmed:hover {
+    opacity: 0.35;
+}
 
 /* Settings mode: the picker shows only its .settings-only items */
 .sort-picker:not(.settings-mode) > .settings-only,
@@ -617,9 +622,6 @@ body:has([id$="-modal"].open) {
     border-radius: 6px;
     outline: none;
 }
-/* Dev is inert during the 10-minute PIN lockout */
-.sort-option.disabled { cursor: default; opacity: 0.35; }
-.sort-option.disabled:hover { opacity: 0.35; }
 .keybind-section {
     margin-bottom: 12px;
 }

@@ -492,6 +492,11 @@ body.show-overall-row .overall-row {
 .sort-option:hover {
     opacity: 0.7;
 }
+/* Dev stays dimmed until the PIN is entered (still clickable unless locked out) */
+.sort-option.dimmed,
+.sort-option.dimmed:hover {
+    opacity: 0.35;
+}
 
 /* Settings mode: the picker shows only its .settings-only items */
 .sort-picker:not(.settings-mode) > .settings-only,
@@ -637,9 +642,6 @@ body:has([id$="-modal"].open) {
     border-radius: 6px;
     outline: none;
 }
-/* Dev is inert during the 10-minute PIN lockout */
-.sort-option.disabled { cursor: default; opacity: 0.35; }
-.sort-option.disabled:hover { opacity: 0.35; }
 .keybind-section {
     margin-bottom: 12px;
 }
@@ -2011,8 +2013,13 @@ const arrowsOn=document.body.classList.contains('show-week-arrows');
 root.querySelectorAll('.sort-option[data-action="weekArrows"]').forEach(o=>{
 o.textContent=arrowsOn?'Nav Arrows OFF':'Nav Arrows ON';
 });
-const pinLocked=_pinLockedOut();
-root.querySelectorAll('.sort-option[data-action="devPin"]').forEach(o=>o.classList.toggle('disabled',pinLocked));
+let devUnlocked=false;
+try{
+const d=new Date();
+const today=`${d.getFullYear()}-${String(d.getMonth()+ 1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+devUnlocked=localStorage.getItem('keybindsUnlockedDate')===today;
+}catch(e){}
+root.querySelectorAll('.sort-option[data-action="devPin"]').forEach(o=>o.classList.toggle('dimmed',!devUnlocked));
 }
 function updateDarkModeLabel(){
 refreshSettingsLabels();
@@ -6137,15 +6144,6 @@ const PIN_LOCKOUT_MS=10*60*1000;
 function _pinLockedOut(){
 try{return Date.now()<(Number(localStorage.getItem("pinLockedUntil"))||0);}catch(e){return false;}
 }
-function _pinLockRemainingMs(){
-try{return(Number(localStorage.getItem("pinLockedUntil"))||0)- Date.now();}catch(e){return 0;}
-}
-function _syncDevOption(){
-const locked=_pinLockedOut();
-document.querySelectorAll('.sort-option[data-action="devPin"]').forEach(o=>o.classList.toggle("disabled",locked));
-if(locked)setTimeout(_syncDevOption,_pinLockRemainingMs()+ 50);
-}
-_syncDevOption();
 function openPinModal(){
 if(_pinLockedOut())return;
 _pinInput.value="";
@@ -6166,11 +6164,11 @@ if(ok){
 _keybindsUnlockedDate=_localDateStr();
 try{localStorage.setItem("keybindsUnlockedDate",_keybindsUnlockedDate);}catch(e){}
 closePinModal();
+refreshSettingsLabels();
 }else{
 _pinInput.value="";
 try{localStorage.setItem("pinLockedUntil",String(Date.now()+ PIN_LOCKOUT_MS));}catch(e){}
 closePinModal();
-_syncDevOption();
 }
 });
 _pinInput.addEventListener("keydown",e=>{

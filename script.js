@@ -50,8 +50,15 @@ function refreshSettingsLabels(root = document) {
     root.querySelectorAll('.sort-option[data-action="weekArrows"]').forEach(o => {
         o.textContent = arrowsOn ? 'Nav Arrows OFF' : 'Nav Arrows ON';
     });
-    const pinLocked = _pinLockedOut();
-    root.querySelectorAll('.sort-option[data-action="devPin"]').forEach(o => o.classList.toggle('disabled', pinLocked));
+    // Dev is dimmed unless the locked keybinds are unlocked today. Reads storage directly
+    // because this can run before the PIN-lock section (and its `let`s) near the end of the file.
+    let devUnlocked = false;
+    try {
+        const d = new Date();
+        const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        devUnlocked = localStorage.getItem('keybindsUnlockedDate') === today;
+    } catch (e) {}
+    root.querySelectorAll('.sort-option[data-action="devPin"]').forEach(o => o.classList.toggle('dimmed', !devUnlocked));
 }
 function updateDarkModeLabel() {
     refreshSettingsLabels();
@@ -4996,21 +5003,12 @@ const _pinModal = document.getElementById("pin-modal");
 const _pinInput = document.getElementById("pin-input");
 
 // One wrong attempt closes the PIN window and makes Dev inert for 10 minutes
-// (localStorage `pinLockedUntil`, epoch ms).
+// (localStorage `pinLockedUntil`, epoch ms). Dev looks the same while locked out.
 const PIN_LOCKOUT_MS = 10 * 60 * 1000;
 // Function declaration (hoisted) that reads storage directly, so refreshSettingsLabels() can call it at load.
 function _pinLockedOut() {
     try { return Date.now() < (Number(localStorage.getItem("pinLockedUntil")) || 0); } catch (e) { return false; }
 }
-function _pinLockRemainingMs() {
-    try { return (Number(localStorage.getItem("pinLockedUntil")) || 0) - Date.now(); } catch (e) { return 0; }
-}
-function _syncDevOption() {
-    const locked = _pinLockedOut();
-    document.querySelectorAll('.sort-option[data-action="devPin"]').forEach(o => o.classList.toggle("disabled", locked));
-    if (locked) setTimeout(_syncDevOption, _pinLockRemainingMs() + 50);  // re-enable when it expires
-}
-_syncDevOption();
 
 function openPinModal() {
     if (_pinLockedOut()) return;
@@ -5032,11 +5030,11 @@ _pinInput.addEventListener("input", async () => {
         _keybindsUnlockedDate = _localDateStr();
         try { localStorage.setItem("keybindsUnlockedDate", _keybindsUnlockedDate); } catch (e) {}
         closePinModal();
+        refreshSettingsLabels();  // un-dim Dev
     } else {
         _pinInput.value = "";
         try { localStorage.setItem("pinLockedUntil", String(Date.now() + PIN_LOCKOUT_MS)); } catch (e) {}
         closePinModal();
-        _syncDevOption();
     }
 });
 _pinInput.addEventListener("keydown", e => {
