@@ -4493,8 +4493,8 @@ function showSeasonRecords(currentYear, isApMode, activeTab) {
     const modal = document.getElementById("season-stats-modal");
     const title = document.getElementById("season-stats-title");
     const table = document.getElementById("season-stats-table");
-    // R/V / All switch sits in the title, after the Stats / Records tabs (Records only).
-    const switcher = `<span class="records-switch">${[["week", "R/V"], ["all", "All"]].map(([k, l]) =>
+    // Voted / All switch sits in the title, after the Stats / Records tabs (Records only).
+    const switcher = `<span class="records-switch">${[["week", "Voted"], ["all", "All"]].map(([k, l]) =>
         `<span class="records-view${_recordsView === k ? " active" : ""}" data-view="${k}">${l}</span>`).join("")}</span>`;
     title.innerHTML = `<span class="records-title-main">${seasonModalTitleHtml(currentYear, isApMode, "records")}${switcher}</span>`
         + `<span class="records-note records-title-note"></span>`;
@@ -4524,7 +4524,7 @@ function showSeasonRecords(currentYear, isApMode, activeTab) {
             showSeasonRecords(currentYear, isApMode, activeTab));
         initRecordsLogos(table);
         if (!data) return;
-        if (_recordsView === "week") fillRecordsOpponents(table, currentYear, data, token);
+        if (_recordsView !== "all") fillRecordsOpponents(table, currentYear, data, token);
         const tbody = table.querySelector("tbody");
         tbody.addEventListener("click", e => {
             // Won / Lost opponent logos highlight the team everywhere instead of opening the game list.
@@ -4548,18 +4548,19 @@ function showSeasonRecords(currentYear, isApMode, activeTab) {
     }
 }
 
-// R/V view: fill each team row's Won / Lost cells with the logos of the opponents it
-// beat / lost to (completed games, by date). One fetchTeamSchedule() per team, at most
-// RECORDS_OPPS_CONCURRENCY at a time; cached schedules fill immediately. The schedules are
-// shared with the expandable game lists.
+// Fill each team row's Won / Lost cells (Voted view only) with the logos of the opponents it
+// beat / lost to over the whole season (completed games, by date; Won trimmed by
+// trimWonOpponents()). One fetchTeamSchedule() per team, at most RECORDS_OPPS_CONCURRENCY at a
+// time; cached schedules fill immediately. The schedules are shared with the expandable game lists.
 const RECORDS_OPPS_CONCURRENCY = 6;
 function fillRecordsOpponents(table, season, records, token) {
     const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const live = () => token === _recordsRenderToken && table.classList.contains("season-records");
     const fill = (tr, sched) => {
         const fmtDate = iso => new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
+        const done = sched.games.filter(g => g.result).sort((a, b) => new Date(a.date) - new Date(b.date));
         tr.querySelectorAll("td.records-opps").forEach(td => {
-            let games = sched.games.filter(g => g.result === td.dataset.result);
+            let games = done.filter(g => g.result === td.dataset.result);
             if (td.dataset.result === "W") games = trimWonOpponents(games, season, records);
             td.innerHTML = games.length ? `<div class="records-opps-list">${games.map(g => {
                 const name = g.opp.key ? conferenceDisplayName(g.opp.key) : g.opp.name;
@@ -4568,38 +4569,38 @@ function fillRecordsOpponents(table, season, records, token) {
                 const tip = esc(`${rank}${name} · ${fmtDate(g.date)} ${site} · ${g.us}-${g.them}${records.byId[g.opp.id] ? "" : " · non-D1"}`);
                 return g.opp.key
                     ? `<img class="records-opp-logo records-logo team-logo" data-team="${esc(g.opp.key)}" data-espn="${g.opp.id}" title="${tip}" alt="">`
-                    : g.opp.logo ? `<img class="records-opp-logo" src="${esc(g.opp.logo)}" title="${tip}" alt="">`
-                    : `<span class="records-opp-logo records-opp-blank" title="${tip}"></span>`;
+                    : oppLogoSrc(g.opp) ? `<img class="records-opp-logo" src="${esc(oppLogoSrc(g.opp))}" data-filler="${esc(g.opp.name)}" title="${tip}" alt="">`
+                    : logoFillerHtml("records-opp-logo", g.opp.name, tip);
             }).join("")}</div>` : `<span class="records-opps-msg">—</span>`;
             initRecordsLogos(td);
         });
     };
     const queue = [];
-    table.querySelectorAll("tr.records-team-row").forEach(tr => {
-        if (!tr.querySelector("td.records-opps")) return;
-        const cached = espnCachedData(`schedule:${season}:${tr.dataset.espn}`);
-        if (cached) fill(tr, cached);
-        if (!cached || Date.now() - cached.at >= ESPN_TTL_MS) queue.push(tr);
-    });
-    const worker = async () => {
-        while (queue.length && live()) {
+    let active = 0;
+    const pump = () => {
+        while (active < RECORDS_OPPS_CONCURRENCY && queue.length && live()) {
             const tr = queue.shift();
-            try {
-                const sched = await fetchTeamSchedule(tr.dataset.espn, season);
+            active++;
+            fetchTeamSchedule(tr.dataset.espn, season).then(sched => {
                 if (live() && tr.isConnected) fill(tr, sched);
-            } catch (err) {
-                if (!live() || !tr.isConnected) continue;
+            }, err => {
+                if (!live() || !tr.isConnected) return;
                 tr.querySelectorAll("td.records-opps").forEach(td => {
                     if (td.querySelector(".records-opps-list")) return;   // keep older data
                     td.innerHTML = `<span class="records-opps-msg" title="${esc(err.message)}">couldn't load</span>`;
                 });
-            }
+            }).finally(() => { active--; pump(); });
         }
     };
-    for (let i = 0; i < RECORDS_OPPS_CONCURRENCY; i++) worker();
+    const enqueue = tr => {
+        const cached = espnCachedData(`schedule:${season}:${tr.dataset.espn}`);
+        if (cached) fill(tr, cached);
+        if (!cached || Date.now() - cached.at >= ESPN_TTL_MS) { queue.push(tr); pump(); }
+    };
+    [...table.querySelectorAll("tr.records-team-row")].filter(tr => tr.querySelector("td.records-opps")).forEach(enqueue);
 }
 
-// R/V Won column: show at most RECORDS_WON_MAX logos. Over that, drop wins (oldest
+// Voted Won column: show at most RECORDS_WON_MAX logos. Over that, drop wins (oldest
 // first within each tier) in this order: non-D1, then unranked + unseeded Mid-Major,
 // then unranked + unseeded Power. Ranked or seeded wins are never dropped, so the
 // column can still exceed the cap if those alone pass it. Date order is kept.
@@ -4637,16 +4638,49 @@ function trimWonOpponents(games, season, records) {
     return games.filter(g => !drop.has(g));
 }
 
-// Our logo files for img.records-logo[data-team], falling back to ESPN's logo.
+// Logo for a schedule opponent we have no key for (non-D1): ESPN's from the schedule, else
+// our NCAA.com file (cbb-logos/ncaa-{espnId}.webp, from nond1_logos.py; ids in NCAA_LOGO_IDS),
+// else null, and the caller shows logoFillerHtml().
+function oppLogoSrc(opp) {
+    if (opp.logo) return opp.logo;
+    const id = String(opp.id);
+    if (typeof NCAA_LOGO_IDS === "undefined" || !NCAA_LOGO_IDS.has(id)) return null;
+    return `cbb-logos/ncaa-${id}${isDarkMode() && NCAA_DARK_LOGO_IDS.has(id) ? "-dark" : ""}.webp`;
+}
+
+// Filler logo for schools with no logo file and none on ESPN (most non-D1 teams): a dashed
+// circle with the school's initial. cls carries the size of the logo it stands in for.
+function logoFillerHtml(cls, name, title = name) {
+    const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const initial = (String(name ?? "").match(/[A-Za-z0-9]/) || ["?"])[0].toUpperCase();
+    return `<span class="${cls} logo-filler"${title ? ` title="${esc(title)}"` : ""}>${initial}</span>`;
+}
+function replaceWithLogoFiller(img, name) {
+    const tpl = document.createElement("template");
+    tpl.innerHTML = logoFillerHtml(img.className.replace(/\b(records-logo|team-logo)\b/g, "").trim(), name, img.title || name);
+    img.replaceWith(tpl.content.firstChild);
+}
+
+// Our logo files for img.records-logo[data-team], falling back to ESPN's logo, then to a
+// filler; ESPN-only images (img[data-filler]) fall back to the filler directly.
 function initRecordsLogos(root) {
     root.querySelectorAll("img.records-logo[data-team]").forEach(img => {
-        img.addEventListener("error", () => {
+        const onError = () => {
             if (img.dataset.espn && !img.dataset.fallback) {
                 img.dataset.fallback = "1";
                 img.src = espnLogoUrl(img.dataset.espn);
+                return;
             }
-        }, { once: true });
+            img.removeEventListener("error", onError);
+            replaceWithLogoFiller(img, conferenceDisplayName(img.dataset.team));
+        };
+        img.addEventListener("error", onError);
         setLogoSrc(img, img.dataset.team);
+    });
+    root.querySelectorAll("img[data-filler]").forEach(img => {
+        const fail = () => replaceWithLogoFiller(img, img.dataset.filler);
+        if (img.complete && img.naturalWidth === 0 && img.getAttribute("src")) fail();
+        else img.addEventListener("error", fail, { once: true });
     });
 }
 
@@ -4692,9 +4726,7 @@ function buildTeamGamesHtml(sched, teamId, records) {
     const split = (label, x, title = "") => x.wins + x.losses
         ? `<span class="records-split"${title ? ` title="${title}"` : ""}>${label} <b>${wl(x)}</b></span>` : "";
     const summary = [
-        split("Home", s.home), split("Away", s.away), split("Neutral", s.neutral),
         split("Conf", s.conf, "Regular-season games vs. the same ESPN conference"),
-        split("vs Top 25", s.vsTop25, "Opponent's AP rank at game time (ESPN); excludes postseason, where ESPN gives seeds"),
         split("vs non-D1", s.nonD1),
     ].filter(Boolean).join("");
     const fmtDate = iso => new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
@@ -4702,7 +4734,8 @@ function buildTeamGamesHtml(sched, teamId, records) {
         const site = g.site === "H" ? "vs" : g.site === "A" ? "@" : "N";
         const logo = g.opp.key
             ? `<img class="records-games-logo records-logo" data-team="${esc(g.opp.key)}" data-espn="${g.opp.id}" alt="">`
-            : g.opp.logo ? `<img class="records-games-logo" src="${esc(g.opp.logo)}" alt="">` : `<span class="records-games-logo"></span>`;
+            : oppLogoSrc(g.opp) ? `<img class="records-games-logo" src="${esc(oppLogoSrc(g.opp))}" data-filler="${esc(g.opp.name)}" alt="">`
+            : logoFillerHtml("records-games-logo", g.opp.name);
         const name = g.opp.key ? conferenceDisplayName(g.opp.key) : g.opp.name;
         const nonD1 = records.byId[g.opp.id] ? "" : `<span class="records-tag" title="Not a Division I team">non-D1</span>`;
         let res;
@@ -4745,16 +4778,17 @@ function recordsNoteHtml(currentYear, data) {
 function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
     const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const view = _recordsView;
-    const COLS = view === "week" ? 9 : 7;   // R/V adds Won / Lost
+    // Won / Lost opponent logos only in Voted; All stops at Conf.
+    const opps = view !== "all";
+    const COLS = opps ? 8 : 6;
 
     const head = `<colgroup>
         <col style="width:28px"><col style="width:26px"><col>
         <col style="width:52px"><col style="width:44px"><col style="width:52px">
-        <col style="width:44px">${view === "week" ? "<col><col>" : ""}
+        ${opps ? "<col><col>" : ""}
     </colgroup><thead><tr>
         <th>#</th><th></th><th class="team-col">Team</th>
-        <th>W-L</th><th>Pct</th><th>Conf</th><th>Strk</th>${view === "week"
-            ? `<th class="records-opps-col">Won</th><th class="records-opps-col">Lost</th>` : ""}
+        <th>W-L</th><th>Pct</th><th>Conf</th>${opps ? `<th class="records-opps-col">Won</th><th class="records-opps-col">Lost</th>` : ""}
     </tr></thead>`;
 
     if (!data) {
@@ -4766,25 +4800,23 @@ function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
 
     const keyOf = id => espnTeamKey(id);
     const pct = r => r.pct === null ? "—" : r.pct.toFixed(3).replace(/^0/, "");
-    const streak = s => !s || s === "-" ? "—"
-        : `<span class="${s[0] === "W" ? "delta-up" : "delta-down"}">${esc(s)}</span>`;
     const row = (num, team, id, extraCls = "") => {
         const r = id ? data.byId[id] : null;
         const key = team || (id && keyOf(id)) || null;
         const name = key ? conferenceDisplayName(key) : r?.name || "?";
         const logo = key
             ? `<img class="logo-sm records-logo" data-team="${esc(key)}"${id ? ` data-espn="${id}"` : ""} alt="">`
-            : id ? `<img class="logo-sm" src="${espnLogoUrl(id)}" alt="">` : "";
+            : id ? `<img class="logo-sm" src="${espnLogoUrl(id)}" data-filler="${esc(name)}" alt="">` : "";
         const cells = r
-            ? `<td class="records-wl">${r.wins}-${r.losses}</td><td>${pct(r)}</td><td>${esc(r.confRecord || "—")}</td><td>${streak(r.streak)}</td>`
-            : `<td colspan="4" class="records-missing">${id ? "Not in ESPN's standings" : "No ESPN ID"}</td>`;
-        // R/V only: opponent logos, filled in by fillRecordsOpponents() once the schedule loads.
-        const opps = view !== "week" ? ""
+            ? `<td class="records-wl">${r.wins}-${r.losses}</td><td>${pct(r)}</td><td>${esc(r.confRecord || "—")}</td>`
+            : `<td colspan="3" class="records-missing">${id ? "Not in ESPN's standings" : "No ESPN ID"}</td>`;
+        // Opponent logos, filled in by fillRecordsOpponents() once the schedule loads.
+        const oppCells = !opps ? ""
             : r ? `<td class="records-opps" data-result="W"><span class="records-opps-msg">…</span></td><td class="records-opps" data-result="L"><span class="records-opps-msg">…</span></td>`
             : `<td></td><td></td>`;
         const cls = [extraCls, r ? "records-team-row" : ""].filter(Boolean).join(" ");
-        return `<tr${cls ? ` class="${cls}"` : ""}${r ? ` data-espn="${id}" title="Show games"` : ""}><td>${num}</td><td>${logo}</td>
-            <td class="team-col">${esc(name)}</td>${cells}${opps}</tr>`;
+        return `<tr${cls ? ` class="${cls}"` : ""}${r ? ` data-espn="${id}"` : ""}><td>${num}</td><td>${logo}</td>
+            <td class="team-col">${esc(name)}</td>${cells}${oppCells}</tr>`;
     };
 
     // Poll points in the active week (official ballots) set the Week view's order.

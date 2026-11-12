@@ -11,6 +11,7 @@ from urllib.parse import unquote
 from PIL import Image
 
 import conferences
+import nond1_logos
 
 # Output directory for logos
 BASE_HTML_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1642,6 +1643,9 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
     ap_tenure_counts_js = json.dumps(ap_tenure_counts or {})
     ap_fragment_years_js = json.dumps(ap_fragment_years or [])
     dark_logo_teams_js = "new Set(" + json.dumps(get_dark_logo_teams()) + ")"
+    ncaa_light, ncaa_dark = nond1_logos.logo_ids(OUTPUT_DIR)
+    ncaa_logo_ids_js = "new Set(" + json.dumps(ncaa_light) + ")"
+    ncaa_dark_logo_ids_js = "new Set(" + json.dumps(ncaa_dark) + ")"
     conference_data_js = conferences.js_payload()
     return f"""<!DOCTYPE html>
 <html>
@@ -1792,6 +1796,8 @@ const FRAGMENT_YEARS = {fragment_years_js};
 const TENURE_COUNTS = {tenure_counts_js};
 const AP_TENURE_COUNTS = {ap_tenure_counts_js};
 const DARK_LOGO_TEAMS = {dark_logo_teams_js};
+const NCAA_LOGO_IDS = {ncaa_logo_ids_js};
+const NCAA_DARK_LOGO_IDS = {ncaa_dark_logo_ids_js};
 const CONFERENCE_DATA = {conference_data_js};
 {JS}
 </script>
@@ -2089,6 +2095,8 @@ def main():
                         help="Scrape only the Official section; store no provisional ballots for this week")
     parser.add_argument("--rebuild", action="store_true", help="Rebuild HTML from existing data without scraping")
     parser.add_argument("--missing-logos", action="store_true", help="Download ESPN logos for conferences.py schools with no logo file and exit")
+    parser.add_argument("--ncaa-logos", action="store_true", help="Download NCAA.com logos for non-D1 opponents ESPN has none for (nond1_logos.NCAA_SLUGS), list unmapped ones, and exit. --year 0 = every shown season (default: current)")
+    parser.add_argument("--force", action="store_true", help="With --ncaa-logos: re-download files that already exist")
     parser.add_argument("--to-webp", action="store_true", help="Convert all existing PNG logos to WebP and exit")
     parser.add_argument("--dark-logos", action="store_true", help="Download ESPN dark-mode logos for all teams")
     parser.add_argument("--delete", action="store_true", help="Delete a specific week from the HTML")
@@ -2104,6 +2112,15 @@ def main():
 
     if args.missing_logos:
         download_missing_logos()
+        return
+    if args.ncaa_logos:
+        today = datetime.date.today()
+        current = today.year + (1 if today.month >= 7 else 0)
+        if args.year == 0:
+            seasons = [y for y in range(2016, current + 1) if str(y) not in EXCLUDED_YEARS]
+        else:
+            seasons = [args.year or current]
+        nond1_logos.run(OUTPUT_DIR, seasons, force=args.force)
         return
     if args.dark_logos:
         download_dark_logos()
