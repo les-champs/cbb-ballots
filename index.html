@@ -38,6 +38,7 @@
     --color-keybind-row:     #444;
     --color-kbd:             #333;
     --color-avg-label:       #555;
+    --color-consensus-dist:  #999;
     --color-picker-cat:      #666;
     --color-spread-text:     #333;
     --color-voter-weighted:  unset;
@@ -320,6 +321,18 @@ body.hide-veteran-tags .veteran-tag,
 .voter-row.row-pinned .veteran-tag,
 .row-pinned-agg .veteran-tag {
     display: none;
+}
+
+/* Consensus-sort distance, pinned to the right edge of the voter cell with
+   fixed-width digits so the numbers line up down the column. */
+.consensus-dist {
+    margin-left: auto;
+    padding-left: 4px;
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: normal;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-consensus-dist);
 }
 
 .veteran-tag.veteran-elite {
@@ -1212,6 +1225,7 @@ body.dark {
     --color-keybind-row:     #bbb;
     --color-kbd:             #ccc;
     --color-avg-label:       #888;
+    --color-consensus-dist:  #888;
     --color-picker-cat:      #888;
     --color-spread-text:     #ccc;
     --color-voter-weighted:  #888;
@@ -2913,7 +2927,6 @@ if(!cell)return;
 const label=document.createElement("span");
 label.className="consensus-dist";
 label.textContent=text;
-label.style.cssText="font-size:11px; color:#999; font-weight:normal; margin-left:4px;";
 cell.appendChild(label);
 };
 if(sort==="alphabetic"){
@@ -2956,7 +2969,7 @@ const TRIM_TOP_GAPS=2;
 const distLabel=(dist,teams,name)=>{
 const gaps=gapsFn(teams,consensusFor(name)).sort((a,b)=>b - a);
 const trimmed=gaps.slice(TRIM_TOP_GAPS).reduce((s,g)=>s + g,0)/ 2 / 25;
-return `+${dist} (${trimmed.toFixed(2)})`;
+return `${dist} (${trimmed.toFixed(2)})`;
 };
 const scores={};
 rows.forEach(r=>{const u=getVoterName(r);scores[u]=scoreFn(voterTeams[u],u);});

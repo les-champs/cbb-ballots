@@ -1017,7 +1017,6 @@ function applyTableSort(sort) {
         const label = document.createElement("span");
         label.className = "consensus-dist";
         label.textContent = text;
-        label.style.cssText = "font-size:11px; color:#999; font-weight:normal; margin-left:4px;";
         cell.appendChild(label);
     };
 
@@ -1072,7 +1071,7 @@ function applyTableSort(sort) {
         const distLabel = (dist, teams, name) => {
             const gaps = gapsFn(teams, consensusFor(name)).sort((a, b) => b - a);
             const trimmed = gaps.slice(TRIM_TOP_GAPS).reduce((s, g) => s + g, 0) / 2 / 25;
-            return `+${dist} (${trimmed.toFixed(2)})`;
+            return `${dist} (${trimmed.toFixed(2)})`;
         };
         const scores = {};
         rows.forEach(r => { const u = getVoterName(r); scores[u] = scoreFn(voterTeams[u], u); });
