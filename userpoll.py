@@ -1286,7 +1286,7 @@ PICKER_HTML = (
     f"<span class='sort-option settings-only' data-action='savePng'>Save as PNG</span>"
     f"<span class='sort-option settings-only' data-action='legend'>Keybinds</span>"
     f"<span class='sort-option settings-only' data-action='devPin'>Dev</span>"
-    f"<span class='credits-only credits-text'>Site displays &amp; analyzes the results of ballot votes from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span>"
+    f"<span class='credits-only credits-text'>Site displays poll results from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span>"
     f"</span>"
 )
 
