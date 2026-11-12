@@ -2930,6 +2930,7 @@ function conferenceTable(year) {
 function conferenceGroups(year) {
     const table = conferenceTable(year);
     if (!table) return null;
+    const power = CONFERENCE_DATA.power;
     const groups = power.filter(c => table[c]).map(c => ({ label: c, teams: new Set(table[c]) }));
     const all = conf => new Set(Object.keys(table).filter(conf).flatMap(c => table[c]));
     groups.push({ label: "Power", teams: all(c => power.includes(c)) });
@@ -4052,6 +4053,11 @@ function showSeasonStatsModal(mode = "stats") {
     const yearTabs = allTabs.filter(t => t.dataset.year === currentYear).reverse();
     if (yearTabs.length === 0) return;
 
+    if (mode === "records") {
+        showSeasonRecords(currentYear, isApMode, activeTab);
+        return;
+    }
+
     const totalWeeks = yearTabs.length;
 
     // Accumulate per-team stats from official ballot sections only
@@ -4207,17 +4213,9 @@ function showSeasonStatsModal(mode = "stats") {
     const title = document.getElementById("season-stats-title");
     const table = document.getElementById("season-stats-table");
 
-    // Title: "YEAR Season — Stats Voters", tabs styled like the Week window's Stats / Conference.
-    // Voters is hidden: its tab only shows while it's open (reached by Shift+W, PIN-locked).
-    const modeTabs = [
-        { key: "stats", label: "Stats" },
-        { key: "voters", label: "Voters", hidden: mode !== "voters" },
-    ].filter(m => !m.hidden).map(m =>
-        `<span class="modal-mode-tab${mode === m.key ? " active" : ""}"
-               onclick="showSeasonStatsModal('${m.key}')">${m.label}</span>`
-    ).join("");
-    title.innerHTML = `${currentYear}${isApMode ? " AP" : ""} Season — ${modeTabs}`;
+    title.innerHTML = seasonModalTitleHtml(currentYear, isApMode, mode);
     table.classList.toggle("season-voters", mode === "voters");
+    table.classList.remove("season-records");
 
     if (mode === "voters") {
         table.innerHTML = buildSeasonVotersTableHtml(weekBallots, voterWeeksVoted, minWeeksVoted, totalWeeks, esc);
@@ -4269,6 +4267,569 @@ function showSeasonStatsModal(mode = "stats") {
     html += `</tbody>`;
     table.innerHTML = html;
     modal.classList.add("open");
+}
+
+// Year window title: "YEAR Season — Stats Records Voters", tabs styled like the Week
+// window's Stats / Conference. Voters is hidden: its tab only shows while it's open
+// (reached by Shift+W, PIN-locked).
+function seasonModalTitleHtml(currentYear, isApMode, mode) {
+    const modeTabs = [
+        { key: "stats", label: "Stats" },
+        { key: "records", label: "Records" },
+        { key: "voters", label: "Voters", hidden: mode !== "voters" },
+    ].filter(m => !m.hidden).map(m =>
+        `<span class="modal-mode-tab${mode === m.key ? " active" : ""}"
+               onclick="showSeasonStatsModal('${m.key}')">${m.label}</span>`
+    ).join("");
+    return `${currentYear}${isApMode ? " AP" : ""} Season — ${modeTabs}`;
+}
+
+// ── ESPN data layer ─────────────────────────────────────────────────────────
+// Live team data from ESPN's public, undocumented site APIs (no key; CORS open, so the
+// browser calls them directly). Anything that needs W-L records or game results should
+// go through these helpers rather than fetching ESPN itself: they share one cache, map
+// ESPN IDs to our team names, and keep the last good data if a refresh fails.
+//
+//   espnIdFor(team)              our team name (data-src / conferences.py key, aliases ok) → ESPN id | null
+//   espnTeamKey(id)              ESPN id → our canonical team name | null
+//   espnLogoUrl(id)              ESPN CDN logo (fallback when we have no logo file)
+//   fetchSeasonRecords(season)   → {byId: {id: {id, name, conf, wins, losses, pct, confRecord,
+//                                   home, road, streak}}, confs: [{name, ids}], at, stale?}
+//                                   One request for every D1 team (~6 MB raw, ~170 KB gzipped).
+//                                   Overall records incl. non-D1 and postseason games.
+//   fetchTeamSchedule(id, season) → {games: [game], at, stale?}; game = {id, date (ISO), site:
+//                                   "H"|"A"|"N", opp: {id, name, key, logo}, oppRank (AP rank
+//                                   at game time, regular season only, or null), oppSeed
+//                                   (tournament seed, postseason only), us, them, result:
+//                                   "W"|"L"|null, state: "pre"|"in"|"post", status, postseason,
+//                                   note (e.g. "SEC Tournament - Final")}. Two requests
+//                                   (seasontype=2 regular season incl. conference tournaments,
+//                                   seasontype=3 NCAA/NIT/etc.), sorted by date.
+//   recordAsOf(games, date)      W-L from completed games before `date` (Date or ISO string)
+//   summarizeGames(games, ctx)   splits: overall, home, away, neutral, conf, vsTop25, nonD1, D1
+//
+// Both fetchers cache for ESPN_TTL_MS and dedupe concurrent calls. Seasons use the project's
+// convention (2027 = 2026-27), which is also ESPN's `season` parameter.
+const ESPN_TTL_MS = 10 * 60 * 1000;
+// site.web.api.espn.com, not site.api.espn.com: the latter 403s some user agents (e.g.
+// HeadlessChrome) without a CORS header, so the browser reports a CORS failure.
+const ESPN_BASE = "https://site.web.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball";
+const ESPN_STANDINGS_URL = season =>
+    `https://site.web.api.espn.com/apis/v2/sports/basketball/mens-college-basketball/standings?group=50&season=${season}`;
+const _espnCache = {};   // key → { at, data, promise }
+
+function espnIdFor(team) {
+    if (typeof CONFERENCE_DATA === "undefined" || !CONFERENCE_DATA.espn) return null;
+    const aliases = CONFERENCE_DATA.aliases || {};
+    return CONFERENCE_DATA.espn[aliases[team] || team] || CONFERENCE_DATA.espn[team] || null;
+}
+
+let _espnKeyOf = null;
+function espnTeamKey(id) {
+    if (!_espnKeyOf) {
+        _espnKeyOf = {};
+        if (typeof CONFERENCE_DATA !== "undefined")
+            Object.entries(CONFERENCE_DATA.espn || {}).forEach(([k, i]) => { _espnKeyOf[i] = k; });
+    }
+    return _espnKeyOf[id] || null;
+}
+
+function espnLogoUrl(id) {
+    return `https://a.espncdn.com/i/teamlogos/ncaa/500/${id}.png`;
+}
+
+// Shared cache wrapper: load() → Promise<data>; validate by throwing inside load().
+function _espnCached(key, load) {
+    const hit = _espnCache[key] || (_espnCache[key] = {});
+    if (hit.data && Date.now() - hit.at < ESPN_TTL_MS) return Promise.resolve(hit.data);
+    if (hit.promise) return hit.promise;
+    hit.promise = load()
+        .then(data => {
+            data.at = Date.now();
+            Object.assign(hit, { data, at: data.at });
+            return data;
+        })
+        .catch(err => {
+            if (hit.data) return { ...hit.data, stale: err.message };
+            throw err;
+        })
+        .finally(() => { hit.promise = null; });
+    return hit.promise;
+}
+
+// Cached data without fetching (null if never loaded).
+function espnCachedData(key) { return _espnCache[key]?.data || null; }
+
+async function _espnJson(url) {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`ESPN returned HTTP ${r.status}`);
+    return r.json();
+}
+
+function fetchSeasonRecords(season) {
+    return _espnCached(`records:${season}`, async () => {
+        const json = await _espnJson(ESPN_STANDINGS_URL(season));
+        const byId = {}, confs = [];
+        // Top-level children are conferences; a conference may nest divisions.
+        const entriesOf = node => [
+            ...(node.standings?.entries || []),
+            ...(node.children || []).flatMap(entriesOf),
+        ];
+        (json.children || []).forEach(conf => {
+            const name = conf.shortName || conf.abbreviation || conf.name;
+            const ids = [];
+            entriesOf(conf).forEach(e => {
+                const st = {};
+                (e.stats || []).forEach(s => { if (s.type) st[s.type] = s; });
+                const dv = k => st[k]?.displayValue || "";
+                const wins = Number(st.wins?.value) || 0;
+                const losses = Number(st.losses?.value) || 0;
+                byId[e.team.id] = {
+                    id: e.team.id,
+                    name: e.team.shortDisplayName || e.team.location || e.team.displayName,
+                    conf: name, wins, losses,
+                    pct: wins + losses ? wins / (wins + losses) : null,
+                    confRecord: dv("vsconf"), home: dv("home"), road: dv("road"),
+                    streak: dv("streak"),
+                };
+                ids.push(e.team.id);
+            });
+            if (ids.length) confs.push({ name, ids });
+        });
+        const n = Object.keys(byId).length;
+        if (n < 250) throw new Error(`ESPN returned only ${n} teams`);
+        return { byId, confs };
+    });
+}
+
+function fetchTeamSchedule(id, season) {
+    return _espnCached(`schedule:${season}:${id}`, async () => {
+        const url = t => `${ESPN_BASE}/teams/${id}/schedule?season=${season}&seasontype=${t}`;
+        const [reg, post] = await Promise.all([
+            _espnJson(url(2)),
+            _espnJson(url(3)).catch(() => ({ events: [] })),   // postseason is optional
+        ]);
+        const seen = new Set();
+        const games = [];
+        [...(reg.events || []), ...(post.events || [])].forEach(ev => {
+            if (seen.has(ev.id)) return;
+            seen.add(ev.id);
+            const c = ev.competitions?.[0];
+            if (!c) return;
+            const me = c.competitors.find(x => x.team?.id === String(id));
+            const op = c.competitors.find(x => x !== me);
+            if (!me || !op) return;
+            const score = x => x.score?.value ?? (x.score?.displayValue ? Number(x.score.displayValue) : null);
+            const state = c.status?.type?.state || "pre";
+            const rank = op.curatedRank?.current;
+            const postseason = ev.seasonType?.type === 3;
+            games.push({
+                id: ev.id,
+                date: ev.date,
+                site: c.neutralSite ? "N" : me.homeAway === "home" ? "H" : "A",
+                opp: {
+                    id: op.team.id,
+                    name: op.team.shortDisplayName || op.team.location || op.team.displayName,
+                    key: espnTeamKey(op.team.id),
+                    logo: op.team.logos?.[0]?.href || op.team.logo || null,
+                },
+                // curatedRank is the AP rank at game time, but the tournament seed in postseason games.
+                oppRank: !postseason && rank && rank <= 25 ? rank : null,
+                oppSeed: postseason && rank && rank <= 16 ? rank : null,
+                us: state === "pre" ? null : score(me),
+                them: state === "pre" ? null : score(op),
+                result: c.status?.type?.completed ? (me.winner ? "W" : "L") : null,
+                state,
+                status: c.status?.type?.shortDetail || "",
+                postseason,
+                note: c.notes?.[0]?.headline || "",
+            });
+        });
+        games.sort((a, b) => a.date.localeCompare(b.date));
+        return { games };
+    });
+}
+
+function recordAsOf(games, date) {
+    const cutoff = new Date(date).toISOString();
+    let wins = 0, losses = 0;
+    games.forEach(g => {
+        if (g.date < cutoff && g.result) g.result === "W" ? wins++ : losses++;
+    });
+    return { wins, losses };
+}
+
+// W-L splits for a team's games. ctx (optional) = {teamId, records: fetchSeasonRecords() data}
+// enables conf (same ESPN conference, excluding conference-tournament games), nonD1 and D1.
+function summarizeGames(games, ctx = {}) {
+    const mk = () => ({ wins: 0, losses: 0 });
+    const s = { overall: mk(), home: mk(), away: mk(), neutral: mk(), conf: mk(), vsTop25: mk(), nonD1: mk(), D1: mk() };
+    const byId = ctx.records?.byId;
+    const myConf = byId?.[ctx.teamId]?.conf;
+    games.forEach(g => {
+        if (!g.result) return;
+        const add = k => { g.result === "W" ? s[k].wins++ : s[k].losses++; };
+        add("overall");
+        add(g.site === "H" ? "home" : g.site === "A" ? "away" : "neutral");
+        if (g.oppRank) add("vsTop25");
+        if (byId) {
+            add(byId[g.opp.id] ? "D1" : "nonD1");
+            if (myConf && byId[g.opp.id]?.conf === myConf && !g.postseason && !/tournament/i.test(g.note)) add("conf");
+        }
+    });
+    return s;
+}
+
+// ── Records tab (Year window) ───────────────────────────────────────────────
+// Uses the ESPN data layer above. Sub-views: "week" = teams receiving votes in the
+// active week, in points order; "all" = every D1 team grouped by conference (ours for
+// 2025+, ESPN's before). Clicking a team row expands its game list (fetchTeamSchedule);
+// expanded teams are remembered in _recordsExpanded across re-renders.
+let _recordsView = "week";  // "week" | "all"
+let _recordsRenderToken = 0;
+const _recordsExpanded = new Set();   // `${season}:${espnId}`
+
+function showSeasonRecords(currentYear, isApMode, activeTab) {
+    const modal = document.getElementById("season-stats-modal");
+    const title = document.getElementById("season-stats-title");
+    const table = document.getElementById("season-stats-table");
+    // R/V / All switch sits in the title, after the Stats / Records tabs (Records only).
+    const switcher = `<span class="records-switch">${[["week", "R/V"], ["all", "All"]].map(([k, l]) =>
+        `<span class="records-view${_recordsView === k ? " active" : ""}" data-view="${k}">${l}</span>`).join("")}</span>`;
+    title.innerHTML = `<span class="records-title-main">${seasonModalTitleHtml(currentYear, isApMode, "records")}${switcher}</span>`
+        + `<span class="records-note records-title-note"></span>`;
+    title.querySelectorAll(".records-view").forEach(el => el.addEventListener("click", () => {
+        if (el.classList.contains("active")) return;
+        _recordsView = el.dataset.view;
+        showSeasonRecords(currentYear, isApMode, activeTab);
+    }));
+    table.classList.remove("season-voters");
+    table.classList.add("season-records");
+
+    const weekId = isApMode && _apCurrentWeekNum !== null
+        ? `week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`
+        : activeTab.dataset.week;
+    const weekTab = isApMode
+        ? getSortedApTabs().find(t => t.dataset.week === weekId) || activeTab
+        : activeTab;
+    const weekLabel = weekTextLabel(weekTab) || `Week ${displayWeekNum(weekTab)}`;
+
+    const token = ++_recordsRenderToken;
+    const render = (data, error) => {
+        if (token !== _recordsRenderToken || !table.classList.contains("season-records")) return;
+        table.innerHTML = buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error);
+        const noteEl = title.querySelector(".records-title-note");
+        if (noteEl) noteEl.innerHTML = recordsNoteHtml(currentYear, data);
+        table.querySelector(".records-retry")?.addEventListener("click", () =>
+            showSeasonRecords(currentYear, isApMode, activeTab));
+        initRecordsLogos(table);
+        if (!data) return;
+        if (_recordsView === "week") fillRecordsOpponents(table, currentYear, data, token);
+        const tbody = table.querySelector("tbody");
+        tbody.addEventListener("click", e => {
+            // Won / Lost opponent logos highlight the team everywhere instead of opening the game list.
+            const opp = e.target.closest("img.records-opp-logo[data-team]");
+            if (opp) { toggleTeamHighlight(opp.dataset.team); return; }
+            const tr = e.target.closest("tr.records-team-row");
+            if (!tr || !tbody.contains(tr)) return;
+            toggleTeamGames(tr, currentYear, data);
+        });
+        // Re-open game lists that were open before this render.
+        tbody.querySelectorAll("tr.records-team-row").forEach(tr => {
+            if (_recordsExpanded.has(`${currentYear}:${tr.dataset.espn}`)) toggleTeamGames(tr, currentYear, data, true);
+        });
+    };
+
+    const cached = espnCachedData(`records:${currentYear}`);
+    render(cached, null);   // cached data (or a loading row) right away
+    modal.classList.add("open");
+    if (!cached || Date.now() - cached.at >= ESPN_TTL_MS) {
+        fetchSeasonRecords(currentYear).then(d => render(d, null), err => render(null, err.message));
+    }
+}
+
+// R/V view: fill each team row's Won / Lost cells with the logos of the opponents it
+// beat / lost to (completed games, by date). One fetchTeamSchedule() per team, at most
+// RECORDS_OPPS_CONCURRENCY at a time; cached schedules fill immediately. The schedules are
+// shared with the expandable game lists.
+const RECORDS_OPPS_CONCURRENCY = 6;
+function fillRecordsOpponents(table, season, records, token) {
+    const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const live = () => token === _recordsRenderToken && table.classList.contains("season-records");
+    const fill = (tr, sched) => {
+        const fmtDate = iso => new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
+        tr.querySelectorAll("td.records-opps").forEach(td => {
+            let games = sched.games.filter(g => g.result === td.dataset.result);
+            if (td.dataset.result === "W") games = trimWonOpponents(games, season, records);
+            td.innerHTML = games.length ? `<div class="records-opps-list">${games.map(g => {
+                const name = g.opp.key ? conferenceDisplayName(g.opp.key) : g.opp.name;
+                const rank = g.oppRank ? `#${g.oppRank} ` : g.oppSeed ? `(${g.oppSeed}) ` : "";
+                const site = g.site === "H" ? "vs" : g.site === "A" ? "@" : "N";
+                const tip = esc(`${rank}${name} · ${fmtDate(g.date)} ${site} · ${g.us}-${g.them}${records.byId[g.opp.id] ? "" : " · non-D1"}`);
+                return g.opp.key
+                    ? `<img class="records-opp-logo records-logo team-logo" data-team="${esc(g.opp.key)}" data-espn="${g.opp.id}" title="${tip}" alt="">`
+                    : g.opp.logo ? `<img class="records-opp-logo" src="${esc(g.opp.logo)}" title="${tip}" alt="">`
+                    : `<span class="records-opp-logo records-opp-blank" title="${tip}"></span>`;
+            }).join("")}</div>` : `<span class="records-opps-msg">—</span>`;
+            initRecordsLogos(td);
+        });
+    };
+    const queue = [];
+    table.querySelectorAll("tr.records-team-row").forEach(tr => {
+        if (!tr.querySelector("td.records-opps")) return;
+        const cached = espnCachedData(`schedule:${season}:${tr.dataset.espn}`);
+        if (cached) fill(tr, cached);
+        if (!cached || Date.now() - cached.at >= ESPN_TTL_MS) queue.push(tr);
+    });
+    const worker = async () => {
+        while (queue.length && live()) {
+            const tr = queue.shift();
+            try {
+                const sched = await fetchTeamSchedule(tr.dataset.espn, season);
+                if (live() && tr.isConnected) fill(tr, sched);
+            } catch (err) {
+                if (!live() || !tr.isConnected) continue;
+                tr.querySelectorAll("td.records-opps").forEach(td => {
+                    if (td.querySelector(".records-opps-list")) return;   // keep older data
+                    td.innerHTML = `<span class="records-opps-msg" title="${esc(err.message)}">couldn't load</span>`;
+                });
+            }
+        }
+    };
+    for (let i = 0; i < RECORDS_OPPS_CONCURRENCY; i++) worker();
+}
+
+// R/V Won column: show at most RECORDS_WON_MAX logos. Over that, drop wins (oldest
+// first within each tier) in this order: non-D1, then unranked + unseeded Mid-Major,
+// then unranked + unseeded Power. Ranked or seeded wins are never dropped, so the
+// column can still exceed the cap if those alone pass it. Date order is kept.
+const RECORDS_WON_MAX = 22;
+function trimWonOpponents(games, season, records) {
+    if (games.length <= RECORDS_WON_MAX) return games;
+    const table = conferenceTable(season);
+    const cd = typeof CONFERENCE_DATA === "undefined" ? {} : CONFERENCE_DATA;
+    const aliases = cd.aliases || {};
+    const power = cd.power || [];
+    const confOf = g => {
+        if (table && g.opp.key) {
+            const k = aliases[g.opp.key] || g.opp.key;
+            const c = Object.keys(table).find(c => table[c].includes(k) || table[c].includes(g.opp.key));
+            if (c) return c;
+        }
+        return records.byId[g.opp.id]?.conf || null;
+    };
+    // 0 = non-D1, 1 = unranked Mid-Major, 2 = unranked Power, null = keep
+    const tier = g => {
+        if (!records.byId[g.opp.id]) return 0;
+        if (g.oppRank || g.oppSeed) return null;
+        return power.includes(confOf(g)) ? 2 : 1;
+    };
+    const byDate = (a, b) => new Date(a.date) - new Date(b.date);
+    const drop = new Set();
+    let excess = games.length - RECORDS_WON_MAX;
+    for (const t of [0, 1, 2]) {
+        for (const g of games.filter(g => tier(g) === t).sort(byDate)) {
+            if (excess <= 0) break;
+            drop.add(g);
+            excess--;
+        }
+    }
+    return games.filter(g => !drop.has(g));
+}
+
+// Our logo files for img.records-logo[data-team], falling back to ESPN's logo.
+function initRecordsLogos(root) {
+    root.querySelectorAll("img.records-logo[data-team]").forEach(img => {
+        img.addEventListener("error", () => {
+            if (img.dataset.espn && !img.dataset.fallback) {
+                img.dataset.fallback = "1";
+                img.src = espnLogoUrl(img.dataset.espn);
+            }
+        }, { once: true });
+        setLogoSrc(img, img.dataset.team);
+    });
+}
+
+// Expand/collapse a Records row's game list (a full-width row inserted after it).
+function toggleTeamGames(tr, season, records, forceOpen = false) {
+    const id = tr.dataset.espn;
+    const key = `${season}:${id}`;
+    const next = tr.nextElementSibling;
+    if (next?.classList.contains("records-games-row")) {
+        if (forceOpen) return;
+        next.remove();
+        tr.classList.remove("expanded");
+        _recordsExpanded.delete(key);
+        return;
+    }
+    _recordsExpanded.add(key);
+    tr.classList.add("expanded");
+    const row = document.createElement("tr");
+    row.className = "records-games-row";
+    row.innerHTML = `<td colspan="${tr.children.length}"><div class="records-games-msg">Loading games…</div></td>`;
+    tr.after(row);
+    const cell = row.firstElementChild;
+    const load = () => fetchTeamSchedule(id, season).then(sched => {
+        if (!row.isConnected) return;
+        cell.innerHTML = buildTeamGamesHtml(sched, id, records);
+        initRecordsLogos(cell);
+    }, err => {
+        if (!row.isConnected) return;
+        cell.innerHTML = `<div class="records-games-msg">Couldn't load games from ESPN (${err.message.replace(/[<>&]/g, "")}).
+            <span class="records-retry">Retry</span></div>`;
+        cell.querySelector(".records-retry").addEventListener("click", ev => { ev.stopPropagation(); load(); });
+    });
+    load();
+}
+
+// One team's games: split summary + one line per game (completed, live, then upcoming).
+function buildTeamGamesHtml(sched, teamId, records) {
+    const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const games = sched.games;
+    if (!games.length) return `<div class="records-games-msg">No games listed by ESPN.</div>`;
+    const s = summarizeGames(games, { teamId, records });
+    const wl = x => `${x.wins}-${x.losses}`;
+    const split = (label, x, title = "") => x.wins + x.losses
+        ? `<span class="records-split"${title ? ` title="${title}"` : ""}>${label} <b>${wl(x)}</b></span>` : "";
+    const summary = [
+        split("Home", s.home), split("Away", s.away), split("Neutral", s.neutral),
+        split("Conf", s.conf, "Regular-season games vs. the same ESPN conference"),
+        split("vs Top 25", s.vsTop25, "Opponent's AP rank at game time (ESPN); excludes postseason, where ESPN gives seeds"),
+        split("vs non-D1", s.nonD1),
+    ].filter(Boolean).join("");
+    const fmtDate = iso => new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
+    const lines = games.map(g => {
+        const site = g.site === "H" ? "vs" : g.site === "A" ? "@" : "N";
+        const logo = g.opp.key
+            ? `<img class="records-games-logo records-logo" data-team="${esc(g.opp.key)}" data-espn="${g.opp.id}" alt="">`
+            : g.opp.logo ? `<img class="records-games-logo" src="${esc(g.opp.logo)}" alt="">` : `<span class="records-games-logo"></span>`;
+        const name = g.opp.key ? conferenceDisplayName(g.opp.key) : g.opp.name;
+        const nonD1 = records.byId[g.opp.id] ? "" : `<span class="records-tag" title="Not a Division I team">non-D1</span>`;
+        let res;
+        if (g.result) res = `<span class="${g.result === "W" ? "delta-up" : "delta-down"}">${g.result}</span> ${g.us}-${g.them}`;
+        else if (g.state === "in") res = `<span class="records-live">Live</span> ${g.us ?? ""}-${g.them ?? ""}`;
+        else res = `<span class="records-upcoming">${esc(g.status.replace(/^\d+\/\d+\s*-\s*/, ""))}</span>`;
+        return `<tr class="${g.result ? "" : "records-game-pending"}">
+            <td class="rg-date">${fmtDate(g.date)}</td>
+            <td class="rg-site" title="${g.site === "N" ? "Neutral site" : g.site === "H" ? "Home" : "Away"}">${site}</td>
+            <td class="rg-opp">${logo}${g.oppRank ? `<span class="rg-rank" title="AP rank at game time">${g.oppRank}</span>` : ""}${g.oppSeed ? `<span class="rg-rank" title="Seed">(${g.oppSeed})</span>` : ""}${esc(name)}${nonD1}</td>
+            <td class="rg-res">${res}</td>
+            <td class="rg-note">${esc(g.note)}${g.postseason && !g.note ? "Postseason" : ""}</td>
+        </tr>`;
+    }).join("");
+    const stale = sched.stale ? `<span class="records-note"> · couldn't refresh (${esc(sched.stale)})</span>` : "";
+    return `<div class="records-games">
+        <div class="records-splits">${summary}${stale}</div>
+        <table class="records-games-table"><tbody>${lines}</tbody></table>
+    </div>`;
+}
+
+// Right-aligned note in the Records title: "ESPN as of 2:15 AM" (date added if the data
+// isn't from today), "ESPN · final" for past seasons.
+function recordsNoteHtml(currentYear, data) {
+    const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const isCurrentSeason = Number(currentYear) >= Math.max(...getSortedTabs().map(t => Number(t.dataset.year)));
+    let note = "ESPN";
+    if (data) {
+        const at = new Date(data.at);
+        const t = at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+        const today = at.toDateString() === new Date().toDateString();
+        note += isCurrentSeason
+            ? ` as of ${today ? t : `${at.toLocaleDateString([], { month: "short", day: "numeric" })}, ${t}`}`
+            : " · final";
+        if (data.stale) note += ` · couldn't refresh (${esc(data.stale)})`;
+    }
+    return note;
+}
+
+function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
+    const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const view = _recordsView;
+    const COLS = view === "week" ? 9 : 7;   // R/V adds Won / Lost
+
+    const head = `<colgroup>
+        <col style="width:28px"><col style="width:26px"><col>
+        <col style="width:52px"><col style="width:44px"><col style="width:52px">
+        <col style="width:44px">${view === "week" ? "<col><col>" : ""}
+    </colgroup><thead><tr>
+        <th>#</th><th></th><th class="team-col">Team</th>
+        <th>W-L</th><th>Pct</th><th>Conf</th><th>Strk</th>${view === "week"
+            ? `<th class="records-opps-col">Won</th><th class="records-opps-col">Lost</th>` : ""}
+    </tr></thead>`;
+
+    if (!data) {
+        const msg = error
+            ? `Couldn't load records from ESPN (${esc(error)}). <span class="records-retry">Retry</span>`
+            : "Loading records from ESPN…";
+        return `${head}<tbody><tr><td colspan="${COLS}" class="records-msg">${msg}</td></tr></tbody>`;
+    }
+
+    const keyOf = id => espnTeamKey(id);
+    const pct = r => r.pct === null ? "—" : r.pct.toFixed(3).replace(/^0/, "");
+    const streak = s => !s || s === "-" ? "—"
+        : `<span class="${s[0] === "W" ? "delta-up" : "delta-down"}">${esc(s)}</span>`;
+    const row = (num, team, id, extraCls = "") => {
+        const r = id ? data.byId[id] : null;
+        const key = team || (id && keyOf(id)) || null;
+        const name = key ? conferenceDisplayName(key) : r?.name || "?";
+        const logo = key
+            ? `<img class="logo-sm records-logo" data-team="${esc(key)}"${id ? ` data-espn="${id}"` : ""} alt="">`
+            : id ? `<img class="logo-sm" src="${espnLogoUrl(id)}" alt="">` : "";
+        const cells = r
+            ? `<td class="records-wl">${r.wins}-${r.losses}</td><td>${pct(r)}</td><td>${esc(r.confRecord || "—")}</td><td>${streak(r.streak)}</td>`
+            : `<td colspan="4" class="records-missing">${id ? "Not in ESPN's standings" : "No ESPN ID"}</td>`;
+        // R/V only: opponent logos, filled in by fillRecordsOpponents() once the schedule loads.
+        const opps = view !== "week" ? ""
+            : r ? `<td class="records-opps" data-result="W"><span class="records-opps-msg">…</span></td><td class="records-opps" data-result="L"><span class="records-opps-msg">…</span></td>`
+            : `<td></td><td></td>`;
+        const cls = [extraCls, r ? "records-team-row" : ""].filter(Boolean).join(" ");
+        return `<tr${cls ? ` class="${cls}"` : ""}${r ? ` data-espn="${id}" title="Show games"` : ""}><td>${num}</td><td>${logo}</td>
+            <td class="team-col">${esc(name)}</td>${cells}${opps}</tr>`;
+    };
+
+    // Poll points in the active week (official ballots) set the Week view's order.
+    const ballots = Object.entries(buildDeltaData(true)[weekId] || {})
+        .filter(([u]) => u !== "Official Overall" && u !== "AP Overall")
+        .map(([, ts]) => ts.slice(0, 25));
+    const pts = {};
+    ballots.forEach(b => b.forEach((t, i) => { if (t) pts[t] = (pts[t] || 0) + (25 - i); }));
+
+    let body = "";
+    if (view === "week") {
+        // Same order as Official Overall / the Stats tab (points desc, ties in ballot order)
+        const order = Object.entries(pts).sort((a, b) => b[1] - a[1]).map(([t]) => t);
+        if (!order.length) {
+            body = `<tr><td colspan="${COLS}" class="records-msg">No ballots for ${esc(weekLabel)}.</td></tr>`;
+        }
+        order.forEach((team, i) => {
+            body += row(i + 1, team, espnIdFor(team), i === 24 && order.length > 25 ? "records-t25-end" : "");
+        });
+    } else {
+        // Our conferences for 2025+ (same as Shift+K); ESPN's grouping for earlier seasons.
+        const ours = conferenceTable(currentYear);
+        const groups = ours
+            ? Object.entries(ours).map(([name, teams]) => ({ name, members: teams.map(t => [t, espnIdFor(t)]) }))
+            : data.confs.map(c => ({ name: c.name, members: c.ids.map(id => [keyOf(id), id]) }));
+        const isPower = g => (CONFERENCE_DATA.power || []).includes(g.name);
+        groups.sort((a, b) => (isPower(b) - isPower(a)) || a.name.localeCompare(b.name));
+        const confPct = r => {
+            const m = /^(\d+)-(\d+)/.exec(r?.confRecord || "");
+            return m && +m[1] + +m[2] ? +m[1] / (+m[1] + +m[2]) : -1;
+        };
+        groups.forEach(g => {
+            const members = g.members.slice().sort(([, a], [, b]) => {
+                const ra = data.byId[a], rb = data.byId[b];
+                return (confPct(rb) - confPct(ra)) || ((rb?.pct ?? -1) - (ra?.pct ?? -1))
+                    || ((rb?.wins ?? 0) - (ra?.wins ?? 0));
+            });
+            body += `<tr class="records-conf-row"><td colspan="${COLS}">${esc(g.name)}
+                <span class="records-conf-count">${members.length}</span></td></tr>`;
+            members.forEach(([team, id], i) => {
+                body += row(i + 1, team, id);
+            });
+        });
+    }
+    return `${head}<tbody>${body}</tbody>`;
 }
 
 // Voters tab of the Year window: one row per voter on official ballots this season.
@@ -4686,6 +5247,7 @@ function showConferenceModal(year) {
 
     const table = CONFERENCE_DATA.seasons[year];
     const confs = Object.keys(table);
+    const power = CONFERENCE_DATA.power;
     const powerConfs = power.filter(c => table[c]);
     const midConfs = confs.filter(c => !power.includes(c)).sort((a, b) => a.localeCompare(b));
     const count = list => list.reduce((n, c) => n + table[c].length, 0);

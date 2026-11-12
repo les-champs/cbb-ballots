@@ -286,6 +286,103 @@ SEASONS = _build()
 LAST_DEFINED_SEASON = max(SEASONS)
 
 
+# ESPN team ID for every school above (all seasons). Feeds the Year window's Records
+# tab, which reads live W-L records from ESPN's standings API. IDs never change for a
+# school; a school added to _BASE_2025/_MOVES needs an entry here too (the check at the
+# bottom of this file reports any that are missing).
+ESPN_IDS = {
+    "AbileneChristian":"2000", "AirForce":"2005", "Akron":"2006", "Alabama":"333",
+    "AlabamaAM":"2010", "AlabamaState":"2011", "Albany":"399", "AlcornState":"2016",
+    "American":"44", "AppalachianState":"2026", "Arizona":"12", "ArizonaState":"9",
+    "Arkansas":"8", "ArkansasPineBluff":"2029", "ArkansasState":"2032", "Army":"349",
+    "Auburn":"2", "AustinPeay":"2046", "BYU":"252", "BallState":"2050", "Baylor":"239",
+    "Bellarmine":"91", "Belmont":"2057", "BethuneCookman":"2065", "Binghamton":"2066",
+    "BoiseState":"68", "BostonCollege":"103", "BostonUniversity":"104", "BowlingGreen":"189",
+    "Bradley":"71", "Brown":"225", "Bryant":"2803", "Bucknell":"2083", "Buffalo":"2084",
+    "Butler":"2086", "CSUBakersfield":"2934", "CSUN":"2463", "CalPoly":"13",
+    "CalStateFullerton":"2239", "California":"25", "CaliforniaBaptist":"2856",
+    "Campbell":"2097", "Canisius":"2099", "CentralArkansas":"2110", "CentralConnecticut":"2115",
+    "CentralMichigan":"2117", "Charleston":"232", "CharlestonSouthern":"2127",
+    "Charlotte":"2429", "Chattanooga":"236", "ChicagoState":"2130", "Cincinnati":"2132",
+    "Clemson":"228", "ClevelandState":"325", "CoastalCarolina":"324", "Colgate":"2142",
+    "Colorado":"38", "ColoradoState":"36", "Columbia":"171", "CoppinState":"2154",
+    "Cornell":"172", "Creighton":"156", "Dartmouth":"159", "Davidson":"2166", "Dayton":"2168",
+    "DePaul":"305", "Delaware":"48", "DelawareState":"2169", "Denver":"2172",
+    "DetroitMercy":"2174", "Drake":"2181", "Drexel":"2182", "Duke":"150", "Duquesne":"2184",
+    "EastCarolina":"151", "EastTennesseeState":"2193", "EasternIllinois":"2197",
+    "EasternKentucky":"2198", "EasternMichigan":"2199", "EasternWashington":"331",
+    "Elon":"2210", "Evansville":"339", "FIU":"2229", "Fairfield":"2217",
+    "FairleighDickinson":"161", "Florida":"57", "FloridaAM":"50", "FloridaAtlantic":"2226",
+    "FloridaGulfCoast":"526", "FloridaState":"52", "Fordham":"2230", "FresnoState":"278",
+    "Furman":"231", "GardnerWebb":"2241", "GeorgeMason":"2244", "GeorgeWashington":"45",
+    "Georgetown":"46", "Georgia":"61", "GeorgiaSouthern":"290", "GeorgiaState":"2247",
+    "GeorgiaTech":"59", "Gonzaga":"2250", "GramblingState":"2755", "GrandCanyon":"2253",
+    "GreenBay":"2739", "Hampton":"2261", "Harvard":"108", "Hawaii":"62", "HighPoint":"2272",
+    "Hofstra":"2275", "HolyCross":"107", "Houston":"248", "HoustonChristian":"2277",
+    "Howard":"47", "IUPUI":"85", "Idaho":"70", "IdahoState":"304", "Illinois":"356",
+    "IllinoisState":"2287", "IncarnateWord":"2916", "Indiana":"84", "IndianaState":"282",
+    "Iona":"314", "Iowa":"2294", "IowaState":"66", "JacksonState":"2296", "Jacksonville":"294",
+    "JacksonvilleState":"55", "JamesMadison":"256", "Kansas":"2305", "KansasCity":"140",
+    "KansasState":"2306", "KennesawState":"338", "KentState":"2309", "Kentucky":"96",
+    "LIU":"112358", "LSU":"99", "LaSalle":"2325", "Lafayette":"322", "Lamar":"2320",
+    "LeMoyne":"2330", "Lehigh":"2329", "Liberty":"2335", "Lindenwood":"2815", "Lipscomb":"288",
+    "LittleRock":"2031", "LongBeachState":"299", "Longwood":"2344", "Louisiana":"309",
+    "LouisianaMonroe":"2433", "LouisianaTech":"2348", "Louisville":"97", "LoyolaChicago":"2350",
+    "LoyolaMD":"2352", "LoyolaMarymount":"2351", "Maine":"311", "Manhattan":"2363",
+    "Marist":"2368", "Marquette":"269", "Marshall":"276", "Maryland":"120", "McNeese":"2377",
+    "Memphis":"235", "Mercer":"2382", "Mercyhurst":"2385", "Merrimack":"2771", "MiamiFL":"2390",
+    "MiamiOH":"193", "Michigan":"130", "MichiganState":"127", "MiddleTennessee":"2393",
+    "Milwaukee":"270", "Minnesota":"135", "MississippiState":"344",
+    "MississippiValleyState":"2400", "Missouri":"142", "MissouriState":"2623",
+    "Monmouth":"2405", "Montana":"149", "MontanaState":"147", "MoreheadState":"2413",
+    "MorganState":"2415", "MountStMarys":"116", "MurrayState":"93", "NCState":"152",
+    "NJIT":"2885", "Navy":"2426", "Nebraska":"158", "Nevada":"2440", "NewHampshire":"160",
+    "NewHaven":"2441", "NewMexico":"167", "NewMexicoState":"166", "NewOrleans":"2443",
+    "Niagara":"315", "Nicholls":"2447", "NorfolkState":"2450", "NorthAlabama":"2453",
+    "NorthCarolina":"153", "NorthCarolinaAT":"2448", "NorthCarolinaCentral":"2428",
+    "NorthDakota":"155", "NorthDakotaState":"2449", "NorthFlorida":"2454", "NorthTexas":"249",
+    "Northeastern":"111", "NorthernArizona":"2464", "NorthernColorado":"2458",
+    "NorthernIllinois":"2459", "NorthernIowa":"2460", "NorthernKentucky":"94",
+    "Northwestern":"77", "NorthwesternState":"2466", "NotreDame":"87", "Oakland":"2473",
+    "Ohio":"195", "OhioState":"194", "Oklahoma":"201", "OklahomaState":"197",
+    "OldDominion":"295", "OleMiss":"145", "Omaha":"2437", "OralRoberts":"198", "Oregon":"2483",
+    "OregonState":"204", "Pacific":"279", "Penn":"219", "PennState":"213", "Pepperdine":"2492",
+    "Pitt":"221", "Portland":"2501", "PortlandState":"2502", "PrairieViewAM":"2504",
+    "Presbyterian":"2506", "Princeton":"163", "Providence":"2507", "Purdue":"2509",
+    "PurdueFortWayne":"2870", "Queens":"2511", "Quinnipiac":"2514", "Radford":"2515",
+    "RhodeIsland":"227", "Rice":"242", "Richmond":"257", "Rider":"2520", "RobertMorris":"2523",
+    "Rutgers":"164", "SCState":"2569", "SELouisiana":"2545", "SEMissouriState":"2546",
+    "SIUEdwardsville":"2565", "SMU":"2567", "SacramentoState":"16", "SacredHeart":"2529",
+    "SaintFrancisPA":"2598", "SaintJosephs":"2603", "SaintLouis":"139", "SaintMarys":"2608",
+    "SaintPeters":"2612", "SamHouston":"2534", "Samford":"2535", "SanDiego":"301",
+    "SanDiegoState":"21", "SanFrancisco":"2539", "SanJoseState":"23", "SantaClara":"2541",
+    "Seattle":"2547", "SetonHall":"2550", "Siena":"2561", "SouthAlabama":"6",
+    "SouthCarolina":"2579", "SouthDakota":"233", "SouthDakotaState":"2571", "SouthFlorida":"58",
+    "Southern":"2582", "SouthernIllinois":"79", "SouthernIndiana":"88", "SouthernMiss":"2572",
+    "SouthernUtah":"253", "StBonaventure":"179", "StJohns":"2599", "StThomas":"2900",
+    "Stanford":"24", "StephenFAustin":"2617", "Stetson":"56", "Stonehill":"284",
+    "StonyBrook":"2619", "Syracuse":"183", "TCU":"2628", "TarletonState":"2627", "Temple":"218",
+    "Tennessee":"2633", "TennesseeState":"2634", "TennesseeTech":"2635", "Texas":"251",
+    "TexasAM":"245", "TexasAMCommerce":"2837", "TexasAMCorpusChristi":"357",
+    "TexasSouthern":"2640", "TexasState":"326", "TexasTech":"2641", "TheCitadel":"2643",
+    "Toledo":"2649", "Towson":"119", "Troy":"2653", "Tulane":"2655", "Tulsa":"202", "UAB":"5",
+    "UCDavis":"302", "UCF":"2116", "UCIrvine":"300", "UCLA":"26", "UCRiverside":"27",
+    "UCSanDiego":"28", "UCSantaBarbara":"2540", "UConn":"41", "UIC":"82", "UMBC":"2378",
+    "UMES":"2379", "UMass":"113", "UMassLowell":"2349", "UNCAsheville":"2427",
+    "UNCGreensboro":"2430", "UNCWilmington":"350", "UNLV":"2439", "USC":"30",
+    "USCUpstate":"2908", "UTArlington":"250", "UTEP":"2638", "UTMartin":"2630", "UTRGV":"292",
+    "UTSA":"2636", "Utah":"254", "UtahState":"328", "UtahTech":"3101", "UtahValley":"3084",
+    "VCU":"2670", "VMI":"2678", "Valparaiso":"2674", "Vanderbilt":"238", "Vermont":"261",
+    "Villanova":"222", "Virginia":"258", "VirginiaTech":"259", "Wagner":"2681",
+    "WakeForest":"154", "Washington":"264", "WashingtonState":"265", "WeberState":"2692",
+    "WestFlorida":"2697", "WestGeorgia":"2698", "WestVirginia":"277", "WesternCarolina":"2717",
+    "WesternIllinois":"2710", "WesternKentucky":"98", "WesternMichigan":"2711",
+    "WichitaState":"2724", "WilliamandMary":"2729", "Winthrop":"2737", "Wisconsin":"275",
+    "Wofford":"2747", "WrightState":"2750", "Wyoming":"2751", "Xavier":"2752", "Yale":"43",
+    "YoungstownState":"2754",
+}
+
+
 def canonical(team):
     return ALIASES.get(team, team)
 
@@ -306,7 +403,7 @@ def tier(team, year):
 
 
 def js_payload():
-    """JSON for the page: {seasons: {year: {conf: [teams]}}, power, aliases, names}."""
+    """JSON for the page: {seasons: {year: {conf: [teams]}}, power, aliases, names, espn}."""
     seasons = {}
     for year, table in SEASONS.items():
         by_conf = {}
@@ -318,6 +415,7 @@ def js_payload():
         "power": POWER_CONFERENCES,
         "aliases": ALIASES,
         "names": DISPLAY_NAMES,
+        "espn": ESPN_IDS,
     }, separators=(",", ":"))
 
 
@@ -357,4 +455,8 @@ if __name__ == "__main__":
               + (f", UNMAPPED: {missing}" if missing else ", all mapped"))
         print("   " + ", ".join(f"{c} {n}" for c, n in sorted(sizes.items())))
         ok &= not missing
+    no_espn = sorted({t for s in SEASONS.values() for t in s} - set(ESPN_IDS))
+    if no_espn:
+        print(f"NO ESPN ID (add to ESPN_IDS): {no_espn}")
+    ok &= not no_espn
     raise SystemExit(0 if ok else 1)

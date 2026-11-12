@@ -851,15 +851,67 @@ kbd {
 #season-stats-table td.team-col { text-align: left; font-size: 12px; color: var(--color-table-team-col); white-space: normal; min-width: 80px; }
 #season-stats-table td:first-child { font-size: 11px; }
 #season-stats-table .logo-sm { height: 20px; width: 20px; object-fit: contain; vertical-align: middle; }
-#season-stats-table:not(.season-voters) th:nth-child(5), #season-stats-table:not(.season-voters) td:nth-child(5) { border-right: none; }
-#season-stats-table:not(.season-voters) th:nth-child(9), #season-stats-table:not(.season-voters) td:nth-child(9) { border-right: none; }
-#season-stats-table:not(.season-voters) th:nth-child(8), #season-stats-table:not(.season-voters) td:nth-child(8) { border-right: 1px solid var(--color-border-nth); }
+#season-stats-table:not(.season-voters):not(.season-records) th:nth-child(5), #season-stats-table:not(.season-voters):not(.season-records) td:nth-child(5) { border-right: none; }
+#season-stats-table:not(.season-voters):not(.season-records) th:nth-child(9), #season-stats-table:not(.season-voters):not(.season-records) td:nth-child(9) { border-right: none; }
+#season-stats-table:not(.season-voters):not(.season-records) th:nth-child(8), #season-stats-table:not(.season-voters):not(.season-records) td:nth-child(8) { border-right: 1px solid var(--color-border-nth); }
 #season-stats-table.season-voters th:nth-child(5), #season-stats-table.season-voters td:nth-child(5) { border-right: 1px solid var(--color-border-nth); }
 #season-stats-table td.fan-col { text-align: left; font-size: 12px; padding-left: 10px; }
 #season-stats-table th.fan-col { text-align: left; padding-left: 10px; }
 #season-stats-table .fan-tie { cursor: help; text-decoration: underline dotted; text-underline-offset: 2px; }
 #season-stats-table .fan-low-sample { font-style: italic; opacity: 0.75; }
 #season-stats-table .fan-dev { font-size: 11px; opacity: 0.6; font-variant-numeric: tabular-nums; }
+
+/* Year window › Records tab */
+.records-switch { font-size: 14px; font-weight: bold; line-height: 1; user-select: none; white-space: nowrap; margin-left: 1.1em; }
+.records-view { cursor: pointer; color: var(--color-modal-h2); opacity: 0.35; margin-left: 0.55em; }
+.records-view:first-child { margin-left: 0; }
+.records-view.active { opacity: 1; cursor: default; }
+.records-view:not(.active):hover { opacity: 0.65; }
+.records-note { font-size: 11px; opacity: 0.6; }
+#season-stats-title:has(.records-title-note) { display: flex; align-items: baseline; gap: 16px; }
+.records-title-note { margin-left: auto; font-weight: normal; white-space: nowrap; }
+#season-stats-table.season-records td { font-variant-numeric: tabular-nums; }
+#season-stats-table.season-records > thead > tr > th, #season-stats-table.season-records > tbody > tr > td { border-right: none; }
+#season-stats-table.season-records > thead > tr > th:nth-child(7), #season-stats-table.season-records > tbody > tr > td:nth-child(7) { border-right: 1px solid var(--color-border-nth); }
+#season-stats-table.season-records tr.records-team-row { cursor: pointer; }
+#season-stats-table.season-records tr.records-team-row:hover > td,
+#season-stats-table.season-records tr.records-team-row.expanded > td { background: var(--color-bg-spread-hover); }
+/* Expanded game list (Records row click) */
+#season-stats-table.season-records tr.records-games-row > td { padding: 4px 8px 10px 54px; text-align: left; border-right: none; white-space: normal; }
+.records-games-msg { font-size: 11px; opacity: 0.7; padding: 4px 0; }
+.records-splits { font-size: 11px; display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 2px 0 6px; opacity: 0.85; }
+.records-split b { font-weight: bold; }
+#season-stats-table .records-games-table { border-collapse: collapse; font-size: 12px; width: auto; }
+#season-stats-table .records-games-table td {
+    padding: 2px 8px 2px 0; border: none; text-align: left; font-size: 12px; white-space: nowrap; vertical-align: middle;
+}
+#season-stats-table .records-games-table td.rg-date { opacity: 0.6; font-size: 11px; min-width: 44px; }
+#season-stats-table .records-games-table td.rg-site { opacity: 0.6; font-size: 11px; min-width: 16px; }
+#season-stats-table .records-games-table td.rg-res { min-width: 70px; font-weight: bold; }
+#season-stats-table .records-games-table td.rg-note { font-size: 11px; opacity: 0.55; white-space: normal; }
+#season-stats-table .records-games-table tr.records-game-pending td { opacity: 0.55; }
+#season-stats-table .records-games-table tr.records-game-pending td.rg-res { font-weight: normal; font-size: 11px; }
+.records-games-logo { display: inline-block; height: 16px; width: 16px; object-fit: contain; vertical-align: middle; margin-right: 5px; }
+.rg-rank { font-size: 10px; opacity: 0.65; margin-right: 3px; }
+.records-tag { font-size: 9px; text-transform: uppercase; letter-spacing: 0.03em; border: 1px solid currentColor; border-radius: 3px; padding: 0 3px; margin-left: 6px; opacity: 0.6; }
+.records-live { color: var(--color-modal-h2); }
+#season-stats-table.season-records td.records-wl { font-weight: bold; }
+#season-stats-table.season-records tr.records-t25-end td { border-bottom: 1px solid var(--color-border-nth); }
+#season-stats-table.season-records tr.records-conf-row td {
+    text-align: left; font-weight: bold; font-size: 12px; color: var(--color-modal-h2);
+    padding-top: 12px; border-right: none;
+}
+.records-conf-count { font-weight: normal; font-size: 11px; opacity: 0.6; margin-left: 4px; }
+#season-stats-table.season-records td.records-msg { padding: 24px 8px; font-size: 12px; opacity: 0.8; border-right: none; }
+#season-stats-table.season-records td.records-missing { font-size: 11px; opacity: 0.55; border-right: 1px solid var(--color-border-nth); }
+.records-retry { cursor: pointer; text-decoration: underline; }
+/* R/V view: Won / Lost opponent logos (fillRecordsOpponents) */
+#season-stats-table.season-records > thead > tr > th.records-opps-col { text-align: left; padding-left: 10px; }
+#season-stats-table.season-records > tbody > tr > td.records-opps { text-align: left; white-space: normal; padding: 6px 6px 6px 10px; }
+#season-stats-table.season-records > tbody > tr > td.records-opps + td.records-opps { border-left: 1px solid var(--color-border-subtle); }
+.records-opps-list { display: flex; flex-wrap: wrap; gap: 5px 2px; width: 196px; }
+.records-opp-logo { display: block; width: 16px; height: 16px; object-fit: contain; }
+.records-opps-msg { font-size: 11px; opacity: 0.45; }
 
 #precision-modal, #tenure-modal {
     display: none;
@@ -1336,6 +1388,20 @@ body.dark .pin-btn.pinned {
 /* Conference ranking rows (Data Ballots, 2025+) */
 .voter-row.row-conference-first > td { border-top: 2px solid var(--color-border-tab); }
 
+/* Clickable elements: don't select text on rapid/double clicks (or flash on mobile taps).
+   Covers every cursor:pointer rule above plus JS/SVG elements given an inline pointer
+   cursor or onclick. Add new clickable selectors here. */
+h1 span, .week-arrow, .picker-btn, .week-tab, .voter-name, .pin-btn, .history-btn,
+.overall-row .voter-cell, .ballot-link-btn, .voters-toggle, .sort-option, .team-logo,
+.rank-header-num, .conf-stats-table .conf-teams img, .records-view, .records-switch,
+#season-stats-table.season-records tr.records-team-row, .records-retry, .spread-toggle,
+.modal-mode-tab, .week-chart-kind, #voter-history-table .week-stats-table tr[data-team],
+.conference-year, [onclick], [style*="cursor: pointer"], [style*="cursor:pointer"] {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
 </style>
 </head>
 <body>
@@ -1726,7 +1792,7 @@ const FRAGMENT_YEARS = ["2022", "2023", "2024", "2025", "2026"];
 const TENURE_COUNTS = {};
 const AP_TENURE_COUNTS = {"Andrew Kahn": 40, "Andrew Krammer": 2, "Andrew Quinn": 60, "Anthony Kristensen": 37, "Bob Ballou": 100, "Brenna Greene": 80, "C.J. Moore": 42, "Chris Lea": 22, "Chris Murray": 100, "Chris Nee": 22, "Dave Borges": 100, "Dave Mackall": 2, "Dave Preston": 100, "David Jablonski": 100, "Davis Baker": 2, "Dick Vitale": 100, "Donna Ditota": 100, "Dylan Sinn": 81, "Eric Crawford": 22, "Geoff Grammer": 100, "Harold Kuntz": 2, "Ian Kress": 22, "Izzie Begley": 2, "Jackson Payne": 22, "Janyre Cooper": 2, "Jeff Borzello": 100, "Jeff Neiburg": 59, "Jeff Rabjohns": 54, "Joe Cook": 21, "John Johnson": 22, "John Wustrow": 22, "Jon Rothstein": 100, "Jon Wilner": 99, "Joseph Duarte": 2, "Justin Jackson": 99, "Kate Rogerson": 62, "Keith Farmer": 2, "Kellan Olson": 2, "Kendall Duncan": 2, "Kevin McNamara": 100, "Kevin Sjuts": 79, "Kyle Franko": 42, "Lance Allan": 2, "Mark Zeigler": 81, "Mia O'Brien": 100, "Pat Rooney": 81, "Percy Allen": 40, "Peter Rauterkaus": 2, "Randy Heitz": 42, "Rob Gray": 2, "Sam Rothman": 22, "Scott Hamilton": 40, "Scott Richey": 97, "Seth Davis": 99, "Shane Mettlen": 62, "Stephen Means": 97, "Toyloy Brown": 41, "Trevor Hass": 42, "Zach Klein": 98, "Pete Hayes": 1, "Abby Schnable": 26, "Andy Greder": 20, "Brenden Martin": 20, "Brian Holland": 97, "Brice Cherry": 60, "Bruce Pascoe": 98, "Connor Earegood": 20, "Johnny Congdon": 38, "Mark Berman": 98, "Matt Young": 20, "Michael McCleary": 40, "Mick Shaffer": 40, "Owen Siebring": 19, "Parth Upadhyaya": 59, "Peter Rauterkus": 40, "Tony Paul": 40, "Victor Flores": 40, "Adam Lichtenstein": 20, "Benjamin Rosenberg": 20, "Bob Holt": 61, "Bret Bloomquist": 78, "Darnell Dickson": 39, "Eric Newman": 19, "Jay Tust": 73, "Louis Fernandez": 20, "Luca Evans": 31, "Marcus Fuller": 78, "Mike Hlas": 20, "Reece Van Haaften": 20, "Rick Bozich": 78, "Stephen Thompson": 20, "Steve Greenberg": 77, "Mitchell Northam": 19, "Adam Cole": 39, "Ben Steele": 47, "Calum McAndrew": 14, "Chad Leistikow": 58, "Chandler Mack": 18, "Dave Reardon": 20, "David Jones": 20, "JB Ricks": 20, "Jeff Welsch": 58, "Jerry Carino": 58, "Jerry DiPaola": 56, "Justin Martinez": 18, "Kellis Robinett": 20, "Kevin Brockway": 56, "Kyle Austin": 20, "Lauren Walsh": 20, "Luke DeCock": 29, "Michelle Gardner": 39, "Nick Alvarez": 20, "Sheldon Mickles": 58, "Stefan Krajisnik": 39, "Steve Hewitt": 58, "Todd Golden": 34, "Tony Garcia": 18, "Rodd Baxley": 10, "Aria Gerson": 37, "C.L. Brown": 19, "Clayton Collier": 38, "Dave Matter": 38, "David Cloninger": 38, "David Thompson": 24, "Jeff Call": 38, "Jimmy Watkins": 2, "John Werner": 38, "Jordan Crammer": 19, "Kelly Hines": 38, "Matt Charboneau": 19, "Matt Tait": 19, "Michelle Kaufman": 1, "Mike Carmin": 5, "Mike Rodak": 38, "Sam Connon": 19, "Stephen Tsai": 23, "Wayne Epps": 20, "Greg Madia": 18, "Matt Daniels": 3, "B.J. Rains": 4, "Bennett Conlin": 1, "Bryce Miller": 19, "Chris Basnett": 19, "Donald Hunt": 19, "Ethan Joyce": 12, "James Crepea": 19, "Jesse Newell": 19, "Lauren Brownlow": 19, "Matt Murschel": 19, "Nick Kelly": 19, "Nick Suss": 19, "Paul Klee": 19, "Scott Wolf": 1, "Terry Toohey": 19, "Theo Lawson": 19};
 const DARK_LOGO_TEAMS = new Set(["AbileneChristian", "AirForce", "Akron", "Alabama", "AlabamaAM", "AlabamaState", "AlcornState", "Arizona", "ArizonaState", "Arkansas", "ArkansasState", "Army", "Auburn", "AustinPeay", "BYU", "BallState", "Baylor", "Bellarmine", "Belmont", "Binghamton", "BoiseState", "BostonCollege", "BostonUniversity", "BowlingGreen", "Bradley", "Brown", "Bryant", "Bucknell", "Buffalo", "Butler", "CSUBakersfield", "CSUN", "CalPoly", "CalStateFullerton", "CaliforniaBaptist", "Campbell", "Canisius", "CentralArkansas", "CentralConnecticut", "CentralMichigan", "Charleston", "CharlestonSouthern", "Charlotte", "Chattanooga", "ChicagoState", "Cincinnati", "Clemson", "ClevelandState", "CoastalCarolina", "Colgate", "Colorado", "ColoradoState", "Columbia", "CoppinState", "Cornell", "Creighton", "Dartmouth", "Davidson", "Dayton", "DePaul", "Delaware", "DelawareState", "Denver", "DetroitMercy", "Drake", "Drexel", "Duke", "Duquesne", "EastCarolina", "EastTennesseeState", "EasternIllinois", "EasternKentucky", "EasternMichigan", "EasternWashington", "Elon", "Evansville", "Fairfield", "FairleighDickinson", "Florida", "FloridaAM", "FloridaAtlantic", "FloridaGulfCoast", "FloridaState", "Fordham", "FresnoState", "Furman", "GeorgeMason", "GeorgeWashington", "Georgetown", "Georgia", "GeorgiaSouthern", "GeorgiaState", "GeorgiaTech", "Gonzaga", "GrandCanyon", "GreenBay", "Hampton", "Harvard", "HighPoint", "Hofstra", "HolyCross", "Houston", "HoustonChristian", "Howard", "Idaho", "IdahoState", "Illinois", "IllinoisState", "IncarnateWord", "Indiana", "IndianaState", "Iona", "Iowa", "IowaState", "JacksonState", "Jacksonville", "JacksonvilleState", "JamesMadison", "Kansas", "KansasCity", "KansasState", "KennesawState", "KentState", "Kentucky", "LSU", "LaSalle", "Lafayette", "Lamar", "LeMoyne", "Lehigh", "Liberty", "Lindenwood", "Lipscomb", "LittleRock", "LongBeachState", "Longwood", "Louisiana", "LouisianaMonroe", "LouisianaTech", "Louisville", "LoyolaChicago", "LoyolaMD", "LoyolaMarymount", "Maine", "Manhattan", "Marist", "Marquette", "Marshall", "Maryland", "McNeese", "Memphis", "Mercer", "Mercyhurst", "Merrimack", "MiamiFL", "MiamiOH", "Michigan", "MichiganState", "MiddleTennessee", "Milwaukee", "Minnesota", "MississippiState", "MississippiValleyState", "Missouri", "MissouriState", "Monmouth", "Montana", "MontanaState", "MoreheadState", "MorganState", "MurrayState", "NCState", "NJIT", "Navy", "Nebraska", "Nevada", "NewHampshire", "NewHaven", "NewMexico", "NewMexicoState", "NewOrleans", "Niagara", "Nicholls", "NorfolkState", "NorthAlabama", "NorthCarolinaAT", "NorthCarolinaCentral", "NorthDakota", "NorthDakotaState", "NorthFlorida", "NorthTexas", "Northeastern", "NorthernArizona", "NorthernColorado", "NorthernIllinois", "NorthernIowa", "NorthernKentucky", "Northwestern", "NorthwesternState", "NotreDame", "Oakland", "Ohio", "OhioState", "Oklahoma", "OklahomaState", "OldDominion", "OleMiss", "Omaha", "OralRoberts", "Oregon", "OregonState", "Pacific", "PennState", "Pepperdine", "Pitt", "Portland", "PortlandState", "PrairieViewAM", "Presbyterian", "Princeton", "Providence", "Purdue", "PurdueFortWayne", "Queens", "Quinnipiac", "Radford", "RhodeIsland", "Rice", "Richmond", "Rider", "RobertMorris", "Rutgers", "SELouisiana", "SIUEdwardsville", "SMU", "SacramentoState", "SacredHeart", "SaintFrancisPA", "SaintLouis", "SamHouston", "Samford", "SanDiego", "SanDiegoState", "SanFrancisco", "SantaClara", "Seattle", "SetonHall", "Siena", "SouthAlabama", "SouthCarolina", "SouthDakota", "SouthDakotaState", "SouthFlorida", "Southern", "SouthernIllinois", "SouthernIndiana", "SouthernMiss", "SouthernUtah", "StJohns", "Stanford", "StephenFAustin", "Stetson", "Stonehill", "StonyBrook", "Syracuse", "TCU", "TarletonState", "Temple", "TennesseeState", "TennesseeTech", "Texas", "TexasSouthern", "TexasState", "TexasTech", "TheCitadel", "Toledo", "Towson", "Troy", "Tulane", "Tulsa", "UAB", "UCDavis", "UCF", "UCIrvine", "UCLA", "UCRiverside", "UCSanDiego", "UCSantaBarbara", "UConn", "UIC", "UMBC", "UMass", "UMassLowell", "UNCAsheville", "UNCGreensboro", "UNCWilmington", "UNLV", "USC", "UTArlington", "UTEP", "UTMartin", "UTRGV", "UTSA", "Utah", "UtahState", "UtahTech", "UtahValley", "VCU", "VMI", "Valparaiso", "Vanderbilt", "Vermont", "Villanova", "Virginia", "VirginiaTech", "Wagner", "WakeForest", "Washington", "WashingtonState", "WeberState", "WestFlorida", "WestGeorgia", "WestVirginia", "WesternCarolina", "WesternIllinois", "WesternKentucky", "WesternMichigan", "WichitaState", "WilliamandMary", "Winthrop", "Wisconsin", "Wofford", "WrightState", "Wyoming", "Xavier", "Yale", "YoungstownState"]);
-const CONFERENCE_DATA = {"seasons":{"2025":{"ACC":["BostonCollege","California","Clemson","Duke","FloridaState","GeorgiaTech","Louisville","MiamiFL","NCState","NorthCarolina","NotreDame","Pitt","SMU","Stanford","Syracuse","Virginia","VirginiaTech","WakeForest"],"ASUN":["AustinPeay","Bellarmine","CentralArkansas","EasternKentucky","FloridaGulfCoast","Jacksonville","Lipscomb","NorthAlabama","NorthFlorida","Queens","Stetson","WestGeorgia"],"America East":["Albany","Binghamton","Bryant","Maine","NJIT","NewHampshire","UMBC","UMassLowell","Vermont"],"American":["Charlotte","EastCarolina","FloridaAtlantic","Memphis","NorthTexas","Rice","SouthFlorida","Temple","Tulane","Tulsa","UAB","UTSA","WichitaState"],"Atlantic 10":["Davidson","Dayton","Duquesne","Fordham","GeorgeMason","GeorgeWashington","LaSalle","LoyolaChicago","RhodeIsland","Richmond","SaintJosephs","SaintLouis","StBonaventure","UMass","VCU"],"Big 12":["Arizona","ArizonaState","BYU","Baylor","Cincinnati","Colorado","Houston","IowaState","Kansas","KansasState","OklahomaState","TCU","TexasTech","UCF","Utah","WestVirginia"],"Big East":["Butler","Creighton","DePaul","Georgetown","Marquette","Providence","SetonHall","StJohns","UConn","Villanova","Xavier"],"Big Sky":["EasternWashington","Idaho","IdahoState","Montana","MontanaState","NorthernArizona","NorthernColorado","PortlandState","SacramentoState","WeberState"],"Big South":["CharlestonSouthern","GardnerWebb","HighPoint","Longwood","Presbyterian","Radford","UNCAsheville","USCUpstate","Winthrop"],"Big Ten":["Illinois","Indiana","Iowa","Maryland","Michigan","MichiganState","Minnesota","Nebraska","Northwestern","OhioState","Oregon","PennState","Purdue","Rutgers","UCLA","USC","Washington","Wisconsin"],"Big West":["CSUBakersfield","CSUN","CalPoly","CalStateFullerton","Hawaii","LongBeachState","UCDavis","UCIrvine","UCRiverside","UCSanDiego","UCSantaBarbara"],"CAA":["Campbell","Charleston","Delaware","Drexel","Elon","Hampton","Hofstra","Monmouth","NorthCarolinaAT","Northeastern","StonyBrook","Towson","UNCWilmington","WilliamandMary"],"Conference USA":["FIU","JacksonvilleState","KennesawState","Liberty","LouisianaTech","MiddleTennessee","NewMexicoState","SamHouston","UTEP","WesternKentucky"],"Horizon":["ClevelandState","DetroitMercy","GreenBay","IUPUI","Milwaukee","NorthernKentucky","Oakland","PurdueFortWayne","RobertMorris","WrightState","YoungstownState"],"Ivy":["Brown","Columbia","Cornell","Dartmouth","Harvard","Penn","Princeton","Yale"],"MAAC":["Canisius","Fairfield","Iona","Manhattan","Marist","Merrimack","MountStMarys","Niagara","Quinnipiac","Rider","SacredHeart","SaintPeters","Siena"],"MAC":["Akron","BallState","BowlingGreen","Buffalo","CentralMichigan","EasternMichigan","KentState","MiamiOH","NorthernIllinois","Ohio","Toledo","WesternMichigan"],"MEAC":["CoppinState","DelawareState","Howard","MorganState","NorfolkState","NorthCarolinaCentral","SCState","UMES"],"Missouri Valley":["Belmont","Bradley","Drake","Evansville","IllinoisState","IndianaState","MissouriState","MurrayState","NorthernIowa","SouthernIllinois","UIC","Valparaiso"],"Mountain West":["AirForce","BoiseState","ColoradoState","FresnoState","Nevada","NewMexico","SanDiegoState","SanJoseState","UNLV","UtahState","Wyoming"],"NEC":["CentralConnecticut","ChicagoState","FairleighDickinson","LIU","LeMoyne","Mercyhurst","SaintFrancisPA","Stonehill","Wagner"],"OVC":["EasternIllinois","Lindenwood","LittleRock","MoreheadState","SEMissouriState","SIUEdwardsville","SouthernIndiana","TennesseeState","TennesseeTech","UTMartin","WesternIllinois"],"Patriot":["American","Army","BostonUniversity","Bucknell","Colgate","HolyCross","Lafayette","Lehigh","LoyolaMD","Navy"],"SEC":["Alabama","Arkansas","Auburn","Florida","Georgia","Kentucky","LSU","MississippiState","Missouri","Oklahoma","OleMiss","SouthCarolina","Tennessee","Texas","TexasAM","Vanderbilt"],"SWAC":["AlabamaAM","AlabamaState","AlcornState","ArkansasPineBluff","BethuneCookman","FloridaAM","GramblingState","JacksonState","MississippiValleyState","PrairieViewAM","Southern","TexasSouthern"],"SoCon":["Chattanooga","EastTennesseeState","Furman","Mercer","Samford","TheCitadel","UNCGreensboro","VMI","WesternCarolina","Wofford"],"Southland":["HoustonChristian","IncarnateWord","Lamar","McNeese","NewOrleans","Nicholls","NorthwesternState","SELouisiana","StephenFAustin","TexasAMCommerce","TexasAMCorpusChristi","UTRGV"],"Summit":["Denver","KansasCity","NorthDakota","NorthDakotaState","Omaha","OralRoberts","SouthDakota","SouthDakotaState","StThomas"],"Sun Belt":["AppalachianState","ArkansasState","CoastalCarolina","GeorgiaSouthern","GeorgiaState","JamesMadison","Louisiana","LouisianaMonroe","Marshall","OldDominion","SouthAlabama","SouthernMiss","TexasState","Troy"],"WAC":["AbileneChristian","CaliforniaBaptist","GrandCanyon","Seattle","SouthernUtah","TarletonState","UTArlington","UtahTech","UtahValley"],"WCC":["Gonzaga","LoyolaMarymount","OregonState","Pacific","Pepperdine","Portland","SaintMarys","SanDiego","SanFrancisco","SantaClara","WashingtonState"]},"2026":{"ACC":["BostonCollege","California","Clemson","Duke","FloridaState","GeorgiaTech","Louisville","MiamiFL","NCState","NorthCarolina","NotreDame","Pitt","SMU","Stanford","Syracuse","Virginia","VirginiaTech","WakeForest"],"ASUN":["AustinPeay","Bellarmine","CentralArkansas","EasternKentucky","FloridaGulfCoast","Jacksonville","Lipscomb","NorthAlabama","NorthFlorida","Queens","Stetson","WestGeorgia"],"America East":["Albany","Binghamton","Bryant","Maine","NJIT","NewHampshire","UMBC","UMassLowell","Vermont"],"American":["Charlotte","EastCarolina","FloridaAtlantic","Memphis","NorthTexas","Rice","SouthFlorida","Temple","Tulane","Tulsa","UAB","UTSA","WichitaState"],"Atlantic 10":["Davidson","Dayton","Duquesne","Fordham","GeorgeMason","GeorgeWashington","LaSalle","LoyolaChicago","RhodeIsland","Richmond","SaintJosephs","SaintLouis","StBonaventure","VCU"],"Big 12":["Arizona","ArizonaState","BYU","Baylor","Cincinnati","Colorado","Houston","IowaState","Kansas","KansasState","OklahomaState","TCU","TexasTech","UCF","Utah","WestVirginia"],"Big East":["Butler","Creighton","DePaul","Georgetown","Marquette","Providence","SetonHall","StJohns","UConn","Villanova","Xavier"],"Big Sky":["EasternWashington","Idaho","IdahoState","Montana","MontanaState","NorthernArizona","NorthernColorado","PortlandState","SacramentoState","WeberState"],"Big South":["CharlestonSouthern","GardnerWebb","HighPoint","Longwood","Presbyterian","Radford","UNCAsheville","USCUpstate","Winthrop"],"Big Ten":["Illinois","Indiana","Iowa","Maryland","Michigan","MichiganState","Minnesota","Nebraska","Northwestern","OhioState","Oregon","PennState","Purdue","Rutgers","UCLA","USC","Washington","Wisconsin"],"Big West":["CSUBakersfield","CSUN","CalPoly","CalStateFullerton","Hawaii","LongBeachState","UCDavis","UCIrvine","UCRiverside","UCSanDiego","UCSantaBarbara"],"CAA":["Campbell","Charleston","Drexel","Elon","Hampton","Hofstra","Monmouth","NorthCarolinaAT","Northeastern","StonyBrook","Towson","UNCWilmington","WilliamandMary"],"Conference USA":["Delaware","FIU","JacksonvilleState","KennesawState","Liberty","LouisianaTech","MiddleTennessee","MissouriState","NewMexicoState","SamHouston","UTEP","WesternKentucky"],"Horizon":["ClevelandState","DetroitMercy","GreenBay","IUPUI","Milwaukee","NorthernKentucky","Oakland","PurdueFortWayne","RobertMorris","WrightState","YoungstownState"],"Ivy":["Brown","Columbia","Cornell","Dartmouth","Harvard","Penn","Princeton","Yale"],"MAAC":["Canisius","Fairfield","Iona","Manhattan","Marist","Merrimack","MountStMarys","Niagara","Quinnipiac","Rider","SacredHeart","SaintPeters","Siena"],"MAC":["Akron","BallState","BowlingGreen","Buffalo","CentralMichigan","EasternMichigan","KentState","MiamiOH","NorthernIllinois","Ohio","Toledo","UMass","WesternMichigan"],"MEAC":["CoppinState","DelawareState","Howard","MorganState","NorfolkState","NorthCarolinaCentral","SCState","UMES"],"Missouri Valley":["Belmont","Bradley","Drake","Evansville","IllinoisState","IndianaState","MurrayState","NorthernIowa","SouthernIllinois","UIC","Valparaiso"],"Mountain West":["AirForce","BoiseState","ColoradoState","FresnoState","GrandCanyon","Nevada","NewMexico","SanDiegoState","SanJoseState","UNLV","UtahState","Wyoming"],"NEC":["CentralConnecticut","ChicagoState","FairleighDickinson","LIU","LeMoyne","Mercyhurst","NewHaven","SaintFrancisPA","Stonehill","Wagner"],"OVC":["EasternIllinois","Lindenwood","LittleRock","MoreheadState","SEMissouriState","SIUEdwardsville","SouthernIndiana","TennesseeState","TennesseeTech","UTMartin","WesternIllinois"],"Patriot":["American","Army","BostonUniversity","Bucknell","Colgate","HolyCross","Lafayette","Lehigh","LoyolaMD","Navy"],"SEC":["Alabama","Arkansas","Auburn","Florida","Georgia","Kentucky","LSU","MississippiState","Missouri","Oklahoma","OleMiss","SouthCarolina","Tennessee","Texas","TexasAM","Vanderbilt"],"SWAC":["AlabamaAM","AlabamaState","AlcornState","ArkansasPineBluff","BethuneCookman","FloridaAM","GramblingState","JacksonState","MississippiValleyState","PrairieViewAM","Southern","TexasSouthern"],"SoCon":["Chattanooga","EastTennesseeState","Furman","Mercer","Samford","TheCitadel","UNCGreensboro","VMI","WesternCarolina","Wofford"],"Southland":["HoustonChristian","IncarnateWord","Lamar","McNeese","NewOrleans","Nicholls","NorthwesternState","SELouisiana","StephenFAustin","TexasAMCommerce","TexasAMCorpusChristi","UTRGV"],"Summit":["Denver","KansasCity","NorthDakota","NorthDakotaState","Omaha","OralRoberts","SouthDakota","SouthDakotaState","StThomas"],"Sun Belt":["AppalachianState","ArkansasState","CoastalCarolina","GeorgiaSouthern","GeorgiaState","JamesMadison","Louisiana","LouisianaMonroe","Marshall","OldDominion","SouthAlabama","SouthernMiss","TexasState","Troy"],"WAC":["AbileneChristian","CaliforniaBaptist","SouthernUtah","TarletonState","UTArlington","UtahTech","UtahValley"],"WCC":["Gonzaga","LoyolaMarymount","OregonState","Pacific","Pepperdine","Portland","SaintMarys","SanDiego","SanFrancisco","SantaClara","Seattle","WashingtonState"]},"2027":{"ACC":["BostonCollege","California","Clemson","Duke","FloridaState","GeorgiaTech","Louisville","MiamiFL","NCState","NorthCarolina","NotreDame","Pitt","SMU","Stanford","Syracuse","Virginia","VirginiaTech","WakeForest"],"ASUN":["Bellarmine","FloridaGulfCoast","Jacksonville","Lipscomb","NorthFlorida","Queens","Stetson","WestFlorida"],"America East":["Albany","Binghamton","Bryant","Maine","NJIT","NewHampshire","UMBC","UMassLowell","Vermont"],"American":["Charlotte","EastCarolina","FloridaAtlantic","Memphis","NorthTexas","Rice","SouthFlorida","Temple","Tulane","Tulsa","UAB","UTSA","WichitaState"],"Atlantic 10":["Davidson","Dayton","Duquesne","Fordham","GeorgeMason","GeorgeWashington","LaSalle","LoyolaChicago","RhodeIsland","Richmond","SaintJosephs","SaintLouis","StBonaventure","VCU"],"Big 12":["Arizona","ArizonaState","BYU","Baylor","Cincinnati","Colorado","Houston","IowaState","Kansas","KansasState","OklahomaState","TCU","TexasTech","UCF","Utah","WestVirginia"],"Big East":["Butler","Creighton","DePaul","Georgetown","Marquette","Providence","SetonHall","StJohns","UConn","Villanova","Xavier"],"Big Sky":["EasternWashington","Idaho","IdahoState","Montana","MontanaState","NorthernArizona","NorthernColorado","PortlandState","SouthernUtah","UtahTech","WeberState"],"Big South":["CharlestonSouthern","GardnerWebb","HighPoint","Longwood","Presbyterian","Radford","UNCAsheville","USCUpstate","Winthrop"],"Big Ten":["Illinois","Indiana","Iowa","Maryland","Michigan","MichiganState","Minnesota","Nebraska","Northwestern","OhioState","Oregon","PennState","Purdue","Rutgers","UCLA","USC","Washington","Wisconsin"],"Big West":["CSUBakersfield","CSUN","CalPoly","CalStateFullerton","CaliforniaBaptist","LongBeachState","SacramentoState","UCIrvine","UCRiverside","UCSanDiego","UCSantaBarbara","UtahValley"],"CAA":["Campbell","Charleston","Drexel","Elon","Hampton","Hofstra","Monmouth","NorthCarolinaAT","Northeastern","StonyBrook","Towson","UNCWilmington","WilliamandMary"],"Conference USA":["Delaware","FIU","JacksonvilleState","KennesawState","Liberty","MiddleTennessee","MissouriState","NewMexicoState","SamHouston","WesternKentucky"],"Horizon":["ClevelandState","DetroitMercy","GreenBay","IUPUI","Milwaukee","NorthernIllinois","NorthernKentucky","Oakland","PurdueFortWayne","RobertMorris","WrightState","YoungstownState"],"Ivy":["Brown","Columbia","Cornell","Dartmouth","Harvard","Penn","Princeton","Yale"],"MAC":["Akron","BallState","BowlingGreen","Buffalo","CentralMichigan","EasternMichigan","KentState","MiamiOH","Ohio","Toledo","UMass","WesternMichigan"],"MEAC":["CoppinState","DelawareState","Howard","MorganState","NorfolkState","NorthCarolinaCentral","SCState","UMES"],"Metro":["Canisius","Fairfield","Iona","Manhattan","Marist","Merrimack","MountStMarys","Niagara","Quinnipiac","Rider","SacredHeart","SaintPeters","Siena"],"Missouri Valley":["Belmont","Bradley","Drake","Evansville","IllinoisState","IndianaState","MurrayState","NorthernIowa","SouthernIllinois","UIC","Valparaiso"],"Mountain West":["AirForce","GrandCanyon","Hawaii","Nevada","NewMexico","SanJoseState","UCDavis","UNLV","UTEP","Wyoming"],"NEC":["CentralConnecticut","ChicagoState","FairleighDickinson","LIU","LeMoyne","Mercyhurst","NewHaven","Stonehill","Wagner"],"OVC":["EasternIllinois","Lindenwood","MoreheadState","SEMissouriState","SIUEdwardsville","SouthernIndiana","TennesseeState","UTMartin","WesternIllinois"],"Pac-12":["BoiseState","ColoradoState","FresnoState","Gonzaga","OregonState","SanDiegoState","TexasState","UtahState","WashingtonState"],"Patriot":["American","Army","BostonUniversity","Bucknell","Colgate","HolyCross","Lafayette","Lehigh","LoyolaMD","Navy"],"SEC":["Alabama","Arkansas","Auburn","Florida","Georgia","Kentucky","LSU","MississippiState","Missouri","Oklahoma","OleMiss","SouthCarolina","Tennessee","Texas","TexasAM","Vanderbilt"],"SWAC":["AlabamaAM","AlabamaState","AlcornState","ArkansasPineBluff","BethuneCookman","FloridaAM","GramblingState","JacksonState","MississippiValleyState","PrairieViewAM","Southern","TexasSouthern"],"SoCon":["Chattanooga","EastTennesseeState","Furman","Mercer","Samford","TennesseeTech","TheCitadel","UNCGreensboro","VMI","WesternCarolina","Wofford"],"Southland":["HoustonChristian","IncarnateWord","Lamar","McNeese","NewOrleans","Nicholls","NorthwesternState","SELouisiana","StephenFAustin","TexasAMCommerce","TexasAMCorpusChristi","UTRGV"],"Summit":["KansasCity","NorthDakota","NorthDakotaState","Omaha","OralRoberts","SouthDakota","SouthDakotaState","StThomas"],"Sun Belt":["AppalachianState","ArkansasState","CoastalCarolina","GeorgiaSouthern","GeorgiaState","JamesMadison","Louisiana","LouisianaMonroe","LouisianaTech","Marshall","OldDominion","SouthAlabama","SouthernMiss","Troy"],"UAC":["AbileneChristian","AustinPeay","CentralArkansas","EasternKentucky","LittleRock","NorthAlabama","TarletonState","UTArlington","WestGeorgia"],"WCC":["Denver","LoyolaMarymount","Pacific","Pepperdine","Portland","SaintMarys","SanDiego","SanFrancisco","SantaClara","Seattle"]}},"power":["ACC","Big Ten","Big 12","SEC","Big East","Pac-12"],"aliases":{"CollegeofCharleston":"Charleston","Citadel":"TheCitadel","NebraskaOmaha":"Omaha","MT":"MiddleTennessee","USF":"SouthFlorida","EastTexasAM":"TexasAMCommerce","IUIndy":"IUPUI"},"names":{"TexasAM":"Texas A&M","TexasAMCommerce":"East Texas A&M","TexasAMCorpusChristi":"Texas A&M-CC","FloridaAM":"Florida A&M","AlabamaAM":"Alabama A&M","PrairieViewAM":"Prairie View A&M","NorthCarolinaAT":"North Carolina A&T","IUPUI":"IU Indy","StJohns":"St. John's","SaintMarys":"Saint Mary's","SaintJosephs":"Saint Joseph's","SaintPeters":"Saint Peter's","MountStMarys":"Mount St. Mary's","StBonaventure":"St. Bonaventure","StThomas":"St. Thomas","SaintFrancisPA":"Saint Francis (PA)","MiamiFL":"Miami (FL)","MiamiOH":"Miami (OH)","OleMiss":"Ole Miss","NCState":"NC State","Pitt":"Pitt","TheCitadel":"The Citadel","LoyolaMD":"Loyola (MD)","LoyolaChicago":"Loyola Chicago","WilliamandMary":"William & Mary","StephenFAustin":"Stephen F. Austin","SEMissouriState":"SE Missouri State","SIUEdwardsville":"SIUE","SCState":"South Carolina State","UMES":"Maryland Eastern Shore","UNCGreensboro":"UNC Greensboro","UNCWilmington":"UNC Wilmington","UNCAsheville":"UNC Asheville","USCUpstate":"USC Upstate","UTMartin":"UT Martin","UTArlington":"UT Arlington","UTRGV":"UTRGV","ArkansasPineBluff":"Arkansas-Pine Bluff","BethuneCookman":"Bethune-Cookman","GardnerWebb":"Gardner-Webb","LouisianaMonroe":"Louisiana-Monroe","SELouisiana":"SE Louisiana","NJIT":"NJIT","UIC":"UIC","CSUBakersfield":"CSU Bakersfield","CSUN":"CSUN","CalStateFullerton":"Cal State Fullerton","LeMoyne":"Le Moyne","FairleighDickinson":"Fairleigh Dickinson","DetroitMercy":"Detroit Mercy","EastTennesseeState":"East Tennessee State","SouthFlorida":"South Florida","NewOrleans":"New Orleans","UMassLowell":"UMass Lowell","DePaul":"DePaul","UConn":"UConn","UMass":"UMass","McNeese":"McNeese"}};
+const CONFERENCE_DATA = {"seasons":{"2025":{"ACC":["BostonCollege","California","Clemson","Duke","FloridaState","GeorgiaTech","Louisville","MiamiFL","NCState","NorthCarolina","NotreDame","Pitt","SMU","Stanford","Syracuse","Virginia","VirginiaTech","WakeForest"],"ASUN":["AustinPeay","Bellarmine","CentralArkansas","EasternKentucky","FloridaGulfCoast","Jacksonville","Lipscomb","NorthAlabama","NorthFlorida","Queens","Stetson","WestGeorgia"],"America East":["Albany","Binghamton","Bryant","Maine","NJIT","NewHampshire","UMBC","UMassLowell","Vermont"],"American":["Charlotte","EastCarolina","FloridaAtlantic","Memphis","NorthTexas","Rice","SouthFlorida","Temple","Tulane","Tulsa","UAB","UTSA","WichitaState"],"Atlantic 10":["Davidson","Dayton","Duquesne","Fordham","GeorgeMason","GeorgeWashington","LaSalle","LoyolaChicago","RhodeIsland","Richmond","SaintJosephs","SaintLouis","StBonaventure","UMass","VCU"],"Big 12":["Arizona","ArizonaState","BYU","Baylor","Cincinnati","Colorado","Houston","IowaState","Kansas","KansasState","OklahomaState","TCU","TexasTech","UCF","Utah","WestVirginia"],"Big East":["Butler","Creighton","DePaul","Georgetown","Marquette","Providence","SetonHall","StJohns","UConn","Villanova","Xavier"],"Big Sky":["EasternWashington","Idaho","IdahoState","Montana","MontanaState","NorthernArizona","NorthernColorado","PortlandState","SacramentoState","WeberState"],"Big South":["CharlestonSouthern","GardnerWebb","HighPoint","Longwood","Presbyterian","Radford","UNCAsheville","USCUpstate","Winthrop"],"Big Ten":["Illinois","Indiana","Iowa","Maryland","Michigan","MichiganState","Minnesota","Nebraska","Northwestern","OhioState","Oregon","PennState","Purdue","Rutgers","UCLA","USC","Washington","Wisconsin"],"Big West":["CSUBakersfield","CSUN","CalPoly","CalStateFullerton","Hawaii","LongBeachState","UCDavis","UCIrvine","UCRiverside","UCSanDiego","UCSantaBarbara"],"CAA":["Campbell","Charleston","Delaware","Drexel","Elon","Hampton","Hofstra","Monmouth","NorthCarolinaAT","Northeastern","StonyBrook","Towson","UNCWilmington","WilliamandMary"],"Conference USA":["FIU","JacksonvilleState","KennesawState","Liberty","LouisianaTech","MiddleTennessee","NewMexicoState","SamHouston","UTEP","WesternKentucky"],"Horizon":["ClevelandState","DetroitMercy","GreenBay","IUPUI","Milwaukee","NorthernKentucky","Oakland","PurdueFortWayne","RobertMorris","WrightState","YoungstownState"],"Ivy":["Brown","Columbia","Cornell","Dartmouth","Harvard","Penn","Princeton","Yale"],"MAAC":["Canisius","Fairfield","Iona","Manhattan","Marist","Merrimack","MountStMarys","Niagara","Quinnipiac","Rider","SacredHeart","SaintPeters","Siena"],"MAC":["Akron","BallState","BowlingGreen","Buffalo","CentralMichigan","EasternMichigan","KentState","MiamiOH","NorthernIllinois","Ohio","Toledo","WesternMichigan"],"MEAC":["CoppinState","DelawareState","Howard","MorganState","NorfolkState","NorthCarolinaCentral","SCState","UMES"],"Missouri Valley":["Belmont","Bradley","Drake","Evansville","IllinoisState","IndianaState","MissouriState","MurrayState","NorthernIowa","SouthernIllinois","UIC","Valparaiso"],"Mountain West":["AirForce","BoiseState","ColoradoState","FresnoState","Nevada","NewMexico","SanDiegoState","SanJoseState","UNLV","UtahState","Wyoming"],"NEC":["CentralConnecticut","ChicagoState","FairleighDickinson","LIU","LeMoyne","Mercyhurst","SaintFrancisPA","Stonehill","Wagner"],"OVC":["EasternIllinois","Lindenwood","LittleRock","MoreheadState","SEMissouriState","SIUEdwardsville","SouthernIndiana","TennesseeState","TennesseeTech","UTMartin","WesternIllinois"],"Patriot":["American","Army","BostonUniversity","Bucknell","Colgate","HolyCross","Lafayette","Lehigh","LoyolaMD","Navy"],"SEC":["Alabama","Arkansas","Auburn","Florida","Georgia","Kentucky","LSU","MississippiState","Missouri","Oklahoma","OleMiss","SouthCarolina","Tennessee","Texas","TexasAM","Vanderbilt"],"SWAC":["AlabamaAM","AlabamaState","AlcornState","ArkansasPineBluff","BethuneCookman","FloridaAM","GramblingState","JacksonState","MississippiValleyState","PrairieViewAM","Southern","TexasSouthern"],"SoCon":["Chattanooga","EastTennesseeState","Furman","Mercer","Samford","TheCitadel","UNCGreensboro","VMI","WesternCarolina","Wofford"],"Southland":["HoustonChristian","IncarnateWord","Lamar","McNeese","NewOrleans","Nicholls","NorthwesternState","SELouisiana","StephenFAustin","TexasAMCommerce","TexasAMCorpusChristi","UTRGV"],"Summit":["Denver","KansasCity","NorthDakota","NorthDakotaState","Omaha","OralRoberts","SouthDakota","SouthDakotaState","StThomas"],"Sun Belt":["AppalachianState","ArkansasState","CoastalCarolina","GeorgiaSouthern","GeorgiaState","JamesMadison","Louisiana","LouisianaMonroe","Marshall","OldDominion","SouthAlabama","SouthernMiss","TexasState","Troy"],"WAC":["AbileneChristian","CaliforniaBaptist","GrandCanyon","Seattle","SouthernUtah","TarletonState","UTArlington","UtahTech","UtahValley"],"WCC":["Gonzaga","LoyolaMarymount","OregonState","Pacific","Pepperdine","Portland","SaintMarys","SanDiego","SanFrancisco","SantaClara","WashingtonState"]},"2026":{"ACC":["BostonCollege","California","Clemson","Duke","FloridaState","GeorgiaTech","Louisville","MiamiFL","NCState","NorthCarolina","NotreDame","Pitt","SMU","Stanford","Syracuse","Virginia","VirginiaTech","WakeForest"],"ASUN":["AustinPeay","Bellarmine","CentralArkansas","EasternKentucky","FloridaGulfCoast","Jacksonville","Lipscomb","NorthAlabama","NorthFlorida","Queens","Stetson","WestGeorgia"],"America East":["Albany","Binghamton","Bryant","Maine","NJIT","NewHampshire","UMBC","UMassLowell","Vermont"],"American":["Charlotte","EastCarolina","FloridaAtlantic","Memphis","NorthTexas","Rice","SouthFlorida","Temple","Tulane","Tulsa","UAB","UTSA","WichitaState"],"Atlantic 10":["Davidson","Dayton","Duquesne","Fordham","GeorgeMason","GeorgeWashington","LaSalle","LoyolaChicago","RhodeIsland","Richmond","SaintJosephs","SaintLouis","StBonaventure","VCU"],"Big 12":["Arizona","ArizonaState","BYU","Baylor","Cincinnati","Colorado","Houston","IowaState","Kansas","KansasState","OklahomaState","TCU","TexasTech","UCF","Utah","WestVirginia"],"Big East":["Butler","Creighton","DePaul","Georgetown","Marquette","Providence","SetonHall","StJohns","UConn","Villanova","Xavier"],"Big Sky":["EasternWashington","Idaho","IdahoState","Montana","MontanaState","NorthernArizona","NorthernColorado","PortlandState","SacramentoState","WeberState"],"Big South":["CharlestonSouthern","GardnerWebb","HighPoint","Longwood","Presbyterian","Radford","UNCAsheville","USCUpstate","Winthrop"],"Big Ten":["Illinois","Indiana","Iowa","Maryland","Michigan","MichiganState","Minnesota","Nebraska","Northwestern","OhioState","Oregon","PennState","Purdue","Rutgers","UCLA","USC","Washington","Wisconsin"],"Big West":["CSUBakersfield","CSUN","CalPoly","CalStateFullerton","Hawaii","LongBeachState","UCDavis","UCIrvine","UCRiverside","UCSanDiego","UCSantaBarbara"],"CAA":["Campbell","Charleston","Drexel","Elon","Hampton","Hofstra","Monmouth","NorthCarolinaAT","Northeastern","StonyBrook","Towson","UNCWilmington","WilliamandMary"],"Conference USA":["Delaware","FIU","JacksonvilleState","KennesawState","Liberty","LouisianaTech","MiddleTennessee","MissouriState","NewMexicoState","SamHouston","UTEP","WesternKentucky"],"Horizon":["ClevelandState","DetroitMercy","GreenBay","IUPUI","Milwaukee","NorthernKentucky","Oakland","PurdueFortWayne","RobertMorris","WrightState","YoungstownState"],"Ivy":["Brown","Columbia","Cornell","Dartmouth","Harvard","Penn","Princeton","Yale"],"MAAC":["Canisius","Fairfield","Iona","Manhattan","Marist","Merrimack","MountStMarys","Niagara","Quinnipiac","Rider","SacredHeart","SaintPeters","Siena"],"MAC":["Akron","BallState","BowlingGreen","Buffalo","CentralMichigan","EasternMichigan","KentState","MiamiOH","NorthernIllinois","Ohio","Toledo","UMass","WesternMichigan"],"MEAC":["CoppinState","DelawareState","Howard","MorganState","NorfolkState","NorthCarolinaCentral","SCState","UMES"],"Missouri Valley":["Belmont","Bradley","Drake","Evansville","IllinoisState","IndianaState","MurrayState","NorthernIowa","SouthernIllinois","UIC","Valparaiso"],"Mountain West":["AirForce","BoiseState","ColoradoState","FresnoState","GrandCanyon","Nevada","NewMexico","SanDiegoState","SanJoseState","UNLV","UtahState","Wyoming"],"NEC":["CentralConnecticut","ChicagoState","FairleighDickinson","LIU","LeMoyne","Mercyhurst","NewHaven","SaintFrancisPA","Stonehill","Wagner"],"OVC":["EasternIllinois","Lindenwood","LittleRock","MoreheadState","SEMissouriState","SIUEdwardsville","SouthernIndiana","TennesseeState","TennesseeTech","UTMartin","WesternIllinois"],"Patriot":["American","Army","BostonUniversity","Bucknell","Colgate","HolyCross","Lafayette","Lehigh","LoyolaMD","Navy"],"SEC":["Alabama","Arkansas","Auburn","Florida","Georgia","Kentucky","LSU","MississippiState","Missouri","Oklahoma","OleMiss","SouthCarolina","Tennessee","Texas","TexasAM","Vanderbilt"],"SWAC":["AlabamaAM","AlabamaState","AlcornState","ArkansasPineBluff","BethuneCookman","FloridaAM","GramblingState","JacksonState","MississippiValleyState","PrairieViewAM","Southern","TexasSouthern"],"SoCon":["Chattanooga","EastTennesseeState","Furman","Mercer","Samford","TheCitadel","UNCGreensboro","VMI","WesternCarolina","Wofford"],"Southland":["HoustonChristian","IncarnateWord","Lamar","McNeese","NewOrleans","Nicholls","NorthwesternState","SELouisiana","StephenFAustin","TexasAMCommerce","TexasAMCorpusChristi","UTRGV"],"Summit":["Denver","KansasCity","NorthDakota","NorthDakotaState","Omaha","OralRoberts","SouthDakota","SouthDakotaState","StThomas"],"Sun Belt":["AppalachianState","ArkansasState","CoastalCarolina","GeorgiaSouthern","GeorgiaState","JamesMadison","Louisiana","LouisianaMonroe","Marshall","OldDominion","SouthAlabama","SouthernMiss","TexasState","Troy"],"WAC":["AbileneChristian","CaliforniaBaptist","SouthernUtah","TarletonState","UTArlington","UtahTech","UtahValley"],"WCC":["Gonzaga","LoyolaMarymount","OregonState","Pacific","Pepperdine","Portland","SaintMarys","SanDiego","SanFrancisco","SantaClara","Seattle","WashingtonState"]},"2027":{"ACC":["BostonCollege","California","Clemson","Duke","FloridaState","GeorgiaTech","Louisville","MiamiFL","NCState","NorthCarolina","NotreDame","Pitt","SMU","Stanford","Syracuse","Virginia","VirginiaTech","WakeForest"],"ASUN":["Bellarmine","FloridaGulfCoast","Jacksonville","Lipscomb","NorthFlorida","Queens","Stetson","WestFlorida"],"America East":["Albany","Binghamton","Bryant","Maine","NJIT","NewHampshire","UMBC","UMassLowell","Vermont"],"American":["Charlotte","EastCarolina","FloridaAtlantic","Memphis","NorthTexas","Rice","SouthFlorida","Temple","Tulane","Tulsa","UAB","UTSA","WichitaState"],"Atlantic 10":["Davidson","Dayton","Duquesne","Fordham","GeorgeMason","GeorgeWashington","LaSalle","LoyolaChicago","RhodeIsland","Richmond","SaintJosephs","SaintLouis","StBonaventure","VCU"],"Big 12":["Arizona","ArizonaState","BYU","Baylor","Cincinnati","Colorado","Houston","IowaState","Kansas","KansasState","OklahomaState","TCU","TexasTech","UCF","Utah","WestVirginia"],"Big East":["Butler","Creighton","DePaul","Georgetown","Marquette","Providence","SetonHall","StJohns","UConn","Villanova","Xavier"],"Big Sky":["EasternWashington","Idaho","IdahoState","Montana","MontanaState","NorthernArizona","NorthernColorado","PortlandState","SouthernUtah","UtahTech","WeberState"],"Big South":["CharlestonSouthern","GardnerWebb","HighPoint","Longwood","Presbyterian","Radford","UNCAsheville","USCUpstate","Winthrop"],"Big Ten":["Illinois","Indiana","Iowa","Maryland","Michigan","MichiganState","Minnesota","Nebraska","Northwestern","OhioState","Oregon","PennState","Purdue","Rutgers","UCLA","USC","Washington","Wisconsin"],"Big West":["CSUBakersfield","CSUN","CalPoly","CalStateFullerton","CaliforniaBaptist","LongBeachState","SacramentoState","UCIrvine","UCRiverside","UCSanDiego","UCSantaBarbara","UtahValley"],"CAA":["Campbell","Charleston","Drexel","Elon","Hampton","Hofstra","Monmouth","NorthCarolinaAT","Northeastern","StonyBrook","Towson","UNCWilmington","WilliamandMary"],"Conference USA":["Delaware","FIU","JacksonvilleState","KennesawState","Liberty","MiddleTennessee","MissouriState","NewMexicoState","SamHouston","WesternKentucky"],"Horizon":["ClevelandState","DetroitMercy","GreenBay","IUPUI","Milwaukee","NorthernIllinois","NorthernKentucky","Oakland","PurdueFortWayne","RobertMorris","WrightState","YoungstownState"],"Ivy":["Brown","Columbia","Cornell","Dartmouth","Harvard","Penn","Princeton","Yale"],"MAC":["Akron","BallState","BowlingGreen","Buffalo","CentralMichigan","EasternMichigan","KentState","MiamiOH","Ohio","Toledo","UMass","WesternMichigan"],"MEAC":["CoppinState","DelawareState","Howard","MorganState","NorfolkState","NorthCarolinaCentral","SCState","UMES"],"Metro":["Canisius","Fairfield","Iona","Manhattan","Marist","Merrimack","MountStMarys","Niagara","Quinnipiac","Rider","SacredHeart","SaintPeters","Siena"],"Missouri Valley":["Belmont","Bradley","Drake","Evansville","IllinoisState","IndianaState","MurrayState","NorthernIowa","SouthernIllinois","UIC","Valparaiso"],"Mountain West":["AirForce","GrandCanyon","Hawaii","Nevada","NewMexico","SanJoseState","UCDavis","UNLV","UTEP","Wyoming"],"NEC":["CentralConnecticut","ChicagoState","FairleighDickinson","LIU","LeMoyne","Mercyhurst","NewHaven","Stonehill","Wagner"],"OVC":["EasternIllinois","Lindenwood","MoreheadState","SEMissouriState","SIUEdwardsville","SouthernIndiana","TennesseeState","UTMartin","WesternIllinois"],"Pac-12":["BoiseState","ColoradoState","FresnoState","Gonzaga","OregonState","SanDiegoState","TexasState","UtahState","WashingtonState"],"Patriot":["American","Army","BostonUniversity","Bucknell","Colgate","HolyCross","Lafayette","Lehigh","LoyolaMD","Navy"],"SEC":["Alabama","Arkansas","Auburn","Florida","Georgia","Kentucky","LSU","MississippiState","Missouri","Oklahoma","OleMiss","SouthCarolina","Tennessee","Texas","TexasAM","Vanderbilt"],"SWAC":["AlabamaAM","AlabamaState","AlcornState","ArkansasPineBluff","BethuneCookman","FloridaAM","GramblingState","JacksonState","MississippiValleyState","PrairieViewAM","Southern","TexasSouthern"],"SoCon":["Chattanooga","EastTennesseeState","Furman","Mercer","Samford","TennesseeTech","TheCitadel","UNCGreensboro","VMI","WesternCarolina","Wofford"],"Southland":["HoustonChristian","IncarnateWord","Lamar","McNeese","NewOrleans","Nicholls","NorthwesternState","SELouisiana","StephenFAustin","TexasAMCommerce","TexasAMCorpusChristi","UTRGV"],"Summit":["KansasCity","NorthDakota","NorthDakotaState","Omaha","OralRoberts","SouthDakota","SouthDakotaState","StThomas"],"Sun Belt":["AppalachianState","ArkansasState","CoastalCarolina","GeorgiaSouthern","GeorgiaState","JamesMadison","Louisiana","LouisianaMonroe","LouisianaTech","Marshall","OldDominion","SouthAlabama","SouthernMiss","Troy"],"UAC":["AbileneChristian","AustinPeay","CentralArkansas","EasternKentucky","LittleRock","NorthAlabama","TarletonState","UTArlington","WestGeorgia"],"WCC":["Denver","LoyolaMarymount","Pacific","Pepperdine","Portland","SaintMarys","SanDiego","SanFrancisco","SantaClara","Seattle"]}},"power":["ACC","Big Ten","Big 12","SEC","Big East","Pac-12"],"aliases":{"CollegeofCharleston":"Charleston","Citadel":"TheCitadel","NebraskaOmaha":"Omaha","MT":"MiddleTennessee","USF":"SouthFlorida","EastTexasAM":"TexasAMCommerce","IUIndy":"IUPUI"},"names":{"TexasAM":"Texas A&M","TexasAMCommerce":"East Texas A&M","TexasAMCorpusChristi":"Texas A&M-CC","FloridaAM":"Florida A&M","AlabamaAM":"Alabama A&M","PrairieViewAM":"Prairie View A&M","NorthCarolinaAT":"North Carolina A&T","IUPUI":"IU Indy","StJohns":"St. John's","SaintMarys":"Saint Mary's","SaintJosephs":"Saint Joseph's","SaintPeters":"Saint Peter's","MountStMarys":"Mount St. Mary's","StBonaventure":"St. Bonaventure","StThomas":"St. Thomas","SaintFrancisPA":"Saint Francis (PA)","MiamiFL":"Miami (FL)","MiamiOH":"Miami (OH)","OleMiss":"Ole Miss","NCState":"NC State","Pitt":"Pitt","TheCitadel":"The Citadel","LoyolaMD":"Loyola (MD)","LoyolaChicago":"Loyola Chicago","WilliamandMary":"William & Mary","StephenFAustin":"Stephen F. Austin","SEMissouriState":"SE Missouri State","SIUEdwardsville":"SIUE","SCState":"South Carolina State","UMES":"Maryland Eastern Shore","UNCGreensboro":"UNC Greensboro","UNCWilmington":"UNC Wilmington","UNCAsheville":"UNC Asheville","USCUpstate":"USC Upstate","UTMartin":"UT Martin","UTArlington":"UT Arlington","UTRGV":"UTRGV","ArkansasPineBluff":"Arkansas-Pine Bluff","BethuneCookman":"Bethune-Cookman","GardnerWebb":"Gardner-Webb","LouisianaMonroe":"Louisiana-Monroe","SELouisiana":"SE Louisiana","NJIT":"NJIT","UIC":"UIC","CSUBakersfield":"CSU Bakersfield","CSUN":"CSUN","CalStateFullerton":"Cal State Fullerton","LeMoyne":"Le Moyne","FairleighDickinson":"Fairleigh Dickinson","DetroitMercy":"Detroit Mercy","EastTennesseeState":"East Tennessee State","SouthFlorida":"South Florida","NewOrleans":"New Orleans","UMassLowell":"UMass Lowell","DePaul":"DePaul","UConn":"UConn","UMass":"UMass","McNeese":"McNeese"},"espn":{"AbileneChristian":"2000","AirForce":"2005","Akron":"2006","Alabama":"333","AlabamaAM":"2010","AlabamaState":"2011","Albany":"399","AlcornState":"2016","American":"44","AppalachianState":"2026","Arizona":"12","ArizonaState":"9","Arkansas":"8","ArkansasPineBluff":"2029","ArkansasState":"2032","Army":"349","Auburn":"2","AustinPeay":"2046","BYU":"252","BallState":"2050","Baylor":"239","Bellarmine":"91","Belmont":"2057","BethuneCookman":"2065","Binghamton":"2066","BoiseState":"68","BostonCollege":"103","BostonUniversity":"104","BowlingGreen":"189","Bradley":"71","Brown":"225","Bryant":"2803","Bucknell":"2083","Buffalo":"2084","Butler":"2086","CSUBakersfield":"2934","CSUN":"2463","CalPoly":"13","CalStateFullerton":"2239","California":"25","CaliforniaBaptist":"2856","Campbell":"2097","Canisius":"2099","CentralArkansas":"2110","CentralConnecticut":"2115","CentralMichigan":"2117","Charleston":"232","CharlestonSouthern":"2127","Charlotte":"2429","Chattanooga":"236","ChicagoState":"2130","Cincinnati":"2132","Clemson":"228","ClevelandState":"325","CoastalCarolina":"324","Colgate":"2142","Colorado":"38","ColoradoState":"36","Columbia":"171","CoppinState":"2154","Cornell":"172","Creighton":"156","Dartmouth":"159","Davidson":"2166","Dayton":"2168","DePaul":"305","Delaware":"48","DelawareState":"2169","Denver":"2172","DetroitMercy":"2174","Drake":"2181","Drexel":"2182","Duke":"150","Duquesne":"2184","EastCarolina":"151","EastTennesseeState":"2193","EasternIllinois":"2197","EasternKentucky":"2198","EasternMichigan":"2199","EasternWashington":"331","Elon":"2210","Evansville":"339","FIU":"2229","Fairfield":"2217","FairleighDickinson":"161","Florida":"57","FloridaAM":"50","FloridaAtlantic":"2226","FloridaGulfCoast":"526","FloridaState":"52","Fordham":"2230","FresnoState":"278","Furman":"231","GardnerWebb":"2241","GeorgeMason":"2244","GeorgeWashington":"45","Georgetown":"46","Georgia":"61","GeorgiaSouthern":"290","GeorgiaState":"2247","GeorgiaTech":"59","Gonzaga":"2250","GramblingState":"2755","GrandCanyon":"2253","GreenBay":"2739","Hampton":"2261","Harvard":"108","Hawaii":"62","HighPoint":"2272","Hofstra":"2275","HolyCross":"107","Houston":"248","HoustonChristian":"2277","Howard":"47","IUPUI":"85","Idaho":"70","IdahoState":"304","Illinois":"356","IllinoisState":"2287","IncarnateWord":"2916","Indiana":"84","IndianaState":"282","Iona":"314","Iowa":"2294","IowaState":"66","JacksonState":"2296","Jacksonville":"294","JacksonvilleState":"55","JamesMadison":"256","Kansas":"2305","KansasCity":"140","KansasState":"2306","KennesawState":"338","KentState":"2309","Kentucky":"96","LIU":"112358","LSU":"99","LaSalle":"2325","Lafayette":"322","Lamar":"2320","LeMoyne":"2330","Lehigh":"2329","Liberty":"2335","Lindenwood":"2815","Lipscomb":"288","LittleRock":"2031","LongBeachState":"299","Longwood":"2344","Louisiana":"309","LouisianaMonroe":"2433","LouisianaTech":"2348","Louisville":"97","LoyolaChicago":"2350","LoyolaMD":"2352","LoyolaMarymount":"2351","Maine":"311","Manhattan":"2363","Marist":"2368","Marquette":"269","Marshall":"276","Maryland":"120","McNeese":"2377","Memphis":"235","Mercer":"2382","Mercyhurst":"2385","Merrimack":"2771","MiamiFL":"2390","MiamiOH":"193","Michigan":"130","MichiganState":"127","MiddleTennessee":"2393","Milwaukee":"270","Minnesota":"135","MississippiState":"344","MississippiValleyState":"2400","Missouri":"142","MissouriState":"2623","Monmouth":"2405","Montana":"149","MontanaState":"147","MoreheadState":"2413","MorganState":"2415","MountStMarys":"116","MurrayState":"93","NCState":"152","NJIT":"2885","Navy":"2426","Nebraska":"158","Nevada":"2440","NewHampshire":"160","NewHaven":"2441","NewMexico":"167","NewMexicoState":"166","NewOrleans":"2443","Niagara":"315","Nicholls":"2447","NorfolkState":"2450","NorthAlabama":"2453","NorthCarolina":"153","NorthCarolinaAT":"2448","NorthCarolinaCentral":"2428","NorthDakota":"155","NorthDakotaState":"2449","NorthFlorida":"2454","NorthTexas":"249","Northeastern":"111","NorthernArizona":"2464","NorthernColorado":"2458","NorthernIllinois":"2459","NorthernIowa":"2460","NorthernKentucky":"94","Northwestern":"77","NorthwesternState":"2466","NotreDame":"87","Oakland":"2473","Ohio":"195","OhioState":"194","Oklahoma":"201","OklahomaState":"197","OldDominion":"295","OleMiss":"145","Omaha":"2437","OralRoberts":"198","Oregon":"2483","OregonState":"204","Pacific":"279","Penn":"219","PennState":"213","Pepperdine":"2492","Pitt":"221","Portland":"2501","PortlandState":"2502","PrairieViewAM":"2504","Presbyterian":"2506","Princeton":"163","Providence":"2507","Purdue":"2509","PurdueFortWayne":"2870","Queens":"2511","Quinnipiac":"2514","Radford":"2515","RhodeIsland":"227","Rice":"242","Richmond":"257","Rider":"2520","RobertMorris":"2523","Rutgers":"164","SCState":"2569","SELouisiana":"2545","SEMissouriState":"2546","SIUEdwardsville":"2565","SMU":"2567","SacramentoState":"16","SacredHeart":"2529","SaintFrancisPA":"2598","SaintJosephs":"2603","SaintLouis":"139","SaintMarys":"2608","SaintPeters":"2612","SamHouston":"2534","Samford":"2535","SanDiego":"301","SanDiegoState":"21","SanFrancisco":"2539","SanJoseState":"23","SantaClara":"2541","Seattle":"2547","SetonHall":"2550","Siena":"2561","SouthAlabama":"6","SouthCarolina":"2579","SouthDakota":"233","SouthDakotaState":"2571","SouthFlorida":"58","Southern":"2582","SouthernIllinois":"79","SouthernIndiana":"88","SouthernMiss":"2572","SouthernUtah":"253","StBonaventure":"179","StJohns":"2599","StThomas":"2900","Stanford":"24","StephenFAustin":"2617","Stetson":"56","Stonehill":"284","StonyBrook":"2619","Syracuse":"183","TCU":"2628","TarletonState":"2627","Temple":"218","Tennessee":"2633","TennesseeState":"2634","TennesseeTech":"2635","Texas":"251","TexasAM":"245","TexasAMCommerce":"2837","TexasAMCorpusChristi":"357","TexasSouthern":"2640","TexasState":"326","TexasTech":"2641","TheCitadel":"2643","Toledo":"2649","Towson":"119","Troy":"2653","Tulane":"2655","Tulsa":"202","UAB":"5","UCDavis":"302","UCF":"2116","UCIrvine":"300","UCLA":"26","UCRiverside":"27","UCSanDiego":"28","UCSantaBarbara":"2540","UConn":"41","UIC":"82","UMBC":"2378","UMES":"2379","UMass":"113","UMassLowell":"2349","UNCAsheville":"2427","UNCGreensboro":"2430","UNCWilmington":"350","UNLV":"2439","USC":"30","USCUpstate":"2908","UTArlington":"250","UTEP":"2638","UTMartin":"2630","UTRGV":"292","UTSA":"2636","Utah":"254","UtahState":"328","UtahTech":"3101","UtahValley":"3084","VCU":"2670","VMI":"2678","Valparaiso":"2674","Vanderbilt":"238","Vermont":"261","Villanova":"222","Virginia":"258","VirginiaTech":"259","Wagner":"2681","WakeForest":"154","Washington":"264","WashingtonState":"265","WeberState":"2692","WestFlorida":"2697","WestGeorgia":"2698","WestVirginia":"277","WesternCarolina":"2717","WesternIllinois":"2710","WesternKentucky":"98","WesternMichigan":"2711","WichitaState":"2724","WilliamandMary":"2729","Winthrop":"2737","Wisconsin":"275","Wofford":"2747","WrightState":"2750","Wyoming":"2751","Xavier":"2752","Yale":"43","YoungstownState":"2754"}};
 const isDarkMode=()=>document.body.classList.contains('dark');
 const SVG_NS="http://www.w3.org/2000/svg";
 let _sortedTabsCache=null;
@@ -4157,6 +4223,7 @@ return CONFERENCE_DATA.seasons[Math.min(year,seasons[seasons.length - 1])];
 function conferenceGroups(year){
 const table=conferenceTable(year);
 if(!table)return null;
+const power=CONFERENCE_DATA.power;
 const groups=power.filter(c=>table[c]).map(c=>({label:c,teams:new Set(table[c])}));
 const all=conf=>new Set(Object.keys(table).filter(conf).flatMap(c=>table[c]));
 groups.push({label:"Power",teams:all(c=>power.includes(c))});
@@ -5094,6 +5161,10 @@ const isApMode=_apCurrentYear!==null;
 const allTabs=isApMode?getSortedApTabs():getSortedTabs();
 const yearTabs=allTabs.filter(t=>t.dataset.year===currentYear).reverse();
 if(yearTabs.length===0)return;
+if(mode==="records"){
+showSeasonRecords(currentYear,isApMode,activeTab);
+return;
+}
 const totalWeeks=yearTabs.length;
 const teamTotalPts={};
 const teamRankSum={};
@@ -5230,15 +5301,9 @@ return `<span class="${cls}"${title}>${label}</span> ${dev}`;
 const modal=document.getElementById("season-stats-modal");
 const title=document.getElementById("season-stats-title");
 const table=document.getElementById("season-stats-table");
-const modeTabs=[
-{key:"stats",label:"Stats"},
-{key:"voters",label:"Voters",hidden:mode!=="voters"},
-].filter(m=>!m.hidden).map(m=>
-`<span class="modal-mode-tab${mode===m.key?" active":""}"
-               onclick="showSeasonStatsModal('${m.key}')">${m.label}</span>`
-).join("");
-title.innerHTML=`${currentYear}${isApMode?" AP":""} Season — ${modeTabs}`;
+title.innerHTML=seasonModalTitleHtml(currentYear,isApMode,mode);
 table.classList.toggle("season-voters",mode==="voters");
+table.classList.remove("season-records");
 if(mode==="voters"){
 table.innerHTML=buildSeasonVotersTableHtml(weekBallots,voterWeeksVoted,minWeeksVoted,totalWeeks,esc);
 modal.classList.add("open");
@@ -5286,6 +5351,477 @@ html +=`<tr>
 html +=`</tbody>`;
 table.innerHTML=html;
 modal.classList.add("open");
+}
+function seasonModalTitleHtml(currentYear,isApMode,mode){
+const modeTabs=[
+{key:"stats",label:"Stats"},
+{key:"records",label:"Records"},
+{key:"voters",label:"Voters",hidden:mode!=="voters"},
+].filter(m=>!m.hidden).map(m=>
+`<span class="modal-mode-tab${mode===m.key?" active":""}"
+               onclick="showSeasonStatsModal('${m.key}')">${m.label}</span>`
+).join("");
+return `${currentYear}${isApMode?" AP":""} Season — ${modeTabs}`;
+}
+const ESPN_TTL_MS=10*60*1000;
+const ESPN_BASE="https://site.web.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball";
+const ESPN_STANDINGS_URL=season=>
+`https://site.web.api.espn.com/apis/v2/sports/basketball/mens-college-basketball/standings?group=50&season=${season}`;
+const _espnCache={};
+function espnIdFor(team){
+if(typeof CONFERENCE_DATA==="undefined"||!CONFERENCE_DATA.espn)return null;
+const aliases=CONFERENCE_DATA.aliases||{};
+return CONFERENCE_DATA.espn[aliases[team]||team]||CONFERENCE_DATA.espn[team]||null;
+}
+let _espnKeyOf=null;
+function espnTeamKey(id){
+if(!_espnKeyOf){
+_espnKeyOf={};
+if(typeof CONFERENCE_DATA!=="undefined")
+Object.entries(CONFERENCE_DATA.espn||{}).forEach(([k,i])=>{_espnKeyOf[i]=k;});
+}
+return _espnKeyOf[id]||null;
+}
+function espnLogoUrl(id){
+return `https://a.espncdn.com/i/teamlogos/ncaa/500/${id}.png`;
+}
+function _espnCached(key,load){
+const hit=_espnCache[key]||(_espnCache[key]={});
+if(hit.data&&Date.now()- hit.at<ESPN_TTL_MS)return Promise.resolve(hit.data);
+if(hit.promise)return hit.promise;
+hit.promise=load()
+.then(data=>{
+data.at=Date.now();
+Object.assign(hit,{data,at:data.at});
+return data;
+})
+.catch(err=>{
+if(hit.data)return{...hit.data,stale:err.message};
+throw err;
+})
+.finally(()=>{hit.promise=null;});
+return hit.promise;
+}
+function espnCachedData(key){return _espnCache[key]?.data||null;}
+async function _espnJson(url){
+const r=await fetch(url);
+if(!r.ok)throw new Error(`ESPN returned HTTP ${r.status}`);
+return r.json();
+}
+function fetchSeasonRecords(season){
+return _espnCached(`records:${season}`,async()=>{
+const json=await _espnJson(ESPN_STANDINGS_URL(season));
+const byId={},confs=[];
+const entriesOf=node=>[
+...(node.standings?.entries||[]),
+...(node.children||[]).flatMap(entriesOf),
+];
+(json.children||[]).forEach(conf=>{
+const name=conf.shortName||conf.abbreviation||conf.name;
+const ids=[];
+entriesOf(conf).forEach(e=>{
+const st={};
+(e.stats||[]).forEach(s=>{if(s.type)st[s.type]=s;});
+const dv=k=>st[k]?.displayValue||"";
+const wins=Number(st.wins?.value)||0;
+const losses=Number(st.losses?.value)||0;
+byId[e.team.id]={
+id:e.team.id,
+name:e.team.shortDisplayName||e.team.location||e.team.displayName,
+conf:name,wins,losses,
+pct:wins + losses?wins /(wins + losses):null,
+confRecord:dv("vsconf"),home:dv("home"),road:dv("road"),
+streak:dv("streak"),
+};
+ids.push(e.team.id);
+});
+if(ids.length)confs.push({name,ids});
+});
+const n=Object.keys(byId).length;
+if(n<250)throw new Error(`ESPN returned only ${n} teams`);
+return{byId,confs};
+});
+}
+function fetchTeamSchedule(id,season){
+return _espnCached(`schedule:${season}:${id}`,async()=>{
+const url=t=>`${ESPN_BASE}/teams/${id}/schedule?season=${season}&seasontype=${t}`;
+const[reg,post]=await Promise.all([
+_espnJson(url(2)),
+_espnJson(url(3)).catch(()=>({events:[]})),
+]);
+const seen=new Set();
+const games=[];
+[...(reg.events||[]),...(post.events||[])].forEach(ev=>{
+if(seen.has(ev.id))return;
+seen.add(ev.id);
+const c=ev.competitions?.[0];
+if(!c)return;
+const me=c.competitors.find(x=>x.team?.id===String(id));
+const op=c.competitors.find(x=>x!==me);
+if(!me||!op)return;
+const score=x=>x.score?.value??(x.score?.displayValue?Number(x.score.displayValue):null);
+const state=c.status?.type?.state||"pre";
+const rank=op.curatedRank?.current;
+const postseason=ev.seasonType?.type===3;
+games.push({
+id:ev.id,
+date:ev.date,
+site:c.neutralSite?"N":me.homeAway==="home"?"H":"A",
+opp:{
+id:op.team.id,
+name:op.team.shortDisplayName||op.team.location||op.team.displayName,
+key:espnTeamKey(op.team.id),
+logo:op.team.logos?.[0]?.href||op.team.logo||null,
+},
+oppRank:!postseason&&rank&&rank<=25?rank:null,
+oppSeed:postseason&&rank&&rank<=16?rank:null,
+us:state==="pre"?null:score(me),
+them:state==="pre"?null:score(op),
+result:c.status?.type?.completed?(me.winner?"W":"L"):null,
+state,
+status:c.status?.type?.shortDetail||"",
+postseason,
+note:c.notes?.[0]?.headline||"",
+});
+});
+games.sort((a,b)=>a.date.localeCompare(b.date));
+return{games};
+});
+}
+function recordAsOf(games,date){
+const cutoff=new Date(date).toISOString();
+let wins=0,losses=0;
+games.forEach(g=>{
+if(g.date<cutoff&&g.result)g.result==="W"?wins++:losses++;
+});
+return{wins,losses};
+}
+function summarizeGames(games,ctx={}){
+const mk=()=>({wins:0,losses:0});
+const s={overall:mk(),home:mk(),away:mk(),neutral:mk(),conf:mk(),vsTop25:mk(),nonD1:mk(),D1:mk()};
+const byId=ctx.records?.byId;
+const myConf=byId?.[ctx.teamId]?.conf;
+games.forEach(g=>{
+if(!g.result)return;
+const add=k=>{g.result==="W"?s[k].wins++:s[k].losses++;};
+add("overall");
+add(g.site==="H"?"home":g.site==="A"?"away":"neutral");
+if(g.oppRank)add("vsTop25");
+if(byId){
+add(byId[g.opp.id]?"D1":"nonD1");
+if(myConf&&byId[g.opp.id]?.conf===myConf&&!g.postseason&&!/tournament/i.test(g.note))add("conf");
+}
+});
+return s;
+}
+let _recordsView="week";
+let _recordsRenderToken=0;
+const _recordsExpanded=new Set();
+function showSeasonRecords(currentYear,isApMode,activeTab){
+const modal=document.getElementById("season-stats-modal");
+const title=document.getElementById("season-stats-title");
+const table=document.getElementById("season-stats-table");
+const switcher=`<span class="records-switch">${[["week","R/V"],["all","All"]].map(([k,l])=>
+`<span class="records-view${_recordsView===k?" active":""}" data-view="${k}">${l}</span>`).join("")}</span>`;
+title.innerHTML=`<span class="records-title-main">${seasonModalTitleHtml(currentYear,isApMode,"records")}${switcher}</span>`
++ `<span class="records-note records-title-note"></span>`;
+title.querySelectorAll(".records-view").forEach(el=>el.addEventListener("click",()=>{
+if(el.classList.contains("active"))return;
+_recordsView=el.dataset.view;
+showSeasonRecords(currentYear,isApMode,activeTab);
+}));
+table.classList.remove("season-voters");
+table.classList.add("season-records");
+const weekId=isApMode&&_apCurrentWeekNum!==null
+?`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`
+:activeTab.dataset.week;
+const weekTab=isApMode
+?getSortedApTabs().find(t=>t.dataset.week===weekId)||activeTab
+:activeTab;
+const weekLabel=weekTextLabel(weekTab)||`Week ${displayWeekNum(weekTab)}`;
+const token=++_recordsRenderToken;
+const render=(data,error)=>{
+if(token!==_recordsRenderToken||!table.classList.contains("season-records"))return;
+table.innerHTML=buildRecordsTableHtml(currentYear,weekId,weekLabel,data,error);
+const noteEl=title.querySelector(".records-title-note");
+if(noteEl)noteEl.innerHTML=recordsNoteHtml(currentYear,data);
+table.querySelector(".records-retry")?.addEventListener("click",()=>
+showSeasonRecords(currentYear,isApMode,activeTab));
+initRecordsLogos(table);
+if(!data)return;
+if(_recordsView==="week")fillRecordsOpponents(table,currentYear,data,token);
+const tbody=table.querySelector("tbody");
+tbody.addEventListener("click",e=>{
+const opp=e.target.closest("img.records-opp-logo[data-team]");
+if(opp){toggleTeamHighlight(opp.dataset.team);return;}
+const tr=e.target.closest("tr.records-team-row");
+if(!tr||!tbody.contains(tr))return;
+toggleTeamGames(tr,currentYear,data);
+});
+tbody.querySelectorAll("tr.records-team-row").forEach(tr=>{
+if(_recordsExpanded.has(`${currentYear}:${tr.dataset.espn}`))toggleTeamGames(tr,currentYear,data,true);
+});
+};
+const cached=espnCachedData(`records:${currentYear}`);
+render(cached,null);
+modal.classList.add("open");
+if(!cached||Date.now()- cached.at>=ESPN_TTL_MS){
+fetchSeasonRecords(currentYear).then(d=>render(d,null),err=>render(null,err.message));
+}
+}
+const RECORDS_OPPS_CONCURRENCY=6;
+function fillRecordsOpponents(table,season,records,token){
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const live=()=>token===_recordsRenderToken&&table.classList.contains("season-records");
+const fill=(tr,sched)=>{
+const fmtDate=iso=>new Date(iso).toLocaleDateString([],{month:"short",day:"numeric"});
+tr.querySelectorAll("td.records-opps").forEach(td=>{
+let games=sched.games.filter(g=>g.result===td.dataset.result);
+if(td.dataset.result==="W")games=trimWonOpponents(games,season,records);
+td.innerHTML=games.length?`<div class="records-opps-list">${games.map(g=>{
+const name=g.opp.key?conferenceDisplayName(g.opp.key):g.opp.name;
+const rank=g.oppRank?`#${g.oppRank} `:g.oppSeed?`(${g.oppSeed}) `:"";
+const site=g.site==="H"?"vs":g.site==="A"?"@":"N";
+const tip=esc(`${rank}${name} · ${fmtDate(g.date)} ${site} · ${g.us}-${g.them}${records.byId[g.opp.id]?"":" · non-D1"}`);
+return g.opp.key
+?`<img class="records-opp-logo records-logo team-logo" data-team="${esc(g.opp.key)}" data-espn="${g.opp.id}" title="${tip}" alt="">`
+:g.opp.logo?`<img class="records-opp-logo" src="${esc(g.opp.logo)}" title="${tip}" alt="">`
+:`<span class="records-opp-logo records-opp-blank" title="${tip}"></span>`;
+}).join("")}</div>`:`<span class="records-opps-msg">—</span>`;
+initRecordsLogos(td);
+});
+};
+const queue=[];
+table.querySelectorAll("tr.records-team-row").forEach(tr=>{
+if(!tr.querySelector("td.records-opps"))return;
+const cached=espnCachedData(`schedule:${season}:${tr.dataset.espn}`);
+if(cached)fill(tr,cached);
+if(!cached||Date.now()- cached.at>=ESPN_TTL_MS)queue.push(tr);
+});
+const worker=async()=>{
+while(queue.length&&live()){
+const tr=queue.shift();
+try{
+const sched=await fetchTeamSchedule(tr.dataset.espn,season);
+if(live()&&tr.isConnected)fill(tr,sched);
+}catch(err){
+if(!live()||!tr.isConnected)continue;
+tr.querySelectorAll("td.records-opps").forEach(td=>{
+if(td.querySelector(".records-opps-list"))return;
+td.innerHTML=`<span class="records-opps-msg" title="${esc(err.message)}">couldn't load</span>`;
+});
+}
+}
+};
+for(let i=0;i<RECORDS_OPPS_CONCURRENCY;i++)worker();
+}
+const RECORDS_WON_MAX=22;
+function trimWonOpponents(games,season,records){
+if(games.length<=RECORDS_WON_MAX)return games;
+const table=conferenceTable(season);
+const cd=typeof CONFERENCE_DATA==="undefined"?{}:CONFERENCE_DATA;
+const aliases=cd.aliases||{};
+const power=cd.power||[];
+const confOf=g=>{
+if(table&&g.opp.key){
+const k=aliases[g.opp.key]||g.opp.key;
+const c=Object.keys(table).find(c=>table[c].includes(k)||table[c].includes(g.opp.key));
+if(c)return c;
+}
+return records.byId[g.opp.id]?.conf||null;
+};
+const tier=g=>{
+if(!records.byId[g.opp.id])return 0;
+if(g.oppRank||g.oppSeed)return null;
+return power.includes(confOf(g))?2:1;
+};
+const byDate=(a,b)=>new Date(a.date)- new Date(b.date);
+const drop=new Set();
+let excess=games.length - RECORDS_WON_MAX;
+for(const t of[0,1,2]){
+for(const g of games.filter(g=>tier(g)===t).sort(byDate)){
+if(excess<=0)break;
+drop.add(g);
+excess--;
+}
+}
+return games.filter(g=>!drop.has(g));
+}
+function initRecordsLogos(root){
+root.querySelectorAll("img.records-logo[data-team]").forEach(img=>{
+img.addEventListener("error",()=>{
+if(img.dataset.espn&&!img.dataset.fallback){
+img.dataset.fallback="1";
+img.src=espnLogoUrl(img.dataset.espn);
+}
+},{once:true});
+setLogoSrc(img,img.dataset.team);
+});
+}
+function toggleTeamGames(tr,season,records,forceOpen=false){
+const id=tr.dataset.espn;
+const key=`${season}:${id}`;
+const next=tr.nextElementSibling;
+if(next?.classList.contains("records-games-row")){
+if(forceOpen)return;
+next.remove();
+tr.classList.remove("expanded");
+_recordsExpanded.delete(key);
+return;
+}
+_recordsExpanded.add(key);
+tr.classList.add("expanded");
+const row=document.createElement("tr");
+row.className="records-games-row";
+row.innerHTML=`<td colspan="${tr.children.length}"><div class="records-games-msg">Loading games…</div></td>`;
+tr.after(row);
+const cell=row.firstElementChild;
+const load=()=>fetchTeamSchedule(id,season).then(sched=>{
+if(!row.isConnected)return;
+cell.innerHTML=buildTeamGamesHtml(sched,id,records);
+initRecordsLogos(cell);
+},err=>{
+if(!row.isConnected)return;
+cell.innerHTML=`<div class="records-games-msg">Couldn't load games from ESPN (${err.message.replace(/[<>&]/g,"")}).
+            <span class="records-retry">Retry</span></div>`;
+cell.querySelector(".records-retry").addEventListener("click",ev=>{ev.stopPropagation();load();});
+});
+load();
+}
+function buildTeamGamesHtml(sched,teamId,records){
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const games=sched.games;
+if(!games.length)return `<div class="records-games-msg">No games listed by ESPN.</div>`;
+const s=summarizeGames(games,{teamId,records});
+const wl=x=>`${x.wins}-${x.losses}`;
+const split=(label,x,title="")=>x.wins + x.losses
+?`<span class="records-split"${title?` title="${title}"`:""}>${label} <b>${wl(x)}</b></span>`:"";
+const summary=[
+split("Home",s.home),split("Away",s.away),split("Neutral",s.neutral),
+split("Conf",s.conf,"Regular-season games vs. the same ESPN conference"),
+split("vs Top 25",s.vsTop25,"Opponent's AP rank at game time (ESPN); excludes postseason, where ESPN gives seeds"),
+split("vs non-D1",s.nonD1),
+].filter(Boolean).join("");
+const fmtDate=iso=>new Date(iso).toLocaleDateString([],{month:"short",day:"numeric"});
+const lines=games.map(g=>{
+const site=g.site==="H"?"vs":g.site==="A"?"@":"N";
+const logo=g.opp.key
+?`<img class="records-games-logo records-logo" data-team="${esc(g.opp.key)}" data-espn="${g.opp.id}" alt="">`
+:g.opp.logo?`<img class="records-games-logo" src="${esc(g.opp.logo)}" alt="">`:`<span class="records-games-logo"></span>`;
+const name=g.opp.key?conferenceDisplayName(g.opp.key):g.opp.name;
+const nonD1=records.byId[g.opp.id]?"":`<span class="records-tag" title="Not a Division I team">non-D1</span>`;
+let res;
+if(g.result)res=`<span class="${g.result==="W"?"delta-up":"delta-down"}">${g.result}</span> ${g.us}-${g.them}`;
+else if(g.state==="in")res=`<span class="records-live">Live</span> ${g.us??""}-${g.them??""}`;
+else res=`<span class="records-upcoming">${esc(g.status.replace(/^\d+\/\d+\s*-\s*/,""))}</span>`;
+return `<tr class="${g.result?"":"records-game-pending"}">
+            <td class="rg-date">${fmtDate(g.date)}</td>
+            <td class="rg-site" title="${g.site==="N"?"Neutral site":g.site==="H"?"Home":"Away"}">${site}</td>
+            <td class="rg-opp">${logo}${g.oppRank?`<span class="rg-rank" title="AP rank at game time">${g.oppRank}</span>`:""}${g.oppSeed?`<span class="rg-rank" title="Seed">(${g.oppSeed})</span>`:""}${esc(name)}${nonD1}</td>
+            <td class="rg-res">${res}</td>
+            <td class="rg-note">${esc(g.note)}${g.postseason&&!g.note?"Postseason":""}</td>
+        </tr>`;
+}).join("");
+const stale=sched.stale?`<span class="records-note"> · couldn't refresh (${esc(sched.stale)})</span>`:"";
+return `<div class="records-games">
+        <div class="records-splits">${summary}${stale}</div>
+        <table class="records-games-table"><tbody>${lines}</tbody></table>
+    </div>`;
+}
+function recordsNoteHtml(currentYear,data){
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const isCurrentSeason=Number(currentYear)>=Math.max(...getSortedTabs().map(t=>Number(t.dataset.year)));
+let note="ESPN";
+if(data){
+const at=new Date(data.at);
+const t=at.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
+const today=at.toDateString()===new Date().toDateString();
+note +=isCurrentSeason
+?` as of ${today?t:`${at.toLocaleDateString([],{month:"short",day:"numeric"})}, ${t}`}`
+:" · final";
+if(data.stale)note +=` · couldn't refresh (${esc(data.stale)})`;
+}
+return note;
+}
+function buildRecordsTableHtml(currentYear,weekId,weekLabel,data,error){
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const view=_recordsView;
+const COLS=view==="week"?9:7;
+const head=`<colgroup>
+        <col style="width:28px"><col style="width:26px"><col>
+        <col style="width:52px"><col style="width:44px"><col style="width:52px">
+        <col style="width:44px">${view==="week"?"<col><col>":""}
+    </colgroup><thead><tr>
+        <th>#</th><th></th><th class="team-col">Team</th>
+        <th>W-L</th><th>Pct</th><th>Conf</th><th>Strk</th>${view==="week"
+?`<th class="records-opps-col">Won</th><th class="records-opps-col">Lost</th>`:""}
+    </tr></thead>`;
+if(!data){
+const msg=error
+?`Couldn't load records from ESPN (${esc(error)}). <span class="records-retry">Retry</span>`
+:"Loading records from ESPN…";
+return `${head}<tbody><tr><td colspan="${COLS}" class="records-msg">${msg}</td></tr></tbody>`;
+}
+const keyOf=id=>espnTeamKey(id);
+const pct=r=>r.pct===null?"—":r.pct.toFixed(3).replace(/^0/,"");
+const streak=s=>!s||s==="-"?"—"
+:`<span class="${s[0]==="W"?"delta-up":"delta-down"}">${esc(s)}</span>`;
+const row=(num,team,id,extraCls="")=>{
+const r=id?data.byId[id]:null;
+const key=team||(id&&keyOf(id))||null;
+const name=key?conferenceDisplayName(key):r?.name||"?";
+const logo=key
+?`<img class="logo-sm records-logo" data-team="${esc(key)}"${id?` data-espn="${id}"`:""} alt="">`
+:id?`<img class="logo-sm" src="${espnLogoUrl(id)}" alt="">`:"";
+const cells=r
+?`<td class="records-wl">${r.wins}-${r.losses}</td><td>${pct(r)}</td><td>${esc(r.confRecord||"—")}</td><td>${streak(r.streak)}</td>`
+:`<td colspan="4" class="records-missing">${id?"Not in ESPN's standings":"No ESPN ID"}</td>`;
+const opps=view!=="week"?""
+:r?`<td class="records-opps" data-result="W"><span class="records-opps-msg">…</span></td><td class="records-opps" data-result="L"><span class="records-opps-msg">…</span></td>`
+:`<td></td><td></td>`;
+const cls=[extraCls,r?"records-team-row":""].filter(Boolean).join(" ");
+return `<tr${cls?` class="${cls}"`:""}${r?` data-espn="${id}" title="Show games"`:""}><td>${num}</td><td>${logo}</td>
+            <td class="team-col">${esc(name)}</td>${cells}${opps}</tr>`;
+};
+const ballots=Object.entries(buildDeltaData(true)[weekId]||{})
+.filter(([u])=>u!=="Official Overall"&&u!=="AP Overall")
+.map(([,ts])=>ts.slice(0,25));
+const pts={};
+ballots.forEach(b=>b.forEach((t,i)=>{if(t)pts[t]=(pts[t]||0)+(25 - i);}));
+let body="";
+if(view==="week"){
+const order=Object.entries(pts).sort((a,b)=>b[1]- a[1]).map(([t])=>t);
+if(!order.length){
+body=`<tr><td colspan="${COLS}" class="records-msg">No ballots for ${esc(weekLabel)}.</td></tr>`;
+}
+order.forEach((team,i)=>{
+body +=row(i + 1,team,espnIdFor(team),i===24&&order.length>25?"records-t25-end":"");
+});
+}else{
+const ours=conferenceTable(currentYear);
+const groups=ours
+?Object.entries(ours).map(([name,teams])=>({name,members:teams.map(t=>[t,espnIdFor(t)])}))
+:data.confs.map(c=>({name:c.name,members:c.ids.map(id=>[keyOf(id),id])}));
+const isPower=g=>(CONFERENCE_DATA.power||[]).includes(g.name);
+groups.sort((a,b)=>(isPower(b)- isPower(a))||a.name.localeCompare(b.name));
+const confPct=r=>{
+const m=/^(\d+)-(\d+)/.exec(r?.confRecord||"");
+return m&&+m[1]+ +m[2]?+m[1]/(+m[1]+ +m[2]):-1;
+};
+groups.forEach(g=>{
+const members=g.members.slice().sort(([,a],[,b])=>{
+const ra=data.byId[a],rb=data.byId[b];
+return(confPct(rb)- confPct(ra))||((rb?.pct??-1)-(ra?.pct??-1))
+||((rb?.wins??0)-(ra?.wins??0));
+});
+body +=`<tr class="records-conf-row"><td colspan="${COLS}">${esc(g.name)}
+                <span class="records-conf-count">${members.length}</span></td></tr>`;
+members.forEach(([team,id],i)=>{
+body +=row(i + 1,team,id);
+});
+});
+}
+return `${head}<tbody>${body}</tbody>`;
 }
 function buildSeasonVotersTableHtml(weekBallots,voterWeeksVoted,minWeeksVoted,totalWeeks,esc){
 const voters={};
@@ -5630,6 +6166,7 @@ year=Number(year);
 if(!seasons.includes(year))year=year<seasons[0]?seasons[0]:seasons[seasons.length - 1];
 const table=CONFERENCE_DATA.seasons[year];
 const confs=Object.keys(table);
+const power=CONFERENCE_DATA.power;
 const powerConfs=power.filter(c=>table[c]);
 const midConfs=confs.filter(c=>!power.includes(c)).sort((a,b)=>a.localeCompare(b));
 const count=list=>list.reduce((n,c)=>n + table[c].length,0);
