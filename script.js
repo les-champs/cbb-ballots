@@ -50,6 +50,8 @@ function refreshSettingsLabels(root = document) {
     root.querySelectorAll('.sort-option[data-action="weekArrows"]').forEach(o => {
         o.textContent = arrowsOn ? 'Nav Arrows OFF' : 'Nav Arrows ON';
     });
+    const pinLocked = _pinLockedOut();
+    root.querySelectorAll('.sort-option[data-action="devPin"]').forEach(o => o.classList.toggle('disabled', pinLocked));
 }
 function updateDarkModeLabel() {
     refreshSettingsLabels();
@@ -847,6 +849,7 @@ document.addEventListener("mousedown", e => {
     const sort = opt.dataset.sort;
     const action = opt.dataset.action;
     const picker = opt.closest(".sort-picker");
+    if (action === "devPin" && _pinLockedOut()) return;  // inert during the PIN lockout
     // Settings and the Show toggles act in place and keep the picker open. The
     // row can reflow under the cursor, so swallow the click that follows this
     // mousedown — otherwise it can land outside the picker and close it.
@@ -4992,36 +4995,32 @@ function isKeybindsUnlocked() { return _keybindsUnlockedDate === _localDateStr()
 const _pinModal = document.getElementById("pin-modal");
 const _pinInput = document.getElementById("pin-input");
 
-// One wrong attempt locks the PIN window for 10 minutes (localStorage `pinLockedUntil`,
-// epoch ms); while locked, Dev shows a large lock instead of the PIN box.
+// One wrong attempt closes the PIN window and makes Dev inert for 10 minutes
+// (localStorage `pinLockedUntil`, epoch ms).
 const PIN_LOCKOUT_MS = 10 * 60 * 1000;
-let _pinLockedUntil = 0;
-try { _pinLockedUntil = Number(localStorage.getItem("pinLockedUntil")) || 0; } catch (e) {}
-let _pinLockTimer = null;
-function _pinLockedOut() { return Date.now() < _pinLockedUntil; }
-function _showPinLockState() {
-    const locked = _pinLockedOut();
-    _pinModal.classList.toggle("locked-out", locked);
-    clearTimeout(_pinLockTimer);
-    if (locked) {
-        _pinInput.blur();
-        _pinLockTimer = setTimeout(() => {   // lockout expired while the window is open
-            if (_pinModal.classList.contains("open")) { _showPinLockState(); }
-        }, _pinLockedUntil - Date.now() + 50);
-    } else {
-        _pinInput.focus();
-    }
+// Function declaration (hoisted) that reads storage directly, so refreshSettingsLabels() can call it at load.
+function _pinLockedOut() {
+    try { return Date.now() < (Number(localStorage.getItem("pinLockedUntil")) || 0); } catch (e) { return false; }
 }
+function _pinLockRemainingMs() {
+    try { return (Number(localStorage.getItem("pinLockedUntil")) || 0) - Date.now(); } catch (e) { return 0; }
+}
+function _syncDevOption() {
+    const locked = _pinLockedOut();
+    document.querySelectorAll('.sort-option[data-action="devPin"]').forEach(o => o.classList.toggle("disabled", locked));
+    if (locked) setTimeout(_syncDevOption, _pinLockRemainingMs() + 50);  // re-enable when it expires
+}
+_syncDevOption();
 
 function openPinModal() {
+    if (_pinLockedOut()) return;
     _pinInput.value = "";
     _pinModal.classList.add("open");
-    _showPinLockState();
+    _pinInput.focus();
 }
 function closePinModal() {
     _pinModal.classList.remove("open");
     _pinInput.value = "";
-    clearTimeout(_pinLockTimer);
 }
 _pinInput.addEventListener("input", async () => {
     _pinInput.value = _pinInput.value.replace(/\D/g, "").slice(0, PIN_LENGTH);
@@ -5035,9 +5034,9 @@ _pinInput.addEventListener("input", async () => {
         closePinModal();
     } else {
         _pinInput.value = "";
-        _pinLockedUntil = Date.now() + PIN_LOCKOUT_MS;
-        try { localStorage.setItem("pinLockedUntil", String(_pinLockedUntil)); } catch (e) {}
-        _showPinLockState();
+        try { localStorage.setItem("pinLockedUntil", String(Date.now() + PIN_LOCKOUT_MS)); } catch (e) {}
+        closePinModal();
+        _syncDevOption();
     }
 });
 _pinInput.addEventListener("keydown", e => {
@@ -5048,7 +5047,6 @@ _pinModal.addEventListener("click", e => { if (e.target === _pinModal) closePinM
 
 document.addEventListener("keydown", e => {
     if (_pinModal.classList.contains("open")) {
-        if (e.key === "Escape") closePinModal();  // the input's own handler covers it unless locked out
         return;
     }
     const _isVetChord = _chordPending === "v" && (e.key === "x" || e.key === "X");

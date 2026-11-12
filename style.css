@@ -617,11 +617,9 @@ body:has([id$="-modal"].open) {
     border-radius: 6px;
     outline: none;
 }
-/* 10-minute lockout after a wrong PIN: the lock replaces the PIN box */
-#pin-lockout { display: none; pointer-events: none; }
-#pin-lockout svg { width: min(40vmin, 260px); height: auto; fill: rgba(255,255,255,0.82); filter: drop-shadow(0 6px 24px rgba(0,0,0,0.35)); }
-#pin-modal.locked-out #pin-box { display: none; }
-#pin-modal.locked-out #pin-lockout { display: block; }
+/* Dev is inert during the 10-minute PIN lockout */
+.sort-option.disabled { cursor: default; opacity: 0.35; }
+.sort-option.disabled:hover { opacity: 0.35; }
 .keybind-section {
     margin-bottom: 12px;
 }

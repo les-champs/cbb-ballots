@@ -1362,7 +1362,154 @@ def load_css():
 
 def load_js():
     with open(JS_PATH, "r", encoding="utf-8") as f:
-        return f.read()
+        return minify_js(f.read())
+
+# ── JS minifier (stdlib only) ────────────────────────────────────────────────
+# Conservative: drops comments and indentation/blank lines and removes spaces
+# next to punctuation. It never renames identifiers or joins lines (so automatic
+# semicolon insertion behaves exactly as in the source). Strings, template
+# literals (incl. nested ${...}) and regex literals are copied verbatim.
+# minify_js() re-tokenizes its output and falls back to the source if the token
+# stream changed.
+
+_JS_PUNCT_NO_SPACE = set("{}()[];,:=<>?!&|*%^~.")
+# After these tokens a "/" starts a regex literal rather than a division.
+_JS_REGEX_PREV_WORDS = {"return", "typeof", "instanceof", "in", "of", "new", "delete",
+                        "void", "throw", "case", "do", "else", "yield", "await"}
+
+def _js_tokens(src):
+    """Yield (kind, text) with kind in ws, nl, comment, str, regex, word, punct."""
+    i, n = 0, len(src)
+    prev = None          # last significant token, for regex-vs-division
+    brace_stack = []     # for template literals: "tpl" marks a ${ opened inside one
+
+    def read_template(i):
+        # src[i] is "`" or the "}" closing a ${...}; return index just past the
+        # closing "`" or past the next "${" (pushing a marker).
+        j = i + 1
+        while j < n:
+            c = src[j]
+            if c == "\\":
+                j += 2
+                continue
+            if c == "`":
+                return j + 1, False
+            if c == "$" and j + 1 < n and src[j + 1] == "{":
+                return j + 2, True
+            j += 1
+        raise ValueError("unterminated template literal")
+
+    while i < n:
+        c = src[i]
+        if c == "\n":
+            j = i
+            while j < n and src[j] in " \t\r\n":
+                j += 1
+            yield ("nl", src[i:j]); i = j; continue
+        if c in " \t\r":
+            j = i
+            while j < n and src[j] in " \t\r":
+                j += 1
+            yield ("ws", src[i:j]); i = j; continue
+        if src.startswith("//", i):
+            j = src.find("\n", i)
+            j = n if j == -1 else j
+            yield ("comment", src[i:j]); i = j; continue
+        if src.startswith("/*", i):
+            j = src.find("*/", i + 2)
+            if j == -1:
+                raise ValueError("unterminated block comment")
+            yield ("comment", src[i:j + 2]); i = j + 2; continue
+        if c in "'\"":
+            j = i + 1
+            while j < n and src[j] != c:
+                if src[j] == "\\":
+                    j += 1
+                elif src[j] == "\n":
+                    raise ValueError("newline in string literal")
+                j += 1
+            tok = ("str", src[i:j + 1]); i = j + 1
+            yield tok; prev = tok; continue
+        if c == "`" or (c == "}" and brace_stack and brace_stack[-1] == "tpl"):
+            if c == "}":
+                brace_stack.pop()
+            j, opened = read_template(i)
+            if opened:
+                brace_stack.append("tpl")
+            tok = ("str", src[i:j]); i = j
+            yield tok; prev = tok; continue
+        if c == "/":
+            regex_ok = (prev is None or (prev[0] == "punct" and prev[1] not in (")", "]", "}"))
+                        or (prev[0] == "word" and prev[1] in _JS_REGEX_PREV_WORDS))
+            if regex_ok:
+                j, in_class = i + 1, False
+                while j < n:
+                    ch = src[j]
+                    if ch == "\\":
+                        j += 2; continue
+                    if ch == "\n":
+                        raise ValueError("newline in regex literal")
+                    if ch == "[":
+                        in_class = True
+                    elif ch == "]":
+                        in_class = False
+                    elif ch == "/" and not in_class:
+                        break
+                    j += 1
+                j += 1
+                while j < n and (src[j].isalnum() or src[j] == "_"):
+                    j += 1   # flags
+                tok = ("regex", src[i:j]); i = j
+                yield tok; prev = tok; continue
+        if c.isalnum() or c in "_$" or ord(c) > 127:
+            j = i
+            while j < n and (src[j].isalnum() or src[j] in "_$." and (src[j] != "." or src[i].isdigit())
+                             or ord(src[j]) > 127):
+                j += 1
+            tok = ("word", src[i:j]); i = j
+            yield tok; prev = tok; continue
+        if c == "{":
+            brace_stack.append("{")
+        elif c == "}" and brace_stack:
+            brace_stack.pop()
+        tok = ("punct", c); i += 1
+        yield tok; prev = tok
+
+def _js_significant(src):
+    return [t for t in _js_tokens(src) if t[0] not in ("ws", "nl", "comment")]
+
+def minify_js(src):
+    try:
+        toks = list(_js_tokens(src))
+        out, pending = [], None   # pending: "ws" or "nl" separator before the next token
+        last = None
+        for kind, text in toks:
+            if kind == "comment":
+                if text.startswith("/*") and "\n" in text and pending != "nl":
+                    pending = "nl"   # a multi-line block comment counts as a line break for ASI
+                elif pending is None:
+                    pending = "ws"
+                continue
+            if kind in ("ws", "nl"):
+                if kind == "nl" or pending != "nl":
+                    pending = kind
+                continue
+            if last is not None and pending:
+                if pending == "nl":
+                    out.append("\n")
+                else:
+                    a, b = last[-1], text[0]
+                    if not (a in _JS_PUNCT_NO_SPACE or b in _JS_PUNCT_NO_SPACE):
+                        out.append(" ")
+            out.append(text)
+            last, pending = text, None
+        result = "".join(out) + "\n"
+        if _js_significant(result) != _js_significant(src):
+            raise ValueError("token stream changed")
+        return result
+    except ValueError as e:
+        print(f"⚠ JS minify skipped ({e}); inlining script.js unminified")
+        return src
 
 WEEK_TABS_MARKER = "<!-- WEEK-TABS -->"
 WEEK_DATA_MARKER = "<!-- WEEK-DATA -->"
@@ -1593,9 +1740,6 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
   <div id="pin-box">
     <h2>Enter PIN</h2>
     <input id="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="9" autocomplete="off" aria-label="9-digit PIN">
-  </div>
-  <div id="pin-lockout" role="img" aria-label="Locked">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5a5.5 5.5 0 0 0-5.5 5.5v3H5.25A1.75 1.75 0 0 0 3.5 11.75v9A1.75 1.75 0 0 0 5.25 22.5h13.5a1.75 1.75 0 0 0 1.75-1.75v-9A1.75 1.75 0 0 0 18.75 10H17.5V7A5.5 5.5 0 0 0 12 1.5Zm-3.5 5.5a3.5 3.5 0 0 1 7 0v3h-7V7Zm3.5 7a2 2 0 0 1 1 3.73V19.5h-2v-1.77A2 2 0 0 1 12 14Z"/></svg>
   </div>
 </div>
 
