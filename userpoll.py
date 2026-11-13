@@ -1621,7 +1621,7 @@ def compute_ap_tenure_counts():
     """Count total AP ballots per voter across all ap25-YEAR.json files."""
     counts = {}
     base_dir = BASE_HTML_DIR
-    for fname in os.listdir(base_dir):
+    for fname in sorted(os.listdir(base_dir)):
         m = re.match(r'ap25-(\d+)\.json$', fname)
         if not m:
             continue
