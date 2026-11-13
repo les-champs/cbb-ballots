@@ -1,0 +1,88 @@
+# Refreshes NET (net-YEAR.json) and quadrant / BPI / SOR / SOS data
+# (quads-YEAR.json) once a day, commits any real change, and redeploys.
+# A push made with GITHUB_TOKEN doesn't trigger other workflows, so the
+# deploy is started explicitly with `gh workflow run`.
+name: Refresh quads
+
+on:
+  schedule:
+    - cron: "0 11 * * *"   # 11:00 UTC = 4–5 AM Pacific, after the night's games
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: refresh-quads
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install Pillow
+
+      # NCAA.com shows last season's NET until December; a failure here
+      # shouldn't block the quads refresh.
+      - name: Fetch NET
+        continue-on-error: true
+        run: python3 userpoll.py --net
+
+      - name: Compute quads
+        run: python3 userpoll.py --quads
+
+      # Every run rewrites the "fetched" timestamp; drop files whose only
+      # change is that, so the repo doesn't grow ~1.4 MB a day for nothing.
+      - name: Discard timestamp-only changes
+        run: |
+          for f in $(git diff --name-only -- 'net-*.json' 'quads-*.json'); do
+            if python3 - "$f" <<'EOF'
+          import json, subprocess, sys
+          f = sys.argv[1]
+          old = json.loads(subprocess.check_output(["git", "show", f"HEAD:{f}"]))
+          new = json.load(open(f))
+          for d in (old, new):
+              d.pop("fetched", None)
+          sys.exit(0 if old == new else 1)
+          EOF
+            then
+              echo "$f: timestamp only, discarding"
+              git checkout -- "$f"
+            fi
+          done
+          git status --short
+
+      # Only changes the pages when a new season's net-/quads- file appears
+      # (QUAD_FILES lists them); otherwise the rebuild output is identical.
+      - name: Rebuild pages
+        run: python3 userpoll.py --rebuild
+
+      - name: Commit and push
+        id: commit
+        run: |
+          git add -A -- 'net-*.json' 'quads-*.json' '*.html'
+          if git diff --cached --quiet; then
+            echo "No data changes."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Refresh NET/quads data ($(date -u +%Y-%m-%d))"
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main
