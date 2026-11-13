@@ -6,7 +6,7 @@ name: Refresh quads
 
 on:
   schedule:
-    - cron: "0 6 * * *"    # 06:00 UTC = 10–11 PM Pacific
+    - cron: "0 10 * * *"   # 10:00 UTC = 2–3 AM Pacific, after the night's games and ESPN's overnight BPI update
   workflow_dispatch:
 
 permissions:
