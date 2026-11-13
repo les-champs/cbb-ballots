@@ -42,6 +42,7 @@ net-YEAR.json          # NET + quadrant records snapshot from --net (not deploye
 cbbpoll-2024-recovery.json  # Output of the removed one-off 2024 Wayback recovery (in git history)
 ballots.json           # Browser-exported poll data for poll_simulator.py --from-json (do not read)
 .github/workflows/pages.yml  # GitHub Pages deploy (source)
+.github/workflows/refresh-quads.yml  # Daily NET/quads refresh (source)
 _config.yml            # Unused (legacy Jekyll excludes); safe to delete
 cbb-logos/             # Team logos: Team.webp + Team-dark.webp (dark-mode variants from ESPN); ncaa-{espnId}.webp + -dark.webp (non-D1, rendered from NCAA.com SVGs)
 logos voters(png)/     # Untracked, not used by the build
@@ -252,7 +253,8 @@ Different site from cbbpoll.net. Only needed if re-scraping.
 ## Common workflows
 
 - **Weekly update:** `python3 userpoll.py --week N --year YYYY` (and `--ap25 --year YYYY` + `--ap25-build --year YYYY` for AP), spot-check locally, commit, push.
-- **Quadrant refresh (any time, e.g. weekly):** `python3 userpoll.py --net` (once NET is out, ~December), then `--quads`, then `--rebuild`; commit `net-YEAR.json` / `quads-YEAR.json` with the pages. Before NET exists `--net` just rewrites last season's final file, which is harmless.
+- **Quadrant refresh (automatic):** `.github/workflows/refresh-quads.yml` ("Refresh quads") runs daily at 11:00 UTC and on demand (`gh workflow run refresh-quads.yml -R les-champs/cbb-ballots`): `--net` (failure tolerated), `--quads`, drops files whose only change is `fetched`, `--rebuild`, commits as github-actions[bot] if anything changed, then starts Deploy Pages via `gh workflow run` (pushes made with GITHUB_TOKEN don't trigger workflows). `git pull` before committing locally. Rebuilds must be byte-identical on Linux and macOS, or every run commits HTML: sort any `os.listdir()` whose order reaches the output.
+- **Quadrant refresh (manual):** `python3 userpoll.py --net` (once NET is out, ~December), then `--quads`, then `--rebuild`; commit `net-YEAR.json` / `quads-YEAR.json` with the pages. Before NET exists `--net` just rewrites last season's final file, which is harmless.
 - **New season:** add to `AP25_SITE_YEARS`; first userpoll week of the new year becomes the inline year in `index.html` and the previous year is split to `data-YEAR.html` automatically.
 - **UI/JS change:** edit `script.js`/`style.css` → `--rebuild` → test at localhost:8000 on both `index.html` and `ap-ballots.html` (incl. AP mode, prior year, dark mode, mobile width) → commit.
 
@@ -262,4 +264,3 @@ Different site from cbbpoll.net. Only needed if re-scraping.
 - Minor UI/layout polish
 - More analysis functions, graphs, and data analysis
 - More uses of ESPN records/game data (see **ESPN data › Limitations and ideas for reuse**), incl. record-as-of-poll-week
-- Optional: a scheduled GitHub Action that runs `--net` + `--quads` + `--rebuild` daily and commits (pushing it needs the `workflow` token scope)
