@@ -21,8 +21,9 @@ Rank sources (--rank-source):
     net   NET ranks from net-YEAR.json (run --net first). Used to check this module against
           the NCAA's official quadrant counts, and to compute game-level quads after NET is out
     auto  (default) net if net-YEAR.json exists for the season, else bpi
-Each team also gets its BPI score and offense / defense components (bpi, off, def), fetched
-whatever the rank source (the Records tab shows them).
+Each team also gets its BPI score and offense / defense components (bpi, off, def) and ESPN's
+Strength of Record and Strength of Schedule ranks (sor, sos; the SOS covers games played so far),
+fetched whatever the rank source from the same request (the Records tab shows them).
 
 Data: ESPN schedules (site.web.api.espn.com, seasontype 2 and 3) for every D1 school in
 conferences.SEASONS[year], i.e. ~730 schedule requests + ~365 BPI requests, 8 at a time.
@@ -99,8 +100,8 @@ def d1_teams(season):
 
 
 def bpi_ranks(season, ids):
-    """{espnId: BPI rank}, {espnId: {bpi, off, def}} (scores, 1 decimal), the latest
-    lastUpdated seen, and [(espnId, error)] for teams without a rank."""
+    """{espnId: BPI rank}, {espnId: {bpi, off, def, sor, sos}} (scores to 1 decimal; SOR and
+    SOS ranks as ints), the latest lastUpdated seen, and [(espnId, error)] for teams without a rank."""
     def one(i):
         d = _get_json(BPI_URL.format(season=season, id=i))
         if not d:
@@ -112,6 +113,9 @@ def bpi_ranks(season, ids):
         score = {k: round(stats[n], 1) for k, n in
                  (("bpi", "bpi"), ("off", "bpioffense"), ("def", "bpidefense"))
                  if stats.get(n) is not None}
+        # ESPN's Strength of Record and Strength of Schedule (games played so far) ranks.
+        score.update({k: int(stats[n]) for k, n in (("sor", "sorrank"), ("sos", "sospastrank"))
+                      if stats.get(n)})
         return int(rank), score, d.get("lastUpdated")
     got = _pmap(one, list(ids))
     ranks, scores, stamps, bad = {}, {}, [], []

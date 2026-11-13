@@ -923,6 +923,13 @@ kbd {
 #season-stats-table.season-records td.records-quad-rank { font-size: 11px; opacity: 0.7; }
 #season-stats-table.season-records td.records-quad { font-size: 12px; }
 #season-stats-table.season-records td.records-bpi { font-size: 12px; font-variant-numeric: tabular-nums; }
+/* SOR / SOS ranks (2027+) sit right after Conf: the line after Conf moves to after SOS */
+#season-stats-table.season-records td.records-resume { font-size: 12px; font-variant-numeric: tabular-nums; }
+#season-stats-table.season-records > thead > tr > th:nth-child(6):has(+ th.records-resume-col),
+#season-stats-table.season-records > tbody > tr > td:nth-child(6):has(+ td.records-resume),
+#season-stats-table.season-records > tbody > tr > td.records-missing:has(+ td.records-resume) { border-right: none; }
+#season-stats-table.season-records > thead > tr > th.records-sos-col:not(:last-child),
+#season-stats-table.season-records > tbody > tr > td.records-sos:not(:last-child) { border-right: 1px solid var(--color-border-nth); }
 #season-stats-table.season-records > thead > tr > th.records-q4-col:not(:last-child),
 #season-stats-table.season-records > tbody > tr > td.records-q4:not(:last-child) { border-right: 1px solid var(--color-border-nth); }
 /* Line between the BPI columns and Q1 */
@@ -5546,6 +5553,7 @@ return s;
 }
 const _quadsPromise={};
 const _quadsData={};
+const RESUME_FROM_SEASON=2027;
 function quadsAvailable(season){
 const f=typeof QUAD_FILES!=="undefined"?QUAD_FILES[season]:null;
 return f?(f.net?"net":f.quads?"bpi":null):null;
@@ -5567,7 +5575,7 @@ teams[k]={rank:t.rank,q1:t.q1,q2:t.q2,q3:t.q3,q4:t.q4};
 if(q)Object.entries(q.teams).forEach(([k,t])=>{
 if(t.bpi==null)return;
 const m=teams[k]||(teams[k]={});
-m.bpi=t.bpi;m.off=t.off;m.def=t.def;
+m.bpi=t.bpi;m.off=t.off;m.def=t.def;m.sor=t.sor;m.sos=t.sos;
 });
 const games={};
 if(q&&q.rankSource===source){
@@ -5869,7 +5877,8 @@ const quadSrc=quadsAvailable(currentYear);
 const qd=_quadsData[currentYear];
 const showNet=quadSrc==="net";
 const showBpi=!!quadSrc&&!!QUAD_FILES[currentYear]?.quads;
-const COLS=(opps?8:6)+(quadSrc?4:0)+(showNet?1:0)+(showBpi?3:0);
+const showResume=showBpi&&Number(currentYear)>=RESUME_FROM_SEASON;
+const COLS=(opps?8:6)+(quadSrc?4:0)+(showNet?1:0)+(showBpi?3:0)+(showResume?2:0);
 const quadTip=quadSrc==="net"
 ?"Official NCAA quadrant record (D1 games only)"
 :"Unofficial: NCAA quadrant cutoffs with ESPN BPI ranks in place of NET (D1 games only)";
@@ -5878,15 +5887,21 @@ const bpiCols=[
 ["off","Off","ESPN BPI offense component (points per 70 possessions above average)"],
 ["def","Def","ESPN BPI defense component (points per 70 possessions above average)"],
 ];
+const resumeCols=[
+["sor","SOR","ESPN Strength of Record rank: how hard it would be for a typical Top 25 team to have this record or better against this schedule (lower is better)"],
+["sos","SOS","ESPN Strength of Schedule rank, games played so far (1 = hardest)"],
+];
 const quadHead=quadSrc
-?(showNet?`<th title="NET rank">NET</th>`:"")
+?(showResume?resumeCols.map(([k,l,tip])=>
+`<th class="records-resume-col${k==="sos"?" records-sos-col":""}" title="${tip}">${l}</th>`).join(""):"")
++(showNet?`<th title="NET rank">NET</th>`:"")
 +(showBpi?bpiCols.map(([,l,tip])=>`<th class="records-bpi-col" title="${tip}">${l}</th>`).join(""):"")
 +[1,2,3,4].map(q=>
 `<th class="records-quad-col${q===1?" records-q1-col":""}${q===4?" records-q4-col":""}" title="${quadTip}">Q${q}</th>`).join(""):"";
 const head=`<colgroup>
         <col style="width:28px"><col style="width:26px"><col>
         <col style="width:52px"><col style="width:44px"><col style="width:52px">
-        ${showNet?`<col style="width:38px">`:""}${showBpi?"<col style=\"width:42px\">".repeat(3):""}
+        ${showResume?"<col style=\"width:40px\">".repeat(2):""}${showNet?`<col style="width:38px">`:""}${showBpi?"<col style=\"width:42px\">".repeat(3):""}
         ${quadSrc?"<col style=\"width:40px\">".repeat(4):""}
         ${opps?"<col><col>":""}
     </colgroup><thead><tr>
@@ -5898,7 +5913,9 @@ if(!quadSrc)return "";
 const t=qd?.teams?.[(CONFERENCE_DATA.aliases||{})[key]||key];
 const blank=qd?"—":"…";
 const num=v=>v==null?blank:(v>0?"+":v<0?"−":"")+ Math.abs(v).toFixed(1);
-return(showNet?`<td class="records-quad-rank">${t?.rank??blank}</td>`:"")
+return(showResume?resumeCols.map(([k])=>
+`<td class="records-resume${k==="sos"?" records-sos":""}">${t?.[k]??blank}</td>`).join(""):"")
++(showNet?`<td class="records-quad-rank">${t?.rank??blank}</td>`:"")
 +(showBpi?bpiCols.map(([k])=>
 `<td class="records-bpi${k==="bpi"?" records-bpi-main":""}">${num(t?.[k])}</td>`).join(""):"")
 + `${[1,2,3,4].map(q=>

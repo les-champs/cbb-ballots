@@ -4486,12 +4486,15 @@ function summarizeGames(games, ctx = {}) {
 //
 //   quadsAvailable(season)  → "net" | "bpi" | null (the ranking the columns will show)
 //   fetchQuads(season)      → Promise<{source, official, asOf, teams: {key: {rank, q1..q4,
-//                              bpi, off, def}},  (BPI scores from quads-YEAR.json when present)
+//                              bpi, off, def, sor, sos}},  (ESPN BPI scores + SOR / SOS ranks
+//                              from quads-YEAR.json when present)
 //                              games: {key: {"YYYY-MM-DD:oppEspnId": 1-4}}}>; result also
 //                              kept in _quadsData[season] (or {error}) for synchronous renders
 //   quadOfGame(season, key, game)  → 1-4 | null, for a fetchTeamSchedule() game
 const _quadsPromise = {};
 const _quadsData = {};
+// First season whose Records tab shows ESPN's SOR / SOS rank columns.
+const RESUME_FROM_SEASON = 2027;
 function quadsAvailable(season) {
     const f = typeof QUAD_FILES !== "undefined" ? QUAD_FILES[season] : null;
     return f ? (f.net ? "net" : f.quads ? "bpi" : null) : null;
@@ -4510,11 +4513,12 @@ function fetchQuads(season) {
         Object.entries(base.teams).forEach(([k, t]) => {
             teams[k] = { rank: t.rank, q1: t.q1, q2: t.q2, q3: t.q3, q4: t.q4 };
         });
-        // BPI score / offense / defense (quads.py fetches them whatever the rank source).
+        // BPI score / offense / defense + SOR / SOS ranks (quads.py fetches them whatever the
+        // rank source).
         if (q) Object.entries(q.teams).forEach(([k, t]) => {
             if (t.bpi == null) return;
             const m = teams[k] || (teams[k] = {});
-            m.bpi = t.bpi; m.off = t.off; m.def = t.def;
+            m.bpi = t.bpi; m.off = t.off; m.def = t.def; m.sor = t.sor; m.sos = t.sos;
         });
         const games = {};
         if (q && q.rankSource === source) {
@@ -4858,13 +4862,15 @@ function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
     // Won / Lost opponent logos only in Voted; All stops at Conf.
     const opps = view !== "all";
     // Quad columns after Conf when the season has NET / quad data (fetchQuads()): NET rank
-    // (once NET is out), then ESPN BPI score + offense + defense (when quads-YEAR.json
-    // exists), then Q1–Q4.
+    // ESPN SOR + SOS ranks (from quads-YEAR.json, RESUME_FROM_SEASON onwards; left of the
+    // line after Conf), then NET rank (once NET is out), then ESPN BPI score + offense +
+    // defense (when quads-YEAR.json exists), then Q1–Q4.
     const quadSrc = quadsAvailable(currentYear);
     const qd = _quadsData[currentYear];
     const showNet = quadSrc === "net";
     const showBpi = !!quadSrc && !!QUAD_FILES[currentYear]?.quads;
-    const COLS = (opps ? 8 : 6) + (quadSrc ? 4 : 0) + (showNet ? 1 : 0) + (showBpi ? 3 : 0);
+    const showResume = showBpi && Number(currentYear) >= RESUME_FROM_SEASON;
+    const COLS = (opps ? 8 : 6) + (quadSrc ? 4 : 0) + (showNet ? 1 : 0) + (showBpi ? 3 : 0) + (showResume ? 2 : 0);
     const quadTip = quadSrc === "net"
         ? "Official NCAA quadrant record (D1 games only)"
         : "Unofficial: NCAA quadrant cutoffs with ESPN BPI ranks in place of NET (D1 games only)";
@@ -4873,8 +4879,14 @@ function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
         ["off", "Off", "ESPN BPI offense component (points per 70 possessions above average)"],
         ["def", "Def", "ESPN BPI defense component (points per 70 possessions above average)"],
     ];
+    const resumeCols = [
+        ["sor", "SOR", "ESPN Strength of Record rank: how hard it would be for a typical Top 25 team to have this record or better against this schedule (lower is better)"],
+        ["sos", "SOS", "ESPN Strength of Schedule rank, games played so far (1 = hardest)"],
+    ];
     const quadHead = quadSrc
-        ? (showNet ? `<th title="NET rank">NET</th>` : "")
+        ? (showResume ? resumeCols.map(([k, l, tip]) =>
+                `<th class="records-resume-col${k === "sos" ? " records-sos-col" : ""}" title="${tip}">${l}</th>`).join("") : "")
+            + (showNet ? `<th title="NET rank">NET</th>` : "")
             + (showBpi ? bpiCols.map(([, l, tip]) => `<th class="records-bpi-col" title="${tip}">${l}</th>`).join("") : "")
             + [1, 2, 3, 4].map(q =>
                 `<th class="records-quad-col${q === 1 ? " records-q1-col" : ""}${q === 4 ? " records-q4-col" : ""}" title="${quadTip}">Q${q}</th>`).join("") : "";
@@ -4882,7 +4894,7 @@ function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
     const head = `<colgroup>
         <col style="width:28px"><col style="width:26px"><col>
         <col style="width:52px"><col style="width:44px"><col style="width:52px">
-        ${showNet ? `<col style="width:38px">` : ""}${showBpi ? "<col style=\"width:42px\">".repeat(3) : ""}
+        ${showResume ? "<col style=\"width:40px\">".repeat(2) : ""}${showNet ? `<col style="width:38px">` : ""}${showBpi ? "<col style=\"width:42px\">".repeat(3) : ""}
         ${quadSrc ? "<col style=\"width:40px\">".repeat(4) : ""}
         ${opps ? "<col><col>" : ""}
     </colgroup><thead><tr>
@@ -4894,7 +4906,9 @@ function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
         const t = qd?.teams?.[(CONFERENCE_DATA.aliases || {})[key] || key];
         const blank = qd ? "—" : "…";
         const num = v => v == null ? blank : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(1);
-        return (showNet ? `<td class="records-quad-rank">${t?.rank ?? blank}</td>` : "")
+        return (showResume ? resumeCols.map(([k]) =>
+                `<td class="records-resume${k === "sos" ? " records-sos" : ""}">${t?.[k] ?? blank}</td>`).join("") : "")
+            + (showNet ? `<td class="records-quad-rank">${t?.rank ?? blank}</td>` : "")
             + (showBpi ? bpiCols.map(([k]) =>
                 `<td class="records-bpi${k === "bpi" ? " records-bpi-main" : ""}">${num(t?.[k])}</td>`).join("") : "")
             + `${[1, 2, 3, 4].map(q =>

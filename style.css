@@ -903,6 +903,13 @@ kbd {
 #season-stats-table.season-records td.records-quad-rank { font-size: 11px; opacity: 0.7; }
 #season-stats-table.season-records td.records-quad { font-size: 12px; }
 #season-stats-table.season-records td.records-bpi { font-size: 12px; font-variant-numeric: tabular-nums; }
+/* SOR / SOS ranks (2027+) sit right after Conf: the line after Conf moves to after SOS */
+#season-stats-table.season-records td.records-resume { font-size: 12px; font-variant-numeric: tabular-nums; }
+#season-stats-table.season-records > thead > tr > th:nth-child(6):has(+ th.records-resume-col),
+#season-stats-table.season-records > tbody > tr > td:nth-child(6):has(+ td.records-resume),
+#season-stats-table.season-records > tbody > tr > td.records-missing:has(+ td.records-resume) { border-right: none; }
+#season-stats-table.season-records > thead > tr > th.records-sos-col:not(:last-child),
+#season-stats-table.season-records > tbody > tr > td.records-sos:not(:last-child) { border-right: 1px solid var(--color-border-nth); }
 #season-stats-table.season-records > thead > tr > th.records-q4-col:not(:last-child),
 #season-stats-table.season-records > tbody > tr > td.records-q4:not(:last-child) { border-right: 1px solid var(--color-border-nth); }
 /* Line between the BPI columns and Q1 */
