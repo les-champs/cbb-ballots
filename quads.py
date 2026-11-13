@@ -162,6 +162,7 @@ def schedule(season, team_id):
         games.append({
             "id": ev["id"],
             "date": ev["date"],
+            "oppName": op["team"].get("shortDisplayName") or op["team"].get("location") or op["team"].get("displayName"),
             "site": "N" if c.get("neutralSite") else ("H" if me["homeAway"] == "home" else "A"),
             "oppId": op["team"]["id"],
             "result": ("W" if me.get("winner") else "L") if done else None,
@@ -215,6 +216,13 @@ def build(season, base_dir, rank_source="auto"):
                 "oppRank": opp_rank, "quad": quad,
                 "result": g["result"], "us": g["us"], "them": g["them"],
             })
+            # Upcoming games keep the full start time (the Records "Next" column shows the local
+            # date; the UTC day in "date" is a day late for evening games in US time zones).
+            if not g["result"]:
+                out[-1]["start"] = g["date"]
+            # Non-D1 opponents have no key; keep ESPN's name for tooltips / filler logos.
+            if g["oppId"] not in id_to_key:
+                out[-1]["oppName"] = g["oppName"]
         entry = {"rank": ranks.get(team_id)}
         entry.update(bpi_scores.get(team_id, {}))
         entry.update({k: f"{w}-{l}" for k, (w, l) in rec.items()})

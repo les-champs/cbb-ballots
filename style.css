@@ -925,6 +925,12 @@ kbd {
 .records-opps-list { display: flex; flex-wrap: wrap; gap: 5px 2px; width: 196px; }
 .records-opp-logo { display: block; width: 16px; height: 16px; object-fit: contain; }
 .records-opps-msg { font-size: 11px; opacity: 0.45; }
+/* All view: each team's next two games (nextGamesHtml) */
+#season-stats-table.season-records > tbody > tr > td.records-next { text-align: left; white-space: nowrap; padding: 4px 6px 4px 10px; }
+.records-next-list { display: flex; gap: 12px; }
+.records-next-game { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; min-width: 76px; }
+.records-next-site { opacity: 0.55; min-width: 12px; text-align: right; }
+.records-next-date { opacity: 0.75; }
 /* Filler for schools with no logo (logoFillerHtml): dashed circle with the initial */
 .logo-filler {
     display: inline-flex; align-items: center; justify-content: center;

@@ -4520,6 +4520,15 @@ function fetchQuads(season) {
             const m = teams[k] || (teams[k] = {});
             m.bpi = t.bpi; m.off = t.off; m.def = t.def; m.sor = t.sor; m.sos = t.sos;
         });
+        // Unplayed games per team (any rank source), for the Records All view's Next column.
+        const upcoming = {};
+        if (q) Object.entries(q.teams).forEach(([k, t]) => {
+            upcoming[k] = t.games.filter(g => !g.result).map(g => ({
+                date: g.start || g.date, dateOnly: !g.start, site: g.site,
+                opp: { id: g.oppId, key: g.opp || espnTeamKey(g.oppId), name: g.oppName || (g.opp ? null : "non-D1"), logo: null },
+                quad: g.quad,
+            }));
+        });
         const games = {};
         if (q && q.rankSource === source) {
             Object.entries(q.teams).forEach(([k, t]) => {
@@ -4527,7 +4536,7 @@ function fetchQuads(season) {
                 t.games.forEach(g => { if (g.quad) m[`${g.date}:${g.oppId}`] = g.quad; });
             });
         }
-        return (_quadsData[season] = { source, official: !!net, asOf: net ? net.through : q.ranksAsOf, teams, games });
+        return (_quadsData[season] = { source, official: !!net, asOf: net ? net.through : q.ranksAsOf, teams, games, upcoming });
     });
     p.catch(err => { _quadsData[season] = { error: err.message }; delete _quadsPromise[season]; });
     return (_quadsPromise[season] = p);
@@ -4535,6 +4544,44 @@ function fetchQuads(season) {
 function quadOfGame(season, key, game) {
     const m = _quadsData[season]?.games?.[key];
     return (m && m[`${game.date.slice(0, 10)}:${game.opp.id}`]) || null;
+}
+
+// A team's next RECORDS_NEXT_COUNT games for the Records All view's Next column. Prefers the
+// live ESPN schedule when it's already cached (opened game list, Voted view), else the unplayed
+// games in quads-YEAR.json (daily snapshot). Snapshot games that started more than
+// NEXT_GAME_GRACE_MS ago are assumed played since; date-only entries (older files) count until
+// the end of their UTC day. Returns null when there's no data for the team yet.
+const RECORDS_NEXT_COUNT = 2;
+const NEXT_GAME_GRACE_MS = 3 * 3600 * 1000;
+function nextGamesFor(season, key, espnId) {
+    const live = espnId ? espnCachedData(`schedule:${season}:${espnId}`) : null;
+    if (live) return live.games.filter(g => !g.result && g.state !== "post").slice(0, RECORDS_NEXT_COUNT);
+    const list = _quadsData[season]?.upcoming?.[key];
+    if (!list) return null;
+    const now = Date.now();
+    return list.filter(g => g.dateOnly
+        ? new Date(`${g.date}T23:59:59Z`).getTime() >= now
+        : new Date(g.date).getTime() >= now - NEXT_GAME_GRACE_MS).slice(0, RECORDS_NEXT_COUNT);
+}
+function nextGamesHtml(games, records, season, key) {
+    const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    if (!games.length) return `<span class="records-opps-msg">—</span>`;
+    return `<div class="records-next-list">${games.map(g => {
+        const d = new Date(g.dateOnly ? `${g.date}T12:00:00Z` : g.date);
+        const day = d.toLocaleDateString([], { month: "short", day: "numeric", ...(g.dateOnly ? { timeZone: "UTC" } : {}) });
+        const time = g.dateOnly ? "" : ` ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+        const site = g.site === "H" ? "vs" : g.site === "A" ? "@" : "N";
+        const name = g.opp.key ? conferenceDisplayName(g.opp.key) : g.opp.name || "?";
+        const quad = g.quad ?? (key ? quadOfGame(season, key, g) : null);
+        const rank = g.oppRank ? `#${g.oppRank} ` : g.oppSeed ? `(${g.oppSeed}) ` : "";
+        const tip = esc(`${site === "N" ? "Neutral site vs" : site} ${rank}${name} · ${day}${time}${quad ? ` · Q${quad}` : ""}${records.byId[g.opp.id] ? "" : " · non-D1"}`);
+        const src = g.opp.key ? null : oppLogoSrc(g.opp) || (g.opp.id ? espnLogoUrl(g.opp.id) : null);
+        const logo = g.opp.key
+            ? `<img class="records-opp-logo records-logo team-logo" data-team="${esc(g.opp.key)}" data-espn="${g.opp.id}" alt="">`
+            : src ? `<img class="records-opp-logo" src="${esc(src)}" data-filler="${esc(name)}" alt="">`
+            : logoFillerHtml("records-opp-logo", name, "");
+        return `<span class="records-next-game" title="${tip}"><span class="records-next-site">${site}</span>${logo}<span class="records-next-date">${esc(day)}</span></span>`;
+    }).join("")}</div>`;
 }
 
 // ── Records tab (Year window) ───────────────────────────────────────────────
@@ -4828,7 +4875,7 @@ function buildTeamGamesHtml(sched, teamId, records, season) {
     </div>`;
 }
 
-// Right-aligned note in the Records title: "ESPN as of 2:15 AM" (date added if the data
+// Right-aligned note in the Records title: "ESPN 2:15 AM" (date added if the data
 // isn't from today), "ESPN · final" for past seasons.
 function recordsNoteHtml(currentYear, data) {
     const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -4839,7 +4886,7 @@ function recordsNoteHtml(currentYear, data) {
         const t = at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
         const today = at.toDateString() === new Date().toDateString();
         note += isCurrentSeason
-            ? ` as of ${today ? t : `${at.toLocaleDateString([], { month: "short", day: "numeric" })}, ${t}`}`
+            ? ` ${today ? t : `${at.toLocaleDateString([], { month: "short", day: "numeric" })}, ${t}`}`
             : " · final";
         if (data.stale) note += ` · couldn't refresh (${esc(data.stale)})`;
     }
@@ -4870,7 +4917,10 @@ function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
     const showNet = quadSrc === "net";
     const showBpi = !!quadSrc && !!QUAD_FILES[currentYear]?.quads;
     const showResume = showBpi && Number(currentYear) >= RESUME_FROM_SEASON;
-    const COLS = (opps ? 8 : 6) + (quadSrc ? 4 : 0) + (showNet ? 1 : 0) + (showBpi ? 3 : 0) + (showResume ? 2 : 0);
+    // All view, current season: each team's next two games (nextGamesFor(); needs quads-YEAR.json).
+    const isCurrentSeason = Number(currentYear) >= Math.max(...getSortedTabs().map(t => Number(t.dataset.year)));
+    const showNext = !opps && showBpi && isCurrentSeason;
+    const COLS = (opps ? 8 : 6) + (quadSrc ? 4 : 0) + (showNet ? 1 : 0) + (showBpi ? 3 : 0) + (showResume ? 2 : 0) + (showNext ? 1 : 0);
     const quadTip = quadSrc === "net"
         ? "Official NCAA quadrant record (D1 games only)"
         : "Unofficial: NCAA quadrant cutoffs with ESPN BPI ranks in place of NET (D1 games only)";
@@ -4896,10 +4946,10 @@ function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
         <col style="width:52px"><col style="width:44px"><col style="width:52px">
         ${showResume ? "<col style=\"width:40px\">".repeat(2) : ""}${showNet ? `<col style="width:38px">` : ""}${showBpi ? "<col style=\"width:42px\">".repeat(3) : ""}
         ${quadSrc ? "<col style=\"width:40px\">".repeat(4) : ""}
-        ${opps ? "<col><col>" : ""}
+        ${opps ? "<col><col>" : ""}${showNext ? "<col>" : ""}
     </colgroup><thead><tr>
         <th>#</th><th></th><th class="team-col">Team</th>
-        <th>W-L</th><th>Pct</th><th>Conf</th>${quadHead}${opps ? `<th class="records-opps-col">Won</th><th class="records-opps-col">Lost</th>` : ""}
+        <th>W-L</th><th>Pct</th><th>Conf</th>${quadHead}${opps ? `<th class="records-opps-col">Won</th><th class="records-opps-col">Lost</th>` : ""}${showNext ? `<th class="records-opps-col records-next-col" title="Next ${RECORDS_NEXT_COUNT} games (hover for opponent, time and quadrant)">Next</th>` : ""}
     </tr></thead>`;
     const quadCells = key => {
         if (!quadSrc) return "";
@@ -4918,7 +4968,7 @@ function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
     if (!data) {
         const msg = error
             ? `Couldn't load records from ESPN (${esc(error)}). <span class="records-retry">Retry</span>`
-            : "Loading records from ESPN…";
+            : "Loading";
         return `${head}<tbody><tr><td colspan="${COLS}" class="records-msg">${msg}</td></tr></tbody>`;
     }
 
@@ -4939,9 +4989,15 @@ function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
         const oppCells = !opps ? ""
             : r ? `<td class="records-opps" data-result="W"><span class="records-opps-msg">…</span></td><td class="records-opps" data-result="L"><span class="records-opps-msg">…</span></td>`
             : `<td></td><td></td>`;
+        let nextCell = "";
+        if (showNext) {
+            const ng = r && key ? nextGamesFor(currentYear, (CONFERENCE_DATA.aliases || {})[key] || key, id) : null;
+            nextCell = `<td class="records-next">${ng ? nextGamesHtml(ng, data, currentYear, key)
+                : `<span class="records-opps-msg">${r && !qd ? "…" : "—"}</span>`}</td>`;
+        }
         const cls = [extraCls, r ? "records-team-row" : ""].filter(Boolean).join(" ");
         return `<tr${cls ? ` class="${cls}"` : ""}${r ? ` data-espn="${id}"` : ""}><td>${num}</td><td>${logo}</td>
-            <td class="team-col">${esc(name)}</td>${cells}${oppCells}</tr>`;
+            <td class="team-col">${esc(name)}</td>${cells}${oppCells}${nextCell}</tr>`;
     };
 
     // Poll points in the active week (official ballots) set the Week view's order.
