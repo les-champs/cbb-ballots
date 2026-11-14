@@ -4590,6 +4590,9 @@ function nextGamesHtml(games, records, season, key) {
 // 2025+, ESPN's before). Clicking a team row expands its game list (fetchTeamSchedule);
 // expanded teams are remembered in _recordsExpanded across re-renders.
 let _recordsView = "week";  // "week" | "all"
+// All view order: "conf" = grouped by conference; "rank" = vote-getters in the active week's
+// points order, then everyone else by ESPN SOR rank (ties: SOS rank, then overall win %).
+let _recordsAllSort = "conf";  // "conf" | "rank"
 let _recordsRenderToken = 0;
 const _recordsExpanded = new Set();   // `${season}:${espnId}`
 
@@ -4600,11 +4603,19 @@ function showSeasonRecords(currentYear, isApMode, activeTab) {
     // Title: "YYYY Records — Voted All", the Voted / All switch styled like the Week window's tabs.
     const switcher = `<span class="records-switch">${[["week", "Voted"], ["all", "All"]].map(([k, l]) =>
         `<span class="records-view${_recordsView === k ? " active" : ""}" data-view="${k}">${l}</span>`).join("")}</span>`;
-    title.innerHTML = `<span class="records-title-main">${currentYear}${isApMode ? " AP" : ""} Records — ${switcher}</span>`
+    // All only: smaller By Conference / By Ranking sort switch right after "All".
+    const sorter = _recordsView !== "all" ? "" : `<span class="records-sort">${[["conf", "Conference"], ["rank", "Ranking"]].map(([k, l]) =>
+        `<span class="records-sort-opt${_recordsAllSort === k ? " active" : ""}" data-sort="${k}">${l}</span>`).join("")}</span>`;
+    title.innerHTML = `<span class="records-title-main">${currentYear}${isApMode ? " AP" : ""} Records — ${switcher}${sorter}</span>`
         + `<span class="records-note records-title-note"></span>`;
     title.querySelectorAll(".records-view").forEach(el => el.addEventListener("click", () => {
         if (el.classList.contains("active")) return;
         _recordsView = el.dataset.view;
+        showSeasonRecords(currentYear, isApMode, activeTab);
+    }));
+    title.querySelectorAll(".records-sort-opt").forEach(el => el.addEventListener("click", () => {
+        if (el.classList.contains("active")) return;
+        _recordsAllSort = el.dataset.sort;
         showSeasonRecords(currentYear, isApMode, activeTab);
     }));
     table.classList.remove("season-voters");
@@ -5023,6 +5034,29 @@ function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
         const groups = ours
             ? Object.entries(ours).map(([name, teams]) => ({ name, members: teams.map(t => [t, espnIdFor(t)]) }))
             : data.confs.map(c => ({ name: c.name, members: c.ids.map(id => [keyOf(id), id]) }));
+        if (_recordsAllSort === "rank") {
+            // Vote-getters in points order (same as Voted), then every other team by SOR rank,
+            // ties by SOS rank, then overall win % and wins. Lines after #25 and the last vote-getter.
+            const qTeam = key => key ? qd?.teams?.[(CONFERENCE_DATA.aliases || {})[key] || key] : null;
+            const seen = new Set();
+            const idOf = ([t, id]) => id || t;
+            const voted = Object.entries(pts).sort((a, b) => b[1] - a[1]).map(([t]) => [t, espnIdFor(t)]);
+            voted.forEach(m => seen.add(idOf(m)));
+            const rank = v => v == null ? Infinity : v;
+            const rest = groups.flatMap(g => g.members).filter(m => !seen.has(idOf(m)) && (seen.add(idOf(m)), true))
+                .sort(([ta, a], [tb, b]) => {
+                    const qa = qTeam(ta || keyOf(a)), qb = qTeam(tb || keyOf(b));
+                    const ra = data.byId[a], rb = data.byId[b];
+                    return (rank(qa?.sor) - rank(qb?.sor)) || (rank(qa?.sos) - rank(qb?.sos))
+                        || ((rb?.pct ?? -1) - (ra?.pct ?? -1)) || ((rb?.wins ?? 0) - (ra?.wins ?? 0));
+                });
+            const all = voted.concat(rest);
+            all.forEach(([team, id], i) => {
+                const line = (i === 24 && all.length > 25) || (i === voted.length - 1 && voted.length > 25 && rest.length);
+                body += row(i + 1, team, id, line ? "records-t25-end" : "");
+            });
+            return `${head}<tbody>${body}</tbody>`;
+        }
         const isPower = g => (CONFERENCE_DATA.power || []).includes(g.name);
         groups.sort((a, b) => (isPower(b) - isPower(a)) || a.name.localeCompare(b.name));
         const confPct = r => {

@@ -880,6 +880,11 @@ kbd {
 .records-view:first-child { margin-left: 0; }
 .records-view.active { opacity: 1; cursor: default; }
 .records-view:not(.active):hover { opacity: 0.65; }
+.records-sort { margin-left: 0.9em; font-size: 0.72em; font-weight: normal; white-space: nowrap; }
+.records-sort-opt { cursor: pointer; color: var(--color-modal-h2); opacity: 0.4; margin-left: 0.7em; }
+.records-sort-opt:first-child { margin-left: 0; }
+.records-sort-opt.active { opacity: 1; cursor: default; }
+.records-sort-opt:not(.active):hover { opacity: 0.7; }
 .records-note { font-size: 11px; opacity: 0.6; }
 #season-stats-title:has(.records-title-note) { display: flex; align-items: baseline; gap: 16px; }
 .records-title-note { margin-left: auto; font-weight: normal; white-space: nowrap; }
@@ -1440,7 +1445,7 @@ body.dark .pin-btn.pinned {
    cursor or onclick. Add new clickable selectors here. */
 h1 span, .week-arrow, .picker-btn, .week-tab, .voter-name, .pin-btn, .history-btn,
 .overall-row .voter-cell, .ballot-link-btn, .voters-toggle, .sort-option, .team-logo,
-.rank-header-num, .conf-stats-table .conf-teams img, .records-view, .records-switch,
+.rank-header-num, .conf-stats-table .conf-teams img, .records-view, .records-switch, .records-sort,
 #season-stats-table.season-records tr.records-team-row, .records-retry, .spread-toggle,
 .modal-mode-tab, .week-chart-kind, #voter-history-table .week-stats-table tr[data-team],
 .conference-year, [onclick], [style*="cursor: pointer"], [style*="cursor:pointer"] {
@@ -5885,6 +5890,7 @@ return `<span class="records-next-game" title="${tip}"><span class="records-next
 }).join("")}</div>`;
 }
 let _recordsView="week";
+let _recordsAllSort="conf";
 let _recordsRenderToken=0;
 const _recordsExpanded=new Set();
 function showSeasonRecords(currentYear,isApMode,activeTab){
@@ -5893,11 +5899,18 @@ const title=document.getElementById("season-stats-title");
 const table=document.getElementById("season-stats-table");
 const switcher=`<span class="records-switch">${[["week","Voted"],["all","All"]].map(([k,l])=>
 `<span class="records-view${_recordsView===k?" active":""}" data-view="${k}">${l}</span>`).join("")}</span>`;
-title.innerHTML=`<span class="records-title-main">${currentYear}${isApMode?" AP":""} Records — ${switcher}</span>`
+const sorter=_recordsView!=="all"?"":`<span class="records-sort">${[["conf","Conference"],["rank","Ranking"]].map(([k,l])=>
+`<span class="records-sort-opt${_recordsAllSort===k?" active":""}" data-sort="${k}">${l}</span>`).join("")}</span>`;
+title.innerHTML=`<span class="records-title-main">${currentYear}${isApMode?" AP":""} Records — ${switcher}${sorter}</span>`
 + `<span class="records-note records-title-note"></span>`;
 title.querySelectorAll(".records-view").forEach(el=>el.addEventListener("click",()=>{
 if(el.classList.contains("active"))return;
 _recordsView=el.dataset.view;
+showSeasonRecords(currentYear,isApMode,activeTab);
+}));
+title.querySelectorAll(".records-sort-opt").forEach(el=>el.addEventListener("click",()=>{
+if(el.classList.contains("active"))return;
+_recordsAllSort=el.dataset.sort;
 showSeasonRecords(currentYear,isApMode,activeTab);
 }));
 table.classList.remove("season-voters");
@@ -6265,6 +6278,27 @@ const ours=conferenceTable(currentYear);
 const groups=ours
 ?Object.entries(ours).map(([name,teams])=>({name,members:teams.map(t=>[t,espnIdFor(t)])}))
 :data.confs.map(c=>({name:c.name,members:c.ids.map(id=>[keyOf(id),id])}));
+if(_recordsAllSort==="rank"){
+const qTeam=key=>key?qd?.teams?.[(CONFERENCE_DATA.aliases||{})[key]||key]:null;
+const seen=new Set();
+const idOf=([t,id])=>id||t;
+const voted=Object.entries(pts).sort((a,b)=>b[1]- a[1]).map(([t])=>[t,espnIdFor(t)]);
+voted.forEach(m=>seen.add(idOf(m)));
+const rank=v=>v==null?Infinity:v;
+const rest=groups.flatMap(g=>g.members).filter(m=>!seen.has(idOf(m))&&(seen.add(idOf(m)),true))
+.sort(([ta,a],[tb,b])=>{
+const qa=qTeam(ta||keyOf(a)),qb=qTeam(tb||keyOf(b));
+const ra=data.byId[a],rb=data.byId[b];
+return(rank(qa?.sor)- rank(qb?.sor))||(rank(qa?.sos)- rank(qb?.sos))
+||((rb?.pct??-1)-(ra?.pct??-1))||((rb?.wins??0)-(ra?.wins??0));
+});
+const all=voted.concat(rest);
+all.forEach(([team,id],i)=>{
+const line=(i===24&&all.length>25)||(i===voted.length - 1&&voted.length>25&&rest.length);
+body +=row(i + 1,team,id,line?"records-t25-end":"");
+});
+return `${head}<tbody>${body}</tbody>`;
+}
 const isPower=g=>(CONFERENCE_DATA.power||[]).includes(g.name);
 groups.sort((a,b)=>(isPower(b)- isPower(a))||a.name.localeCompare(b.name));
 const confPct=r=>{
