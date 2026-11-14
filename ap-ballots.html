@@ -880,11 +880,6 @@ kbd {
 .records-view:first-child { margin-left: 0; }
 .records-view.active { opacity: 1; cursor: default; }
 .records-view:not(.active):hover { opacity: 0.65; }
-.records-sort { margin-left: 0.9em; font-size: 0.72em; font-weight: normal; white-space: nowrap; }
-.records-sort-opt { cursor: pointer; color: var(--color-modal-h2); opacity: 0.4; margin-left: 0.7em; }
-.records-sort-opt:first-child { margin-left: 0; }
-.records-sort-opt.active { opacity: 1; cursor: default; }
-.records-sort-opt:not(.active):hover { opacity: 0.7; }
 .records-note { font-size: 11px; opacity: 0.6; }
 #season-stats-title:has(.records-title-note) { display: flex; align-items: baseline; gap: 16px; }
 .records-title-note { margin-left: auto; font-weight: normal; white-space: nowrap; }
@@ -919,7 +914,6 @@ kbd {
     text-align: left; font-weight: bold; font-size: 12px; color: var(--color-modal-h2);
     padding-top: 12px; border-right: none;
 }
-.records-conf-count { font-weight: normal; font-size: 11px; opacity: 0.6; margin-left: 4px; }
 #season-stats-table.season-records td.records-msg { padding: 24px 8px; font-size: 12px; opacity: 0.8; border-right: none; }
 #season-stats-table.season-records td.records-missing { font-size: 11px; opacity: 0.55; }
 #season-stats-table.season-records td.records-missing:not(:last-child) { border-right: 1px solid var(--color-border-nth); }
@@ -945,9 +939,6 @@ kbd {
 .rg-quad-tag { font-size: 9px; letter-spacing: 0.03em; border: 1px solid currentColor; border-radius: 3px; padding: 0 3px; }
 /* Voted view: Won / Lost opponent logos (fillRecordsOpponents) */
 #season-stats-table.season-records > thead > tr > th.records-opps-col { text-align: left; padding-left: 10px; }
-#season-stats-table.season-records > tbody > tr > td.records-opps { text-align: left; white-space: normal; padding: 6px 6px 6px 10px; }
-#season-stats-table.season-records > tbody > tr > td.records-opps + td.records-opps { border-left: 1px solid var(--color-border-subtle); }
-.records-opps-list { display: flex; flex-wrap: wrap; gap: 5px 2px; width: 196px; }
 .records-opp-logo { display: block; width: 16px; height: 16px; object-fit: contain; }
 .records-opps-msg { font-size: 11px; opacity: 0.45; }
 /* All view: each team's next two games (nextGamesHtml) */
@@ -1445,7 +1436,7 @@ body.dark .pin-btn.pinned {
    cursor or onclick. Add new clickable selectors here. */
 h1 span, .week-arrow, .picker-btn, .week-tab, .voter-name, .pin-btn, .history-btn,
 .overall-row .voter-cell, .ballot-link-btn, .voters-toggle, .sort-option, .team-logo,
-.rank-header-num, .conf-stats-table .conf-teams img, .records-view, .records-switch, .records-sort,
+.rank-header-num, .conf-stats-table .conf-teams img, .records-view, .records-switch,
 #season-stats-table.season-records tr.records-team-row, .records-retry, .spread-toggle,
 .modal-mode-tab, .week-chart-kind, #voter-history-table .week-stats-table tr[data-team],
 .conference-year, [onclick], [style*="cursor: pointer"], [style*="cursor:pointer"] {
@@ -5645,7 +5636,6 @@ return `<span class="records-next-game" title="${tip}"><span class="records-next
 }).join("")}</div>`;
 }
 let _recordsView="week";
-let _recordsAllSort="conf";
 let _recordsRenderToken=0;
 const _recordsExpanded=new Set();
 function showSeasonRecords(currentYear,isApMode,activeTab){
@@ -5654,18 +5644,11 @@ const title=document.getElementById("season-stats-title");
 const table=document.getElementById("season-stats-table");
 const switcher=`<span class="records-switch">${[["week","Voted"],["all","All"]].map(([k,l])=>
 `<span class="records-view${_recordsView===k?" active":""}" data-view="${k}">${l}</span>`).join("")}</span>`;
-const sorter=_recordsView!=="all"?"":`<span class="records-sort">${[["conf","Conference"],["rank","Ranking"]].map(([k,l])=>
-`<span class="records-sort-opt${_recordsAllSort===k?" active":""}" data-sort="${k}">${l}</span>`).join("")}</span>`;
-title.innerHTML=`<span class="records-title-main">${currentYear}${isApMode?" AP":""} Records — ${switcher}${sorter}</span>`
+title.innerHTML=`<span class="records-title-main">${currentYear}${isApMode?" AP":""} Records — ${switcher}</span>`
 + `<span class="records-note records-title-note"></span>`;
 title.querySelectorAll(".records-view").forEach(el=>el.addEventListener("click",()=>{
 if(el.classList.contains("active"))return;
 _recordsView=el.dataset.view;
-showSeasonRecords(currentYear,isApMode,activeTab);
-}));
-title.querySelectorAll(".records-sort-opt").forEach(el=>el.addEventListener("click",()=>{
-if(el.classList.contains("active"))return;
-_recordsAllSort=el.dataset.sort;
 showSeasonRecords(currentYear,isApMode,activeTab);
 }));
 table.classList.remove("season-voters");
@@ -5689,7 +5672,6 @@ table.querySelector(".records-retry")?.addEventListener("click",()=>
 showSeasonRecords(currentYear,isApMode,activeTab));
 initRecordsLogos(table);
 if(!data)return;
-if(_recordsView!=="all")fillRecordsOpponents(table,currentYear,data,token);
 const tbody=table.querySelector("tbody");
 tbody.addEventListener("click",e=>{
 const opp=e.target.closest("img.records-opp-logo[data-team]");
@@ -5712,85 +5694,6 @@ fetchQuads(currentYear).then(again,again);
 if(!cached||Date.now()- cached.at>=ESPN_TTL_MS){
 fetchSeasonRecords(currentYear).then(d=>render(d,null),err=>render(null,err.message));
 }
-}
-const RECORDS_OPPS_CONCURRENCY=6;
-function fillRecordsOpponents(table,season,records,token){
-const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const live=()=>token===_recordsRenderToken&&table.classList.contains("season-records");
-const fill=(tr,sched)=>{
-const fmtDate=iso=>new Date(iso).toLocaleDateString([],{month:"short",day:"numeric"});
-const done=sched.games.filter(g=>g.result).sort((a,b)=>new Date(a.date)- new Date(b.date));
-tr.querySelectorAll("td.records-opps").forEach(td=>{
-let games=done.filter(g=>g.result===td.dataset.result);
-if(td.dataset.result==="W")games=trimWonOpponents(games,season,records);
-td.innerHTML=games.length?`<div class="records-opps-list">${games.map(g=>{
-const name=g.opp.key?conferenceDisplayName(g.opp.key):g.opp.name;
-const rank=g.oppRank?`#${g.oppRank} `:g.oppSeed?`(${g.oppSeed}) `:"";
-const site=g.site==="H"?"vs":g.site==="A"?"@":"N";
-const tip=esc(`${rank}${name} · ${fmtDate(g.date)} ${site} · ${g.us}-${g.them}${records.byId[g.opp.id]?"":" · non-D1"}`);
-return g.opp.key
-?`<img class="records-opp-logo records-logo team-logo" data-team="${esc(g.opp.key)}" data-espn="${g.opp.id}" title="${tip}" alt="">`
-:oppLogoSrc(g.opp)?`<img class="records-opp-logo" src="${esc(oppLogoSrc(g.opp))}" data-filler="${esc(g.opp.name)}" title="${tip}" alt="">`
-:logoFillerHtml("records-opp-logo",g.opp.name,tip);
-}).join("")}</div>`:`<span class="records-opps-msg">—</span>`;
-initRecordsLogos(td);
-});
-};
-const queue=[];
-let active=0;
-const pump=()=>{
-while(active<RECORDS_OPPS_CONCURRENCY&&queue.length&&live()){
-const tr=queue.shift();
-active++;
-fetchTeamSchedule(tr.dataset.espn,season).then(sched=>{
-if(live()&&tr.isConnected)fill(tr,sched);
-},err=>{
-if(!live()||!tr.isConnected)return;
-tr.querySelectorAll("td.records-opps").forEach(td=>{
-if(td.querySelector(".records-opps-list"))return;
-td.innerHTML=`<span class="records-opps-msg" title="${esc(err.message)}">couldn't load</span>`;
-});
-}).finally(()=>{active--;pump();});
-}
-};
-const enqueue=tr=>{
-const cached=espnCachedData(`schedule:${season}:${tr.dataset.espn}`);
-if(cached)fill(tr,cached);
-if(!cached||Date.now()- cached.at>=ESPN_TTL_MS){queue.push(tr);pump();}
-};
-[...table.querySelectorAll("tr.records-team-row")].filter(tr=>tr.querySelector("td.records-opps")).forEach(enqueue);
-}
-const RECORDS_WON_MAX=22;
-function trimWonOpponents(games,season,records){
-if(games.length<=RECORDS_WON_MAX)return games;
-const table=conferenceTable(season);
-const cd=typeof CONFERENCE_DATA==="undefined"?{}:CONFERENCE_DATA;
-const aliases=cd.aliases||{};
-const power=cd.power||[];
-const confOf=g=>{
-if(table&&g.opp.key){
-const k=aliases[g.opp.key]||g.opp.key;
-const c=Object.keys(table).find(c=>table[c].includes(k)||table[c].includes(g.opp.key));
-if(c)return c;
-}
-return records.byId[g.opp.id]?.conf||null;
-};
-const tier=g=>{
-if(!records.byId[g.opp.id])return 0;
-if(g.oppRank||g.oppSeed)return null;
-return power.includes(confOf(g))?2:1;
-};
-const byDate=(a,b)=>new Date(a.date)- new Date(b.date);
-const drop=new Set();
-let excess=games.length - RECORDS_WON_MAX;
-for(const t of[0,1,2]){
-for(const g of games.filter(g=>tier(g)===t).sort(byDate)){
-if(excess<=0)break;
-drop.add(g);
-excess--;
-}
-}
-return games.filter(g=>!drop.has(g));
 }
 function oppLogoSrc(opp){
 if(opp.logo)return opp.logo;
@@ -5928,18 +5831,18 @@ note +=qd.official
 }
 return note;
 }
+const RECORDS_NAME_MAX=17;
 function buildRecordsTableHtml(currentYear,weekId,weekLabel,data,error){
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const view=_recordsView;
-const opps=view!=="all";
 const quadSrc=quadsAvailable(currentYear);
 const qd=_quadsData[currentYear];
 const showNet=quadSrc==="net";
 const showBpi=!!quadSrc&&!!QUAD_FILES[currentYear]?.quads;
 const showResume=showBpi&&Number(currentYear)>=RESUME_FROM_SEASON;
 const isCurrentSeason=Number(currentYear)>=Math.max(...getSortedTabs().map(t=>Number(t.dataset.year)));
-const showNext=!opps&&showBpi&&isCurrentSeason;
-const COLS=(opps?8:6)+(quadSrc?4:0)+(showNet?1:0)+(showBpi?3:0)+(showResume?2:0)+(showNext?1:0);
+const showNext=showBpi&&isCurrentSeason;
+const COLS=6 +(quadSrc?4:0)+(showNet?1:0)+(showBpi?3:0)+(showResume?2:0)+(showNext?1:0);
 const quadTip=quadSrc==="net"
 ?"Official NCAA quadrant record (D1 games only)"
 :"Unofficial: NCAA quadrant cutoffs with ESPN BPI ranks in place of NET (D1 games only)";
@@ -5964,10 +5867,10 @@ const head=`<colgroup>
         <col style="width:52px"><col style="width:44px"><col style="width:52px">
         ${showResume?"<col style=\"width:40px\">".repeat(2):""}${showNet?`<col style="width:38px">`:""}${showBpi?"<col style=\"width:42px\">".repeat(3):""}
         ${quadSrc?"<col style=\"width:40px\">".repeat(4):""}
-        ${opps?"<col><col>":""}${showNext?"<col>":""}
+        ${showNext?"<col>":""}
     </colgroup><thead><tr>
         <th>#</th><th></th><th class="team-col">Team</th>
-        <th>W-L</th><th>Pct</th><th>Conf</th>${quadHead}${opps?`<th class="records-opps-col">Won</th><th class="records-opps-col">Lost</th>`:""}${showNext?`<th class="records-opps-col records-next-col" title="Next ${RECORDS_NEXT_COUNT} games (hover for opponent, time and quadrant)">Next</th>`:""}
+        <th>W-L</th><th>Pct</th><th>Conf</th>${quadHead}${showNext?`<th class="records-opps-col records-next-col" title="Next ${RECORDS_NEXT_COUNT} games (hover for opponent, time and quadrant)">Next</th>`:""}
     </tr></thead>`;
 const quadCells=key=>{
 if(!quadSrc)return "";
@@ -5993,7 +5896,8 @@ const pct=r=>r.pct===null?"—":r.pct.toFixed(3).replace(/^0/,"");
 const row=(num,team,id,extraCls="")=>{
 const r=id?data.byId[id]:null;
 const key=team||(id&&keyOf(id))||null;
-const name=key?conferenceDisplayName(key):r?.name||"?";
+const fullName=key?conferenceDisplayName(key):r?.name||"?";
+const name=fullName.length>RECORDS_NAME_MAX&&r?.name&&r.name.length<fullName.length?r.name:fullName;
 const logo=key
 ?`<img class="logo-sm records-logo" data-team="${esc(key)}"${id?` data-espn="${id}"`:""} alt="">`
 :id?`<img class="logo-sm" src="${espnLogoUrl(id)}" data-filler="${esc(name)}" alt="">`:"";
@@ -6001,9 +5905,6 @@ const cells=(r
 ?`<td class="records-wl">${r.wins}-${r.losses}</td><td>${pct(r)}</td><td>${esc(r.confRecord||"—")}</td>`
 :`<td colspan="3" class="records-missing">${id?"Not in ESPN's standings":"No ESPN ID"}</td>`)
 + quadCells(key);
-const oppCells=!opps?""
-:r?`<td class="records-opps" data-result="W"><span class="records-opps-msg">…</span></td><td class="records-opps" data-result="L"><span class="records-opps-msg">…</span></td>`
-:`<td></td><td></td>`;
 let nextCell="";
 if(showNext){
 const ng=r&&key?nextGamesFor(currentYear,(CONFERENCE_DATA.aliases||{})[key]||key,id):null;
@@ -6012,7 +5913,7 @@ nextCell=`<td class="records-next">${ng?nextGamesHtml(ng,data,currentYear,key)
 }
 const cls=[extraCls,r?"records-team-row":""].filter(Boolean).join(" ");
 return `<tr${cls?` class="${cls}"`:""}${r?` data-espn="${id}"`:""}><td>${num}</td><td>${logo}</td>
-            <td class="team-col">${esc(name)}</td>${cells}${oppCells}${nextCell}</tr>`;
+            <td class="team-col"${name!==fullName?` title="${esc(fullName)}"`:""}>${esc(name)}</td>${cells}${nextCell}</tr>`;
 };
 const ballots=Object.entries(buildDeltaData(true)[weekId]||{})
 .filter(([u])=>u!=="Official Overall"&&u!=="AP Overall")
@@ -6033,27 +5934,6 @@ const ours=conferenceTable(currentYear);
 const groups=ours
 ?Object.entries(ours).map(([name,teams])=>({name,members:teams.map(t=>[t,espnIdFor(t)])}))
 :data.confs.map(c=>({name:c.name,members:c.ids.map(id=>[keyOf(id),id])}));
-if(_recordsAllSort==="rank"){
-const qTeam=key=>key?qd?.teams?.[(CONFERENCE_DATA.aliases||{})[key]||key]:null;
-const seen=new Set();
-const idOf=([t,id])=>id||t;
-const voted=Object.entries(pts).sort((a,b)=>b[1]- a[1]).map(([t])=>[t,espnIdFor(t)]);
-voted.forEach(m=>seen.add(idOf(m)));
-const rank=v=>v==null?Infinity:v;
-const rest=groups.flatMap(g=>g.members).filter(m=>!seen.has(idOf(m))&&(seen.add(idOf(m)),true))
-.sort(([ta,a],[tb,b])=>{
-const qa=qTeam(ta||keyOf(a)),qb=qTeam(tb||keyOf(b));
-const ra=data.byId[a],rb=data.byId[b];
-return(rank(qa?.sor)- rank(qb?.sor))||(rank(qa?.sos)- rank(qb?.sos))
-||((rb?.pct??-1)-(ra?.pct??-1))||((rb?.wins??0)-(ra?.wins??0));
-});
-const all=voted.concat(rest);
-all.forEach(([team,id],i)=>{
-const line=(i===24&&all.length>25)||(i===voted.length - 1&&voted.length>25&&rest.length);
-body +=row(i + 1,team,id,line?"records-t25-end":"");
-});
-return `${head}<tbody>${body}</tbody>`;
-}
 const isPower=g=>(CONFERENCE_DATA.power||[]).includes(g.name);
 groups.sort((a,b)=>(isPower(b)- isPower(a))||a.name.localeCompare(b.name));
 const confPct=r=>{
@@ -6066,8 +5946,7 @@ const ra=data.byId[a],rb=data.byId[b];
 return(confPct(rb)- confPct(ra))||((rb?.pct??-1)-(ra?.pct??-1))
 ||((rb?.wins??0)-(ra?.wins??0));
 });
-body +=`<tr class="records-conf-row"><td colspan="${COLS}">${esc(g.name)}
-                <span class="records-conf-count">${members.length}</span></td></tr>`;
+body +=`<tr class="records-conf-row"><td colspan="${COLS}">${esc(g.name)}</td></tr>`;
 members.forEach(([team,id],i)=>{
 body +=row(i + 1,team,id);
 });

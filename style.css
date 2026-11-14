@@ -860,11 +860,6 @@ kbd {
 .records-view:first-child { margin-left: 0; }
 .records-view.active { opacity: 1; cursor: default; }
 .records-view:not(.active):hover { opacity: 0.65; }
-.records-sort { margin-left: 0.9em; font-size: 0.72em; font-weight: normal; white-space: nowrap; }
-.records-sort-opt { cursor: pointer; color: var(--color-modal-h2); opacity: 0.4; margin-left: 0.7em; }
-.records-sort-opt:first-child { margin-left: 0; }
-.records-sort-opt.active { opacity: 1; cursor: default; }
-.records-sort-opt:not(.active):hover { opacity: 0.7; }
 .records-note { font-size: 11px; opacity: 0.6; }
 #season-stats-title:has(.records-title-note) { display: flex; align-items: baseline; gap: 16px; }
 .records-title-note { margin-left: auto; font-weight: normal; white-space: nowrap; }
@@ -899,7 +894,6 @@ kbd {
     text-align: left; font-weight: bold; font-size: 12px; color: var(--color-modal-h2);
     padding-top: 12px; border-right: none;
 }
-.records-conf-count { font-weight: normal; font-size: 11px; opacity: 0.6; margin-left: 4px; }
 #season-stats-table.season-records td.records-msg { padding: 24px 8px; font-size: 12px; opacity: 0.8; border-right: none; }
 #season-stats-table.season-records td.records-missing { font-size: 11px; opacity: 0.55; }
 #season-stats-table.season-records td.records-missing:not(:last-child) { border-right: 1px solid var(--color-border-nth); }
@@ -925,9 +919,6 @@ kbd {
 .rg-quad-tag { font-size: 9px; letter-spacing: 0.03em; border: 1px solid currentColor; border-radius: 3px; padding: 0 3px; }
 /* Voted view: Won / Lost opponent logos (fillRecordsOpponents) */
 #season-stats-table.season-records > thead > tr > th.records-opps-col { text-align: left; padding-left: 10px; }
-#season-stats-table.season-records > tbody > tr > td.records-opps { text-align: left; white-space: normal; padding: 6px 6px 6px 10px; }
-#season-stats-table.season-records > tbody > tr > td.records-opps + td.records-opps { border-left: 1px solid var(--color-border-subtle); }
-.records-opps-list { display: flex; flex-wrap: wrap; gap: 5px 2px; width: 196px; }
 .records-opp-logo { display: block; width: 16px; height: 16px; object-fit: contain; }
 .records-opps-msg { font-size: 11px; opacity: 0.45; }
 /* All view: each team's next two games (nextGamesHtml) */
@@ -1425,7 +1416,7 @@ body.dark .pin-btn.pinned {
    cursor or onclick. Add new clickable selectors here. */
 h1 span, .week-arrow, .picker-btn, .week-tab, .voter-name, .pin-btn, .history-btn,
 .overall-row .voter-cell, .ballot-link-btn, .voters-toggle, .sort-option, .team-logo,
-.rank-header-num, .conf-stats-table .conf-teams img, .records-view, .records-switch, .records-sort,
+.rank-header-num, .conf-stats-table .conf-teams img, .records-view, .records-switch,
 #season-stats-table.season-records tr.records-team-row, .records-retry, .spread-toggle,
 .modal-mode-tab, .week-chart-kind, #voter-history-table .week-stats-table tr[data-team],
 .conference-year, [onclick], [style*="cursor: pointer"], [style*="cursor:pointer"] {
