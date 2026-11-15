@@ -1983,6 +1983,7 @@ function showWeekHighLowChart(weekId, mode = "stats") {
     statsTable.className = "week-stats-table";
     statsTable.innerHTML = html;
     fillWeekResults(statsTable, weekId);
+    fillWeekRecords(statsTable, weekId);
     statsTable.addEventListener("click", e => {
         // W / L opponent names highlight the opponent, not the row's team.
         const opp = e.target.closest(".ws-opp[data-team]");
@@ -3268,11 +3269,10 @@ function buildWeekStatsTableHtml(weekId) {
         return `<tr data-team="${teamAttr}">
             <td>${rankDisplay}</td>
             <td style="padding:2px 4px;"><img class="logo-sm" src="${logoSrc(team)}"></td>
-            <td class="team-col">${formatTeamName(team)}</td>
+            <td class="team-col">${formatTeamName(team)}<span class="ws-rec"></span></td>
             <td style="white-space:nowrap">${rankDelta}</td>
             <td>${count}</td>
             <td>${pts}</td>
-            <td title="Share of the maximum possible points (every voter ranking this team #1)">${Math.round(pts / (25 * totalVoters) * 100)}%</td>
             <td>${inTop25 ? (Number.isInteger(hi) ? hi : hi.toFixed(1)) : ""}</td>
             <td>${inTop25 ? avg.toFixed(1) : ""}</td>
             <td>${inTop25 ? (Number.isInteger(lo) ? lo : lo.toFixed(1)) : ""}</td>
@@ -3290,7 +3290,6 @@ function buildWeekStatsTableHtml(weekId) {
         <col style="width:52px">
         <col style="width:36px">
         <col style="width:64px">
-        <col style="width:56px">
         <col style="width:44px">
         <col style="width:52px">
         <col style="width:44px">
@@ -3305,7 +3304,6 @@ function buildWeekStatsTableHtml(weekId) {
         <th title="Rank change from previous week">Δ</th>
         <th>Voters</th>
         <th>Pts</th>
-        <th title="Share of the maximum possible points: 100% = ranked #1 (25 pts) by every voter">Pts%</th>
         <th title="10th percentile rank across all voters">P<sub>90+</sub></th>
         <th>Avg</th>
         <th title="90th percentile rank across all voters">P<sub>10−</sub></th>
@@ -3316,11 +3314,51 @@ function buildWeekStatsTableHtml(weekId) {
     </tr></thead><tbody>`;
     top25.forEach((team, i) => { html += buildRow(team, i + 1); });
     if (receivingVotes.length > 0) {
-        html += `<tr class="rv-divider"><td colspan="15">Receiving Votes</td></tr>`;
+        html += `<tr class="rv-divider"><td colspan="14">Receiving Votes</td></tr>`;
         receivingVotes.forEach((team, i) => { html += buildRow(team, 26 + i); });
     }
     html += "</tbody>";
     return html;
+}
+
+// "(W-L)" after each team name in the Week Stats table: the team's overall record (ESPN, incl.
+// non-D1 and postseason) as of the poll's deadline (pollDeadline(), i.e. what voters had seen),
+// from each team's schedule via recordAsOf(). Weeks without a deadline (AP, legacy 2016–2022)
+// show the live standings record only for the latest week of the current season; otherwise,
+// and for pre-season, nothing.
+function fillWeekRecords(statsTable, weekId) {
+    const isAp = weekId.startsWith("week-ap-");
+    const tabs = isAp ? getSortedApTabs() : getSortedTabs();
+    const i = tabs.findIndex(t => t.dataset.week === weekId);
+    if (i === -1 || tabs[i].dataset.weeknum === "0") return;
+    const season = tabs[i].dataset.year;
+    const deadline = isAp ? null : pollDeadline(weekId);
+    const isLatest = i === 0;
+    if (!deadline && !isLatest) return;
+    const rows = Array.from(statsTable.querySelectorAll("tr[data-team]"))
+        .map(tr => ({ id: tr.querySelector("td.ws-w")?.dataset.espn, span: tr.querySelector(".ws-rec") }))
+        .filter(r => r.id && r.span);
+    const show = (span, wins, losses, tip) => {
+        if (!statsTable.isConnected) return;
+        span.textContent = ` (${wins}-${losses})`;
+        span.title = tip;
+    };
+    if (!deadline) {
+        fetchSeasonRecords(season).then(({ byId }) => {
+            rows.forEach(r => {
+                const t = byId[r.id];
+                if (t) show(r.span, t.wins, t.losses, "Current record (ESPN)");
+            });
+        }, () => {});
+        return;
+    }
+    const asOf = new Date(deadline).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    rows.forEach(r => {
+        fetchTeamSchedule(r.id, season).then(({ games }) => {
+            const { wins, losses } = recordAsOf(games, deadline);
+            show(r.span, wins, losses, `Record at the poll deadline (${asOf}), ESPN`);
+        }, () => {});
+    });
 }
 
 // W / L columns of the Week Stats table: each team's wins and losses in date order, each as

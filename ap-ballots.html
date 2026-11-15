@@ -779,17 +779,17 @@ kbd {
 #voter-history-table .week-stats-table .logo-sm { height: 20px; width: 20px; object-fit: contain; vertical-align: middle; }
 #voter-history-table .week-stats-table tr.rv-divider td { padding: 6px 0 2px; color: var(--color-divider-text); font-size: 11px; text-align: left; border-bottom: none; }
 #voter-history-table .week-stats-table th:nth-child(5), #voter-history-table .week-stats-table td:nth-child(5),
-#voter-history-table .week-stats-table th:nth-child(6), #voter-history-table .week-stats-table td:nth-child(6),
+#voter-history-table .week-stats-table th:nth-child(7), #voter-history-table .week-stats-table td:nth-child(7),
 #voter-history-table .week-stats-table th:nth-child(8), #voter-history-table .week-stats-table td:nth-child(8),
 #voter-history-table .week-stats-table th:nth-child(9), #voter-history-table .week-stats-table td:nth-child(9),
-#voter-history-table .week-stats-table th:nth-child(10), #voter-history-table .week-stats-table td:nth-child(10),
-#voter-history-table .week-stats-table th:nth-child(12), #voter-history-table .week-stats-table td:nth-child(12),
-#voter-history-table .week-stats-table th:nth-child(14), #voter-history-table .week-stats-table td:nth-child(14),
-#voter-history-table .week-stats-table th:nth-child(15), #voter-history-table .week-stats-table td:nth-child(15) { border-right: none; }
-#voter-history-table .week-stats-table th:nth-child(7), #voter-history-table .week-stats-table td:nth-child(7),
 #voter-history-table .week-stats-table th:nth-child(11), #voter-history-table .week-stats-table td:nth-child(11),
-#voter-history-table .week-stats-table th:nth-child(13), #voter-history-table .week-stats-table td:nth-child(13) { border-right: 1px solid var(--color-border-strong); }
+#voter-history-table .week-stats-table th:nth-child(13), #voter-history-table .week-stats-table td:nth-child(13),
+#voter-history-table .week-stats-table th:nth-child(14), #voter-history-table .week-stats-table td:nth-child(14) { border-right: none; }
+#voter-history-table .week-stats-table th:nth-child(6), #voter-history-table .week-stats-table td:nth-child(6),
+#voter-history-table .week-stats-table th:nth-child(10), #voter-history-table .week-stats-table td:nth-child(10),
+#voter-history-table .week-stats-table th:nth-child(12), #voter-history-table .week-stats-table td:nth-child(12) { border-right: 1px solid var(--color-border-strong); }
 /* W / L (last two columns): opponents beaten / lost to since the previous poll (fillWeekResults() in script.js) */
+#voter-history-table .week-stats-table .ws-rec { white-space: nowrap; font-size: 11px; opacity: 0.6; font-variant-numeric: tabular-nums; }
 #voter-history-table .week-stats-table td.ws-res { white-space: normal; text-align: left; font-size: 11px; line-height: 1.3; padding: 2px 6px; max-width: 170px; }
 #voter-history-table .week-stats-table th.ws-res { text-align: left; padding-left: 6px; }
 #voter-history-table .week-stats-table .ws-res-list { display: flex; flex-wrap: wrap; gap: 3px 8px; justify-content: flex-start; }
@@ -799,7 +799,7 @@ kbd {
 #voter-history-table .week-stats-table .ws-opp-rank { opacity: 0.75; font-variant-numeric: tabular-nums; }
 #voter-history-table .week-stats-table .ws-res-msg { opacity: 0.45; }
 #voter-history-table .week-stats-table.ws-no-results .ws-res { display: none; }
-#voter-history-table .week-stats-table.ws-no-results th:nth-child(13), #voter-history-table .week-stats-table.ws-no-results td:nth-child(13) { border-right: none; }
+#voter-history-table .week-stats-table.ws-no-results th:nth-child(12), #voter-history-table .week-stats-table.ws-no-results td:nth-child(12) { border-right: none; }
 
 
 /* Stats › Week › Conference tab (buildConferenceView() in script.js) */
@@ -3531,6 +3531,7 @@ const statsTable=document.createElement("table");
 statsTable.className="week-stats-table";
 statsTable.innerHTML=html;
 fillWeekResults(statsTable,weekId);
+fillWeekRecords(statsTable,weekId);
 statsTable.addEventListener("click",e=>{
 const opp=e.target.closest(".ws-opp[data-team]");
 if(opp){toggleTeamHighlight(opp.dataset.team);return;}
@@ -4580,11 +4581,10 @@ const espnAttr=espnId?` data-espn="${espnId}"`:"";
 return `<tr data-team="${teamAttr}">
             <td>${rankDisplay}</td>
             <td style="padding:2px 4px;"><img class="logo-sm" src="${logoSrc(team)}"></td>
-            <td class="team-col">${formatTeamName(team)}</td>
+            <td class="team-col">${formatTeamName(team)}<span class="ws-rec"></span></td>
             <td style="white-space:nowrap">${rankDelta}</td>
             <td>${count}</td>
             <td>${pts}</td>
-            <td title="Share of the maximum possible points (every voter ranking this team #1)">${Math.round(pts /(25*totalVoters)*100)}%</td>
             <td>${inTop25?(Number.isInteger(hi)?hi:hi.toFixed(1)):""}</td>
             <td>${inTop25?avg.toFixed(1):""}</td>
             <td>${inTop25?(Number.isInteger(lo)?lo:lo.toFixed(1)):""}</td>
@@ -4601,7 +4601,6 @@ let html=`<colgroup>
         <col style="width:52px">
         <col style="width:36px">
         <col style="width:64px">
-        <col style="width:56px">
         <col style="width:44px">
         <col style="width:52px">
         <col style="width:44px">
@@ -4616,7 +4615,6 @@ let html=`<colgroup>
         <th title="Rank change from previous week">Δ</th>
         <th>Voters</th>
         <th>Pts</th>
-        <th title="Share of the maximum possible points: 100% = ranked #1 (25 pts) by every voter">Pts%</th>
         <th title="10th percentile rank across all voters">P<sub>90+</sub></th>
         <th>Avg</th>
         <th title="90th percentile rank across all voters">P<sub>10−</sub></th>
@@ -4627,11 +4625,45 @@ let html=`<colgroup>
     </tr></thead><tbody>`;
 top25.forEach((team,i)=>{html +=buildRow(team,i + 1);});
 if(receivingVotes.length>0){
-html +=`<tr class="rv-divider"><td colspan="15">Receiving Votes</td></tr>`;
+html +=`<tr class="rv-divider"><td colspan="14">Receiving Votes</td></tr>`;
 receivingVotes.forEach((team,i)=>{html +=buildRow(team,26 + i);});
 }
 html +="</tbody>";
 return html;
+}
+function fillWeekRecords(statsTable,weekId){
+const isAp=weekId.startsWith("week-ap-");
+const tabs=isAp?getSortedApTabs():getSortedTabs();
+const i=tabs.findIndex(t=>t.dataset.week===weekId);
+if(i===-1||tabs[i].dataset.weeknum==="0")return;
+const season=tabs[i].dataset.year;
+const deadline=isAp?null:pollDeadline(weekId);
+const isLatest=i===0;
+if(!deadline&&!isLatest)return;
+const rows=Array.from(statsTable.querySelectorAll("tr[data-team]"))
+.map(tr=>({id:tr.querySelector("td.ws-w")?.dataset.espn,span:tr.querySelector(".ws-rec")}))
+.filter(r=>r.id&&r.span);
+const show=(span,wins,losses,tip)=>{
+if(!statsTable.isConnected)return;
+span.textContent=` (${wins}-${losses})`;
+span.title=tip;
+};
+if(!deadline){
+fetchSeasonRecords(season).then(({byId})=>{
+rows.forEach(r=>{
+const t=byId[r.id];
+if(t)show(r.span,t.wins,t.losses,"Current record (ESPN)");
+});
+},()=>{});
+return;
+}
+const asOf=new Date(deadline).toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+rows.forEach(r=>{
+fetchTeamSchedule(r.id,season).then(({games})=>{
+const{wins,losses}=recordAsOf(games,deadline);
+show(r.span,wins,losses,`Record at the poll deadline (${asOf}), ESPN`);
+},()=>{});
+});
 }
 function fillWeekResults(statsTable,weekId){
 const win=pollResultsWindow(weekId);
