@@ -129,7 +129,13 @@ function toggleDarkMode() {
     });
 })();
 
+const TEAM_NAME_OVERRIDES = {
+    TexasAM: "Texas A&M",
+    TexasAMCommerce: "East Texas A&M",
+};
+
 function formatTeamName(team) {
+    if (TEAM_NAME_OVERRIDES[team]) return TEAM_NAME_OVERRIDES[team];
     // Always insert space before "State"
     let name = team.replace(/State/g, " State");
     // Insert space before uppercase letter when preceded by lowercase (camelCase boundary)
@@ -3348,7 +3354,7 @@ function fillWeekRecords(statsTable, weekId) {
 }
 
 // W / L columns of the Week Stats table: each team's wins and losses in date order, each as
-// site (V / @ / N) + opponent's AP rank at game time (seed in the postseason) + opponent logo between the previous poll's deadline and this poll's (pollResultsWindow()),
+// opponent's AP rank at game time (seed in the postseason) + opponent logo (site only in the tooltip) between the previous poll's deadline and this poll's (pollResultsWindow()),
 // i.e. the results voters had seen since their last ballot. Live from ESPN's scoreboard.
 // Weeks without a window (pre-season, AP, pre-2025) hide both columns via .ws-no-results.
 function fillWeekResults(statsTable, weekId) {
@@ -3361,12 +3367,12 @@ function fillWeekResults(statsTable, weekId) {
     statsTable.querySelector("th.ws-l").title = `Losses since the previous poll (${span})`;
     const cells = () => statsTable.querySelectorAll("td.ws-res");
     cells().forEach(td => { td.innerHTML = `<span class="ws-res-msg">…</span>`; });
-    // One game: site (vs home, @ away, N neutral), opponent's AP rank (or seed), opponent logo.
-    // The rank span is always there (empty when unranked) so every chip has the same layout.
+    // One game: opponent's AP rank (or seed), opponent logo, school name. Site (vs / @ / neutral) is in the tooltip only.
+    // Unranked opponents have no rank span, so the chip starts with the logo.
     const oppHtml = g => {
-        const site = g.site === "H" ? "vs" : g.site === "A" ? "@" : "N";
         const siteWord = g.site === "H" ? "vs" : g.site === "A" ? "@" : "neutral vs";
         const name = g.opp.key ? conferenceDisplayName(g.opp.key) : g.opp.name || "?";
+        const label = g.opp.key ? shortTeamName(g.opp.key) : name;  // chip text; tooltip keeps the full name
         const rank = g.oppRank ? `${g.oppRank}` : g.oppSeed ? `(${g.oppSeed})` : "";
         const day = new Date(g.date).toLocaleDateString([], { month: "short", day: "numeric" });
         const tip = esc(`${g.result} ${g.us}-${g.them} ${siteWord} ${g.oppRank ? `#${rank} ` : rank ? rank + " " : ""}${name} · ${day}${g.note ? ` · ${g.note}` : ""}`);
@@ -3375,20 +3381,25 @@ function fillWeekResults(statsTable, weekId) {
             ? `<img class="records-opp-logo records-logo" data-team="${esc(g.opp.key)}" data-espn="${g.opp.id}" alt="">`
             : src ? `<img class="records-opp-logo" src="${esc(src)}" data-filler="${esc(name)}" alt="">`
             : logoFillerHtml("records-opp-logo", name, "");
-        return `<span class="ws-opp"${g.opp.key ? ` data-team="${esc(g.opp.key)}"` : ""} title="${tip}"><span class="ws-opp-site">${site}</span><span class="ws-opp-rank">${rank}</span>${logo}</span>`;
+        return `<span class="ws-opp"${g.opp.key ? ` data-team="${esc(g.opp.key)}"` : ""} title="${tip}">${rank ? `<span class="ws-opp-rank">${rank}</span>` : ""}${logo}<span class="ws-opp-name">${esc(label)}</span></span>`;
     };
     fetchResultsBetween(win.start, win.end).then(({ byTeam }) => {
         if (!statsTable.isConnected) return;
         cells().forEach(td => {
             const id = td.closest("tr")?.querySelector("td.ws-w")?.dataset.espn;
             const want = td.classList.contains("ws-w") ? "W" : "L";
-            const games = id ? (byTeam[id] || []).filter(g => g.result === want) : null;
+            let games = id ? (byTeam[id] || []).filter(g => g.result === want) : null;
+            // At most 2 games per cell: keep the two best-ranked opponents (AP rank, then seed,
+            // then unranked), shown in date order.
+            if (games && games.length > 2) {
+                const strength = g => g.oppRank || (g.oppSeed ? 100 + g.oppSeed : 1000);
+                const keep = new Set([...games].sort((a, b) => strength(a) - strength(b)).slice(0, 2));
+                games = games.filter(g => keep.has(g));
+            }
             td.innerHTML = games === null
                 ? `<span class="ws-res-msg" title="No ESPN id for this team">?</span>`
                 : games.length ? `<div class="ws-res-list">${games.map(oppHtml).join("")}</div>` : "—";
         });
-        // Postseason seeds "(16)" need a wider rank slot than AP ranks "16".
-        statsTable.classList.toggle("ws-has-seeds", Object.values(byTeam).some(gs => gs.some(g => !g.oppRank && g.oppSeed)));
         initRecordsLogos(statsTable);
     }, err => {
         if (!statsTable.isConnected) return;
@@ -5551,6 +5562,13 @@ function conferenceDisplayName(team) {
     const names = CONFERENCE_DATA.names;
     if (names[team]) return names[team];
     return team.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2");
+}
+
+// Shorter team name for tight spaces ("Michigan ST", "E. Kentucky", "FAU"), from
+// SHORT_NAMES in conferences.py; falls back to the display name. Applies aliases.
+function shortTeamName(team) {
+    const key = CONFERENCE_DATA.aliases[team] || team;
+    return CONFERENCE_DATA.short?.[key] ?? conferenceDisplayName(key);
 }
 
 function showConferenceModal(year) {

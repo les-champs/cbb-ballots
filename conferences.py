@@ -64,6 +64,79 @@ DISPLAY_NAMES = {
     "DePaul": "DePaul", "UConn": "UConn", "UMass": "UMass", "McNeese": "McNeese",
 }
 
+# Shorter names for tight spaces (e.g. the Week Stats table). Only schools whose short
+# name differs from the display name are listed; shortTeamName() in script.js falls back
+# to the display name. Conventions: "State" -> "ST"; leading North/South/East/West and
+# Northern/Southern/Eastern/Western/Central -> N./S./E./W./C.; Saint -> St., Mount -> Mt.;
+# a well-known initialism (FAU, SDSU, UNCW...) where the rules still leave a long name.
+SHORT_NAMES = {
+    # "State" -> "ST"
+    "AlabamaState": "Alabama ST", "AlcornState": "Alcorn ST", "AppalachianState": "App ST",
+    "ArizonaState": "Arizona ST", "ArkansasState": "Arkansas ST", "BallState": "Ball ST",
+    "BoiseState": "Boise ST", "ChicagoState": "Chicago ST", "ClevelandState": "Cleveland ST",
+    "ColoradoState": "Colorado ST", "CoppinState": "Coppin ST", "DelawareState": "Delaware ST",
+    "FloridaState": "Florida ST", "FresnoState": "Fresno ST", "GeorgiaState": "Georgia ST",
+    "GramblingState": "Grambling ST", "IdahoState": "Idaho ST", "IllinoisState": "Illinois ST",
+    "IndianaState": "Indiana ST", "IowaState": "Iowa ST", "JacksonState": "Jackson ST",
+    "JacksonvilleState": "Jax ST", "KansasState": "Kansas ST", "KennesawState": "Kennesaw ST",
+    "KentState": "Kent ST", "LongBeachState": "Long Beach ST", "MichiganState": "Michigan ST",
+    "MississippiState": "Miss. ST", "MissouriState": "Missouri ST", "MontanaState": "Montana ST",
+    "MoreheadState": "Morehead ST", "MorganState": "Morgan ST", "MurrayState": "Murray ST",
+    "NewMexicoState": "New Mexico ST", "NorfolkState": "Norfolk ST", "OhioState": "Ohio ST",
+    "OklahomaState": "Oklahoma ST", "OregonState": "Oregon ST", "PennState": "Penn ST",
+    "PortlandState": "Portland ST", "SacramentoState": "Sacramento ST", "SCState": "SC ST",
+    "SEMissouriState": "SE Missouri ST", "TarletonState": "Tarleton ST",
+    "TennesseeState": "Tenn. ST", "TexasState": "Texas ST", "UtahState": "Utah ST",
+    "WashingtonState": "Wash. ST", "WeberState": "Weber ST", "WichitaState": "Wichita ST",
+    "WrightState": "Wright ST", "YoungstownState": "Youngstown ST",
+    "NorthwesternState": "NW ST", "NorthDakotaState": "N. Dakota ST",
+    "SouthDakotaState": "S. Dakota ST",
+    # Directions
+    "CentralArkansas": "C. Arkansas", "CentralConnecticut": "C. Conn.",
+    "CentralMichigan": "C. Michigan", "EastCarolina": "E. Carolina",
+    "EasternIllinois": "E. Illinois", "EasternKentucky": "E. Kentucky",
+    "EasternMichigan": "E. Michigan", "EasternWashington": "E. Washington",
+    "NorthAlabama": "N. Alabama", "NorthDakota": "N. Dakota", "NorthFlorida": "N. Florida",
+    "NorthTexas": "N. Texas", "NorthernArizona": "N. Arizona", "NorthernColorado": "N. Colorado",
+    "NorthernIllinois": "N. Illinois", "NorthernIowa": "N. Iowa",
+    "NorthernKentucky": "N. Kentucky", "SouthAlabama": "S. Alabama",
+    "SouthCarolina": "S. Carolina", "SouthDakota": "S. Dakota",
+    "SouthernIllinois": "S. Illinois", "SouthernIndiana": "S. Indiana",
+    "SouthernMiss": "So. Miss", "SouthernUtah": "S. Utah", "WestFlorida": "W. Florida",
+    "WestGeorgia": "W. Georgia", "WesternCarolina": "W. Carolina",
+    "WesternIllinois": "W. Illinois", "WesternKentucky": "W. Kentucky",
+    "WesternMichigan": "W. Michigan", "TexasAMCommerce": "E. Texas A&M",
+    "CharlestonSouthern": "Charleston So.", "GeorgiaSouthern": "Georgia So.",
+    "TexasSouthern": "Texas So.",
+    # Saint / Mount
+    "SaintFrancisPA": "St. Francis (PA)", "SaintJosephs": "St. Joseph's",
+    "SaintLouis": "St. Louis", "SaintMarys": "St. Mary's", "SaintPeters": "St. Peter's",
+    "MountStMarys": "Mt. St. Mary's", "StBonaventure": "St. Bona",
+    # Other word abbreviations
+    "AbileneChristian": "Abilene Chr.", "HoustonChristian": "Houston Chr.",
+    "BostonCollege": "Boston Col.", "BostonUniversity": "Boston U.",
+    "BowlingGreen": "Bowling Grn", "California": "Cal", "CaliforniaBaptist": "Cal Baptist",
+    "CalStateFullerton": "CS Fullerton", "CSUBakersfield": "Bakersfield",
+    "CoastalCarolina": "Coastal Car.", "DetroitMercy": "Detroit",
+    "GeorgeWashington": "G. Washington", "GeorgiaTech": "Ga. Tech",
+    "LouisianaTech": "La. Tech", "LoyolaChicago": "Loyola Chi.",
+    "MiddleTennessee": "Middle Tenn.", "TennesseeTech": "Tenn. Tech",
+    "NorthCarolinaAT": "NC A&T", "NorthCarolinaCentral": "NC Central",
+    "PrairieViewAM": "Prairie View", "PurdueFortWayne": "Purdue FW",
+    "TexasAMCorpusChristi": "A&M-CC", "TheCitadel": "Citadel", "VirginiaTech": "Va. Tech",
+    "BethuneCookman": "B-Cookman",
+    # Initialisms
+    "ArkansasPineBluff": "UAPB", "EastTennesseeState": "ETSU", "FairleighDickinson": "FDU",
+    "FloridaAtlantic": "FAU", "FloridaGulfCoast": "FGCU", "IncarnateWord": "UIW",
+    "JamesMadison": "JMU", "LouisianaMonroe": "ULM", "LoyolaMarymount": "LMU",
+    "MississippiValleyState": "MVSU", "NewHampshire": "UNH", "NorthCarolina": "UNC",
+    "OldDominion": "ODU", "SanDiegoState": "SDSU", "SanJoseState": "SJSU",
+    "SouthFlorida": "USF", "StephenFAustin": "SFA", "UCSanDiego": "UCSD",
+    "UCSantaBarbara": "UCSB", "UNCAsheville": "UNCA", "UNCGreensboro": "UNCG",
+    "UNCWilmington": "UNCW", "UTArlington": "UTA", "WestVirginia": "WVU",
+    "WilliamandMary": "W&M",
+}
+
 # Full D1 membership for the 2024-25 season (2025), basketball affiliation.
 _BASE_2025 = {
     "ACC": [
@@ -403,7 +476,7 @@ def tier(team, year):
 
 
 def js_payload():
-    """JSON for the page: {seasons: {year: {conf: [teams]}}, power, aliases, names, espn}."""
+    """JSON for the page: {seasons: {year: {conf: [teams]}}, power, aliases, names, short, espn}."""
     seasons = {}
     for year, table in SEASONS.items():
         by_conf = {}
@@ -415,6 +488,7 @@ def js_payload():
         "power": POWER_CONFERENCES,
         "aliases": ALIASES,
         "names": DISPLAY_NAMES,
+        "short": SHORT_NAMES,
         "espn": ESPN_IDS,
     }, separators=(",", ":"))
 
@@ -455,6 +529,11 @@ if __name__ == "__main__":
               + (f", UNMAPPED: {missing}" if missing else ", all mapped"))
         print("   " + ", ".join(f"{c} {n}" for c, n in sorted(sizes.items())))
         ok &= not missing
+    known = {t for s in SEASONS.values() for t in s}
+    bad_short = sorted(set(SHORT_NAMES) - known)
+    if bad_short:
+        print(f"SHORT_NAMES keys that aren't canonical D1 teams: {bad_short}")
+    ok &= not bad_short
     no_espn = sorted({t for s in SEASONS.values() for t in s} - set(ESPN_IDS))
     if no_espn:
         print(f"NO ESPN ID (add to ESPN_IDS): {no_espn}")
