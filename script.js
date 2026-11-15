@@ -3176,6 +3176,7 @@ function buildWeekStatsTableHtml(weekId) {
     const teamVoterCount = {};
     const teamPoints = {};
     const teamRanks = {};
+    const teamFirsts = {};
     voterRows.forEach(row => {
         const teams = Array.from(row.querySelectorAll(".team-logo")).map(img => img.dataset.team);
         teams.slice(0, 25).forEach((team, i) => {
@@ -3183,6 +3184,7 @@ function buildWeekStatsTableHtml(weekId) {
             teamRankSum[team] = (teamRankSum[team] || 0) + rank;
             teamVoterCount[team] = (teamVoterCount[team] || 0) + 1;
             teamPoints[team] = (teamPoints[team] || 0) + (26 - rank);
+            if (rank === 1) teamFirsts[team] = (teamFirsts[team] || 0) + 1;
             if (!teamRanks[team]) teamRanks[team] = [];
             teamRanks[team].push(rank);
         });
@@ -3206,10 +3208,19 @@ function buildWeekStatsTableHtml(weekId) {
     const currYear = allTabsSorted[currTabIdx]?.dataset.year;
     const prevTab = allTabsSorted[currTabIdx + 1];
     const prevTeamRank = {};
+    const prevTeamPoints = {};
+    let prevVoters = 0;
     const deltaDataForNew = buildDeltaData(true);
     if (prevTab && prevTab.dataset.year === currYear) {
-        const prevTeams = deltaDataForNew[prevTab.dataset.week]?.["Official Overall"];
+        const prevWeek = deltaDataForNew[prevTab.dataset.week];
+        const prevTeams = prevWeek?.["Official Overall"];
         if (prevTeams) prevTeams.forEach((t, i) => { prevTeamRank[t] = i + 1; });
+        // Previous week's points from its official ballots (same 25..1 scoring as this week)
+        Object.entries(prevWeek || {}).forEach(([voter, teams]) => {
+            if (voter === "Official Overall") return;
+            prevVoters++;
+            teams.slice(0, 25).forEach((t, i) => { prevTeamPoints[t] = (prevTeamPoints[t] || 0) + (25 - i); });
+        });
     }
     const hasPrevWeek = Object.keys(prevTeamRank).length > 0;
 
@@ -3264,6 +3275,15 @@ function buildWeekStatsTableHtml(weekId) {
                 }
             }
         }
+        // Change in share of points available (25 per voter), since voter counts vary week to week
+        let ptsDelta = '—';
+        if (prevVoters) {
+            const d = Math.round(1000 * (pts / (25 * totalVoters) - (prevTeamPoints[team] || 0) / (25 * prevVoters))) / 10;
+            ptsDelta = d > 0 ? `<span class="delta-up">${d.toFixed(1)}%</span>`
+                : d < 0 ? `<span class="delta-down">${(-d).toFixed(1)}%</span>`
+                : `<span class="delta-same">—</span>`;
+        }
+        const firsts = teamFirsts[team] || 0;
         const inTop25 = rank <= 25;
         const rankDisplay = `<div style="font-variant-numeric:tabular-nums;text-align:center">${rank}</div>`;
         const band = outlookBands[team];
@@ -3279,6 +3299,8 @@ function buildWeekStatsTableHtml(weekId) {
             <td style="white-space:nowrap">${rankDelta}</td>
             <td>${count}</td>
             <td>${pts}</td>
+            <td>${firsts || ""}</td>
+            <td style="white-space:nowrap">${ptsDelta}</td>
             <td>${inTop25 ? (Number.isInteger(hi) ? hi : hi.toFixed(1)) : ""}</td>
             <td>${inTop25 ? avg.toFixed(1) : ""}</td>
             <td>${inTop25 ? (Number.isInteger(lo) ? lo : lo.toFixed(1)) : ""}</td>
@@ -3296,6 +3318,8 @@ function buildWeekStatsTableHtml(weekId) {
         <th title="Rank change from previous week">Δ</th>
         <th>Voters</th>
         <th>Pts</th>
+        <th title="First-place votes">#1</th>
+        <th title="Change from previous week in points as a share of points available (25 × voters)">Δ Pts</th>
         <th title="10th percentile rank across all voters">P<sub>90+</sub></th>
         <th>Avg</th>
         <th title="90th percentile rank across all voters">P<sub>10−</sub></th>
@@ -3306,7 +3330,7 @@ function buildWeekStatsTableHtml(weekId) {
     </tr></thead><tbody>`;
     top25.forEach((team, i) => { html += buildRow(team, i + 1); });
     if (receivingVotes.length > 0) {
-        html += `<tr class="rv-divider"><td colspan="13">Receiving Votes</td></tr>`;
+        html += `<tr class="rv-divider"><td colspan="15">Receiving Votes</td></tr>`;
         receivingVotes.forEach((team, i) => { html += buildRow(team, 26 + i); });
     }
     html += "</tbody>";

@@ -782,14 +782,16 @@ kbd {
 #voter-history-table .week-stats-table .logo-sm { height: 20px; width: 20px; object-fit: contain; vertical-align: middle; }
 #voter-history-table .week-stats-table tr.rv-divider td { padding: 6px 0 2px; color: var(--color-divider-text); font-size: 11px; text-align: left; border-bottom: none; }
 #voter-history-table .week-stats-table th:nth-child(5), #voter-history-table .week-stats-table td:nth-child(5),
-#voter-history-table .week-stats-table th:nth-child(7), #voter-history-table .week-stats-table td:nth-child(7),
-#voter-history-table .week-stats-table th:nth-child(8), #voter-history-table .week-stats-table td:nth-child(8),
-#voter-history-table .week-stats-table th:nth-child(9), #voter-history-table .week-stats-table td:nth-child(9),
-#voter-history-table .week-stats-table th:nth-child(11), #voter-history-table .week-stats-table td:nth-child(11),
-#voter-history-table .week-stats-table th:nth-child(13), #voter-history-table .week-stats-table td:nth-child(13) { border-right: none; }
 #voter-history-table .week-stats-table th:nth-child(6), #voter-history-table .week-stats-table td:nth-child(6),
+#voter-history-table .week-stats-table th:nth-child(7), #voter-history-table .week-stats-table td:nth-child(7),
+#voter-history-table .week-stats-table th:nth-child(9), #voter-history-table .week-stats-table td:nth-child(9),
 #voter-history-table .week-stats-table th:nth-child(10), #voter-history-table .week-stats-table td:nth-child(10),
-#voter-history-table .week-stats-table th:nth-child(12), #voter-history-table .week-stats-table td:nth-child(12) { border-right: 1px solid var(--color-border-strong); }
+#voter-history-table .week-stats-table th:nth-child(11), #voter-history-table .week-stats-table td:nth-child(11),
+#voter-history-table .week-stats-table th:nth-child(13), #voter-history-table .week-stats-table td:nth-child(13),
+#voter-history-table .week-stats-table th:nth-child(15), #voter-history-table .week-stats-table td:nth-child(15) { border-right: none; }
+#voter-history-table .week-stats-table th:nth-child(8), #voter-history-table .week-stats-table td:nth-child(8),
+#voter-history-table .week-stats-table th:nth-child(12), #voter-history-table .week-stats-table td:nth-child(12),
+#voter-history-table .week-stats-table th:nth-child(14), #voter-history-table .week-stats-table td:nth-child(14) { border-right: 1px solid var(--color-border-strong); }
 /* W / L (last two columns): opponents beaten / lost to since the previous poll (fillWeekResults() in script.js) */
 #voter-history-table .week-stats-table .ws-rec { white-space: nowrap; font-size: 11px; opacity: 0.6; font-variant-numeric: tabular-nums; }
 /* Centered under the chart and as wide as it (.week-chart-panel): every column but W / L
@@ -814,7 +816,7 @@ kbd {
 #voter-history-table .week-stats-table .ws-opp-site { opacity: 0.55; min-width: 13px; text-align: right; }
 #voter-history-table .week-stats-table .ws-res-msg { opacity: 0.45; }
 #voter-history-table .week-stats-table.ws-no-results .ws-res { display: none; }
-#voter-history-table .week-stats-table.ws-no-results th:nth-child(12), #voter-history-table .week-stats-table.ws-no-results td:nth-child(12) { border-right: none; }
+#voter-history-table .week-stats-table.ws-no-results th:nth-child(14), #voter-history-table .week-stats-table.ws-no-results td:nth-child(14) { border-right: none; }
 
 
 /* Stats › Week › Conference tab (buildConferenceView() in script.js) */
@@ -4515,6 +4517,7 @@ const teamRankSum={};
 const teamVoterCount={};
 const teamPoints={};
 const teamRanks={};
+const teamFirsts={};
 voterRows.forEach(row=>{
 const teams=Array.from(row.querySelectorAll(".team-logo")).map(img=>img.dataset.team);
 teams.slice(0,25).forEach((team,i)=>{
@@ -4522,6 +4525,7 @@ const rank=i + 1;
 teamRankSum[team]=(teamRankSum[team]||0)+ rank;
 teamVoterCount[team]=(teamVoterCount[team]||0)+ 1;
 teamPoints[team]=(teamPoints[team]||0)+(26 - rank);
+if(rank===1)teamFirsts[team]=(teamFirsts[team]||0)+ 1;
 if(!teamRanks[team])teamRanks[team]=[];
 teamRanks[team].push(rank);
 });
@@ -4540,10 +4544,18 @@ const currTabIdx=allTabsSorted.findIndex(t=>t.dataset.week===weekId);
 const currYear=allTabsSorted[currTabIdx]?.dataset.year;
 const prevTab=allTabsSorted[currTabIdx + 1];
 const prevTeamRank={};
+const prevTeamPoints={};
+let prevVoters=0;
 const deltaDataForNew=buildDeltaData(true);
 if(prevTab&&prevTab.dataset.year===currYear){
-const prevTeams=deltaDataForNew[prevTab.dataset.week]?.["Official Overall"];
+const prevWeek=deltaDataForNew[prevTab.dataset.week];
+const prevTeams=prevWeek?.["Official Overall"];
 if(prevTeams)prevTeams.forEach((t,i)=>{prevTeamRank[t]=i + 1;});
+Object.entries(prevWeek||{}).forEach(([voter,teams])=>{
+if(voter==="Official Overall")return;
+prevVoters++;
+teams.slice(0,25).forEach((t,i)=>{prevTeamPoints[t]=(prevTeamPoints[t]||0)+(25 - i);});
+});
 }
 const hasPrevWeek=Object.keys(prevTeamRank).length>0;
 const seasonTeamsSeen=new Set();
@@ -4592,6 +4604,14 @@ rankDelta=`<span class="delta-same">—</span>`;
 }
 }
 }
+let ptsDelta='—';
+if(prevVoters){
+const d=Math.round(1000*(pts /(25*totalVoters)-(prevTeamPoints[team]||0)/(25*prevVoters)))/ 10;
+ptsDelta=d>0?`<span class="delta-up">${d.toFixed(1)}%</span>`
+:d<0?`<span class="delta-down">${(-d).toFixed(1)}%</span>`
+:`<span class="delta-same">—</span>`;
+}
+const firsts=teamFirsts[team]||0;
 const inTop25=rank<=25;
 const rankDisplay=`<div style="font-variant-numeric:tabular-nums;text-align:center">${rank}</div>`;
 const band=outlookBands[team];
@@ -4607,6 +4627,8 @@ return `<tr data-team="${teamAttr}">
             <td style="white-space:nowrap">${rankDelta}</td>
             <td>${count}</td>
             <td>${pts}</td>
+            <td>${firsts||""}</td>
+            <td style="white-space:nowrap">${ptsDelta}</td>
             <td>${inTop25?(Number.isInteger(hi)?hi:hi.toFixed(1)):""}</td>
             <td>${inTop25?avg.toFixed(1):""}</td>
             <td>${inTop25?(Number.isInteger(lo)?lo:lo.toFixed(1)):""}</td>
@@ -4622,6 +4644,8 @@ let html=`<thead><tr>
         <th title="Rank change from previous week">Δ</th>
         <th>Voters</th>
         <th>Pts</th>
+        <th title="First-place votes">#1</th>
+        <th title="Change from previous week in points as a share of points available (25 × voters)">Δ Pts</th>
         <th title="10th percentile rank across all voters">P<sub>90+</sub></th>
         <th>Avg</th>
         <th title="90th percentile rank across all voters">P<sub>10−</sub></th>
@@ -4632,7 +4656,7 @@ let html=`<thead><tr>
     </tr></thead><tbody>`;
 top25.forEach((team,i)=>{html +=buildRow(team,i + 1);});
 if(receivingVotes.length>0){
-html +=`<tr class="rv-divider"><td colspan="13">Receiving Votes</td></tr>`;
+html +=`<tr class="rv-divider"><td colspan="15">Receiving Votes</td></tr>`;
 receivingVotes.forEach((team,i)=>{html +=buildRow(team,26 + i);});
 }
 html +="</tbody>";
