@@ -11,6 +11,8 @@
     --color-bg-kbd:          #f0f0f0;
 
     --color-heading:         #333;
+    --color-win:             #2a9d2a;
+    --color-loss:            #cc0000;
     --color-tab:             inherit;
     --color-tab-active:      #fff;
     --color-modal-h2:        #333;
@@ -418,8 +420,8 @@ body.show-overall-row .overall-row {
     white-space: nowrap;
 }
 
-.delta-up { color: #2a9d2a; }
-.delta-down { color: #cc0000; }
+.delta-up { color: var(--color-win); }
+.delta-down { color: var(--color-loss); }
 .delta-same { color: #888; }
 .delta-new { color: #3388dd; }
 
@@ -764,8 +766,7 @@ kbd {
 #voter-history-table .week-stats-table th:nth-child(8), #voter-history-table .week-stats-table td:nth-child(8),
 #voter-history-table .week-stats-table th:nth-child(9), #voter-history-table .week-stats-table td:nth-child(9),
 #voter-history-table .week-stats-table th:nth-child(11), #voter-history-table .week-stats-table td:nth-child(11),
-#voter-history-table .week-stats-table th:nth-child(13), #voter-history-table .week-stats-table td:nth-child(13),
-#voter-history-table .week-stats-table th:nth-child(14), #voter-history-table .week-stats-table td:nth-child(14) { border-right: none; }
+#voter-history-table .week-stats-table th:nth-child(13), #voter-history-table .week-stats-table td:nth-child(13) { border-right: none; }
 #voter-history-table .week-stats-table th:nth-child(6), #voter-history-table .week-stats-table td:nth-child(6),
 #voter-history-table .week-stats-table th:nth-child(10), #voter-history-table .week-stats-table td:nth-child(10),
 #voter-history-table .week-stats-table th:nth-child(12), #voter-history-table .week-stats-table td:nth-child(12) { border-right: 1px solid var(--color-border-strong); }
@@ -785,6 +786,9 @@ kbd {
 /* Game chip: rank if any (natural width) + 16px logo + school name; chips wrap when a team has several games */
 #voter-history-table .week-stats-table .ws-opp { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; flex: 0 0 auto; }
 #voter-history-table .week-stats-table .ws-opp[data-team] { cursor: pointer; }
+/* Only the school name takes the result color; the rank keeps the default text color */
+#voter-history-table .week-stats-table .ws-opp.ws-win .ws-opp-name { color: var(--color-win); }
+#voter-history-table .week-stats-table .ws-opp.ws-loss .ws-opp-name { color: var(--color-loss); }
 #voter-history-table .week-stats-table .ws-opp-name { margin-left: 1px; }
 #voter-history-table .week-stats-table .ws-opp-rank { opacity: 0.75; font-variant-numeric: tabular-nums; }
 #voter-history-table .week-stats-table .ws-res-msg { opacity: 0.45; }
@@ -1247,6 +1251,8 @@ body.dark {
     --color-bg-kbd:          #333;
 
     --color-heading:         #d0d0d0;
+    --color-win:             #5cc85c;
+    --color-loss:            #ff6b6b;
     --color-tab:             #ccc;
     --color-tab-active:      #111;
     --color-modal-h2:        #ccc;

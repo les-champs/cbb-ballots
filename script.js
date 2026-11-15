@@ -3285,7 +3285,7 @@ function buildWeekStatsTableHtml(weekId) {
             <td>${inTop25 ? (sdRaw != null ? sdRaw.toFixed(1) : "—") : ""}</td>
             ${inTop25 ? cellLikely : "<td></td>"}
             ${inTop25 ? cellOutlook : "<td></td>"}
-            <td class="ws-res ws-w"${espnAttr}></td><td class="ws-res ws-l"></td>
+            <td class="ws-res"${espnAttr}></td>
         </tr>`;
     };
 
@@ -3302,11 +3302,11 @@ function buildWeekStatsTableHtml(weekId) {
         <th title="Standard deviation of ranks given by voters this week">Dev</th>
         <th title="Outlook inner band: likely range (~50%) of this team's rank over the next few polls">50%</th>
         <th title="Outlook outer band: wider range (~77.5%) of this team's rank over the next few polls, from voters' best/worst ranks over the last 5 polls">77%</th>
-        <th class="ws-res ws-w">W</th><th class="ws-res ws-l">L</th>
+        <th class="ws-res">Games</th>
     </tr></thead><tbody>`;
     top25.forEach((team, i) => { html += buildRow(team, i + 1); });
     if (receivingVotes.length > 0) {
-        html += `<tr class="rv-divider"><td colspan="14">Receiving Votes</td></tr>`;
+        html += `<tr class="rv-divider"><td colspan="13">Receiving Votes</td></tr>`;
         receivingVotes.forEach((team, i) => { html += buildRow(team, 26 + i); });
     }
     html += "</tbody>";
@@ -3328,7 +3328,7 @@ function fillWeekRecords(statsTable, weekId) {
     const isLatest = i === 0;
     if (!deadline && !isLatest) return;
     const rows = Array.from(statsTable.querySelectorAll("tr[data-team]"))
-        .map(tr => ({ id: tr.querySelector("td.ws-w")?.dataset.espn, span: tr.querySelector(".ws-rec") }))
+        .map(tr => ({ id: tr.querySelector("td.ws-res")?.dataset.espn, span: tr.querySelector(".ws-rec") }))
         .filter(r => r.id && r.span);
     const show = (span, wins, losses, tip) => {
         if (!statsTable.isConnected) return;
@@ -3353,18 +3353,18 @@ function fillWeekRecords(statsTable, weekId) {
     });
 }
 
-// W / L columns of the Week Stats table: each team's wins and losses in date order, each as
-// opponent's AP rank at game time (seed in the postseason) + opponent logo (site only in the tooltip) between the previous poll's deadline and this poll's (pollResultsWindow()),
+// Games column of the Week Stats table: every game each team played, in date order, each as
+// opponent's AP rank at game time (seed in the postseason) + opponent logo + name (site only in the tooltip),
+// wins in green and losses in red, between the previous poll's deadline and this poll's (pollResultsWindow()),
 // i.e. the results voters had seen since their last ballot. Live from ESPN's scoreboard.
-// Weeks without a window (pre-season, AP, pre-2025) hide both columns via .ws-no-results.
+// Weeks without a window (pre-season, AP, pre-2025) hide the column via .ws-no-results.
 function fillWeekResults(statsTable, weekId) {
     const win = pollResultsWindow(weekId);
     if (!win) { statsTable.classList.add("ws-no-results"); return; }
     const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const fmt = ms => new Date(ms).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
     const span = `${fmt(win.start)} – ${fmt(win.end)}`;
-    statsTable.querySelector("th.ws-w").title = `Wins since the previous poll (${span}); hover a game for details`;
-    statsTable.querySelector("th.ws-l").title = `Losses since the previous poll (${span})`;
+    statsTable.querySelector("th.ws-res").title = `Games since the previous poll (${span}): wins in green, losses in red; hover a game for details`;
     const cells = () => statsTable.querySelectorAll("td.ws-res");
     cells().forEach(td => { td.innerHTML = `<span class="ws-res-msg">…</span>`; });
     // One game: opponent's AP rank (or seed), opponent logo, school name. Site (vs / @ / neutral) is in the tooltip only.
@@ -3381,21 +3381,13 @@ function fillWeekResults(statsTable, weekId) {
             ? `<img class="records-opp-logo records-logo" data-team="${esc(g.opp.key)}" data-espn="${g.opp.id}" alt="">`
             : src ? `<img class="records-opp-logo" src="${esc(src)}" data-filler="${esc(name)}" alt="">`
             : logoFillerHtml("records-opp-logo", name, "");
-        return `<span class="ws-opp"${g.opp.key ? ` data-team="${esc(g.opp.key)}"` : ""} title="${tip}">${rank ? `<span class="ws-opp-rank">${rank}</span>` : ""}${logo}<span class="ws-opp-name">${esc(label)}</span></span>`;
+        return `<span class="ws-opp ${g.result === "W" ? "ws-win" : "ws-loss"}"${g.opp.key ? ` data-team="${esc(g.opp.key)}"` : ""} title="${tip}">${rank ? `<span class="ws-opp-rank">${rank}</span>` : ""}${logo}<span class="ws-opp-name">${esc(label)}</span></span>`;
     };
     fetchResultsBetween(win.start, win.end).then(({ byTeam }) => {
         if (!statsTable.isConnected) return;
         cells().forEach(td => {
-            const id = td.closest("tr")?.querySelector("td.ws-w")?.dataset.espn;
-            const want = td.classList.contains("ws-w") ? "W" : "L";
-            let games = id ? (byTeam[id] || []).filter(g => g.result === want) : null;
-            // At most 2 games per cell: keep the two best-ranked opponents (AP rank, then seed,
-            // then unranked), shown in date order.
-            if (games && games.length > 2) {
-                const strength = g => g.oppRank || (g.oppSeed ? 100 + g.oppSeed : 1000);
-                const keep = new Set([...games].sort((a, b) => strength(a) - strength(b)).slice(0, 2));
-                games = games.filter(g => keep.has(g));
-            }
+            const id = td.dataset.espn;
+            const games = id ? (byTeam[id] || []).filter(g => g.result === "W" || g.result === "L") : null;
             td.innerHTML = games === null
                 ? `<span class="ws-res-msg" title="No ESPN id for this team">?</span>`
                 : games.length ? `<div class="ws-res-list">${games.map(oppHtml).join("")}</div>` : "—";
@@ -5479,7 +5471,7 @@ function showPrecisionModal() {
             <td>${i + 1}</td>
             <td class="name-col">${username}</td>
             <td>${scores.combined.toFixed(2)}</td>
-            <td style="color:#2a9d2a">${adj > 0.05 ? '+' + adj.toFixed(2) : '—'}</td>
+            <td style="color:var(--color-win)">${adj > 0.05 ? '+' + adj.toFixed(2) : '—'}</td>
             <td>${missedWeeks > 0 ? missedWeeks : '—'}</td>
         </tr>`;
     });
