@@ -3354,7 +3354,8 @@ function fillWeekRecords(statsTable, weekId) {
 }
 
 // Games column of the Week Stats table: every game each team played, in date order, each as
-// opponent's AP rank at game time (seed in the postseason) + opponent logo + name (site only in the tooltip),
+// site (vs / @ / N) + opponent logo + score (opponent's AP rank at game time, or seed in the postseason, and name only in the tooltip),
+// at most WEEK_RESULTS_MAX per team (see trimWeekGames()),
 // wins in green and losses in red, between the previous poll's deadline and this poll's (pollResultsWindow()),
 // i.e. the results voters had seen since their last ballot. Live from ESPN's scoreboard.
 // Weeks without a window (pre-season, AP, pre-2025) hide the column via .ws-no-results.
@@ -3367,12 +3368,10 @@ function fillWeekResults(statsTable, weekId) {
     statsTable.querySelector("th.ws-res").title = `Games since the previous poll (${span}): wins in green, losses in red; hover a game for details`;
     const cells = () => statsTable.querySelectorAll("td.ws-res");
     cells().forEach(td => { td.innerHTML = `<span class="ws-res-msg">…</span>`; });
-    // One game: opponent's AP rank (or seed), opponent logo, school name. Site (vs / @ / neutral) is in the tooltip only.
-    // Unranked opponents have no rank span, so the chip starts with the logo.
+    // One game: site (vs home / @ away / N neutral), opponent logo, score (ours first). Opponent's AP rank (or seed) and name are in the tooltip only.
     const oppHtml = g => {
         const siteWord = g.site === "H" ? "vs" : g.site === "A" ? "@" : "neutral vs";
         const name = g.opp.key ? conferenceDisplayName(g.opp.key) : g.opp.name || "?";
-        const label = g.opp.key ? shortTeamName(g.opp.key) : name;  // chip text; tooltip keeps the full name
         const rank = g.oppRank ? `${g.oppRank}` : g.oppSeed ? `(${g.oppSeed})` : "";
         const day = new Date(g.date).toLocaleDateString([], { month: "short", day: "numeric" });
         const tip = esc(`${g.result} ${g.us}-${g.them} ${siteWord} ${g.oppRank ? `#${rank} ` : rank ? rank + " " : ""}${name} · ${day}${g.note ? ` · ${g.note}` : ""}`);
@@ -3381,13 +3380,17 @@ function fillWeekResults(statsTable, weekId) {
             ? `<img class="records-opp-logo records-logo" data-team="${esc(g.opp.key)}" data-espn="${g.opp.id}" alt="">`
             : src ? `<img class="records-opp-logo" src="${esc(src)}" data-filler="${esc(name)}" alt="">`
             : logoFillerHtml("records-opp-logo", name, "");
-        return `<span class="ws-opp ${g.result === "W" ? "ws-win" : "ws-loss"}"${g.opp.key ? ` data-team="${esc(g.opp.key)}"` : ""} title="${tip}">${rank ? `<span class="ws-opp-rank">${rank}</span>` : ""}${logo}<span class="ws-opp-name">${esc(label)}</span></span>`;
+        return `<span class="ws-opp ${g.result === "W" ? "ws-win" : "ws-loss"}"${g.opp.key ? ` data-team="${esc(g.opp.key)}"` : ""} title="${tip}"><span class="ws-opp-site">${g.site === "H" ? "vs" : g.site === "A" ? "@" : "N"}</span>${logo}<span class="ws-opp-score">${g.us}-${g.them}</span></span>`;
     };
-    fetchResultsBetween(win.start, win.end).then(({ byTeam }) => {
+    // Opponent ratings for trimWeekGames(): NET / BPI rank from the season's quads file when there is one.
+    const tab = (weekId.startsWith("week-ap-") ? getSortedApTabs() : getSortedTabs()).find(t => t.dataset.week === weekId);
+    const season = tab?.dataset.year;
+    const quads = season && quadsAvailable(season) ? fetchQuads(season).catch(() => null) : Promise.resolve(null);
+    Promise.all([fetchResultsBetween(win.start, win.end), quads]).then(([{ byTeam }, q]) => {
         if (!statsTable.isConnected) return;
         cells().forEach(td => {
             const id = td.dataset.espn;
-            const games = id ? (byTeam[id] || []).filter(g => g.result === "W" || g.result === "L") : null;
+            const games = id ? trimWeekGames((byTeam[id] || []).filter(g => g.result === "W" || g.result === "L"), q?.teams) : null;
             td.innerHTML = games === null
                 ? `<span class="ws-res-msg" title="No ESPN id for this team">?</span>`
                 : games.length ? `<div class="ws-res-list">${games.map(oppHtml).join("")}</div>` : "—";
@@ -3398,6 +3401,21 @@ function fillWeekResults(statsTable, weekId) {
         const msg = esc(`Couldn't load results from ESPN (${err.message})`);
         cells().forEach(td => { td.innerHTML = `<span class="ws-res-msg" title="${msg}">!</span>`; });
     });
+}
+
+// Games column cap: with more than WEEK_RESULTS_MAX games, drop wins over the lowest-rated
+// opponents until it fits (losses are always kept, so a team with 3+ losses shows them all).
+// Rating = the opponent's NET / BPI rank from quads-YEAR.json / net-YEAR.json (current, not at
+// game time) when the season has one, else its AP rank at game time; unrated and non-D1
+// opponents rate lowest. Ties drop the later game. Keeps date order.
+const WEEK_RESULTS_MAX = 2;
+function trimWeekGames(games, quadTeams) {
+    if (games.length <= WEEK_RESULTS_MAX) return games;
+    const rating = g => quadTeams?.[g.opp.key]?.rank ?? (quadTeams ? null : g.oppRank) ?? Infinity;
+    const drop = new Set(games.map((g, i) => ({ g, i })).filter(x => x.g.result === "W")
+        .sort((a, b) => rating(b.g) - rating(a.g) || b.i - a.i)
+        .slice(0, games.length - WEEK_RESULTS_MAX).map(x => x.g));
+    return games.filter(g => !drop.has(g));
 }
 
 // ── Stats › Week › Conference tab (2025+) ────────────────────────────────────
