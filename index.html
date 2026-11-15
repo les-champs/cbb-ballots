@@ -753,7 +753,8 @@ kbd {
 
 #voter-history-table .week-stats-table {
     border-collapse: collapse;
-    width: 100%;
+    width: auto; /* content width, like the Records table, not stretched to the chart */
+    min-width: 0;
     font-size: 13px;
     table-layout: auto;
 }
@@ -790,14 +791,27 @@ kbd {
 #voter-history-table .week-stats-table th:nth-child(12), #voter-history-table .week-stats-table td:nth-child(12) { border-right: 1px solid var(--color-border-strong); }
 /* W / L (last two columns): opponents beaten / lost to since the previous poll (fillWeekResults() in script.js) */
 #voter-history-table .week-stats-table .ws-rec { white-space: nowrap; font-size: 11px; opacity: 0.6; font-variant-numeric: tabular-nums; }
-#voter-history-table .week-stats-table td.ws-res { white-space: normal; text-align: left; font-size: 11px; line-height: 1.3; padding: 2px 6px; max-width: 170px; }
+/* Centered under the chart and as wide as it (.week-chart-panel): every column but W / L
+   shrinks to its content (width: 1px + nowrap), so W and L take up the remaining width.
+   Weeks without W / L keep the content-width table, still centered. */
+#voter-history-table .week-stats-table { margin: 0 auto; }
+#voter-history-table .week-stats-table:not(.ws-no-results) { width: min(860px, 90vw); }
+#voter-history-table .week-stats-table:not(.ws-no-results) th:not(.ws-res),
+#voter-history-table .week-stats-table:not(.ws-no-results) td:not(.ws-res) { width: 1px; }
+#voter-history-table .week-stats-table:not(.ws-no-results) td.team-col { white-space: nowrap; }
+#voter-history-table .week-stats-table td.ws-res { white-space: normal; text-align: left; font-size: 11px; line-height: 1.3; padding: 2px 6px; }
 #voter-history-table .week-stats-table th.ws-res { text-align: left; padding-left: 6px; }
-#voter-history-table .week-stats-table .ws-res-list { display: flex; flex-wrap: wrap; gap: 3px 8px; justify-content: flex-start; }
+#voter-history-table .week-stats-table .ws-res-list { display: flex; flex-wrap: nowrap; gap: 3px 12px; justify-content: flex-start; }
 #voter-history-table .week-stats-table .ws-opp { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
 #voter-history-table .week-stats-table .ws-opp[data-team] { cursor: pointer; }
-#voter-history-table .week-stats-table .ws-opp-site { opacity: 0.55; min-width: 9px; text-align: center; }
-#voter-history-table .week-stats-table .ws-opp-rank { opacity: 0.75; font-variant-numeric: tabular-nums; }
+#voter-history-table .week-stats-table .ws-opp-site { opacity: 0.55; width: 14px; text-align: right; }
+#voter-history-table .week-stats-table .ws-opp-rank { opacity: 0.75; font-variant-numeric: tabular-nums; width: 13px; text-align: right; }
+#voter-history-table .week-stats-table.ws-has-seeds .ws-opp-rank { width: 22px; }
+/* Fixed-width game chips (site 14 + rank 13, or 22 with seeds + logo 20 + gaps), like the Records Next column */
+#voter-history-table .week-stats-table .ws-opp { flex: 0 0 auto; }
 #voter-history-table .week-stats-table .ws-res-msg { opacity: 0.45; }
+/* W / L opponent logos: 20px here (the Records window keeps 16px) */
+#voter-history-table .week-stats-table .ws-opp .records-opp-logo { width: 20px; height: 20px; }
 #voter-history-table .week-stats-table.ws-no-results .ws-res { display: none; }
 #voter-history-table .week-stats-table.ws-no-results th:nth-child(12), #voter-history-table .week-stats-table.ws-no-results td:nth-child(12) { border-right: none; }
 
@@ -4839,22 +4853,7 @@ return `<tr data-team="${teamAttr}">
             <td class="ws-res ws-w"${espnAttr}></td><td class="ws-res ws-l"></td>
         </tr>`;
 };
-let html=`<colgroup>
-        <col style="width:28px">
-        <col style="width:28px">
-        <col>
-        <col style="width:52px">
-        <col style="width:36px">
-        <col style="width:64px">
-        <col style="width:44px">
-        <col style="width:52px">
-        <col style="width:44px">
-        <col style="width:48px">
-        <col style="width:60px">
-        <col style="width:60px">
-        <col class="ws-res">
-        <col class="ws-res">
-    </colgroup><thead><tr>
+let html=`<thead><tr>
         <th>#</th><th></th>
         <th class="team-col">Team</th>
         <th title="Rank change from previous week">Δ</th>
@@ -4921,18 +4920,18 @@ statsTable.querySelector("th.ws-l").title=`Losses since the previous poll (${spa
 const cells=()=>statsTable.querySelectorAll("td.ws-res");
 cells().forEach(td=>{td.innerHTML=`<span class="ws-res-msg">…</span>`;});
 const oppHtml=g=>{
-const site=g.site==="H"?"V":g.site==="A"?"@":"N";
+const site=g.site==="H"?"vs":g.site==="A"?"@":"N";
 const siteWord=g.site==="H"?"vs":g.site==="A"?"@":"neutral vs";
 const name=g.opp.key?conferenceDisplayName(g.opp.key):g.opp.name||"?";
-const rank=g.oppRank?`#${g.oppRank}`:g.oppSeed?`(${g.oppSeed})`:"";
+const rank=g.oppRank?`${g.oppRank}`:g.oppSeed?`(${g.oppSeed})`:"";
 const day=new Date(g.date).toLocaleDateString([],{month:"short",day:"numeric"});
-const tip=esc(`${g.result} ${g.us}-${g.them} ${siteWord} ${rank?rank + " ":""}${name} · ${day}${g.note?` · ${g.note}`:""}`);
+const tip=esc(`${g.result} ${g.us}-${g.them} ${siteWord} ${g.oppRank?`#${rank} `:rank?rank + " ":""}${name} · ${day}${g.note?` · ${g.note}`:""}`);
 const src=g.opp.key?null:oppLogoSrc(g.opp)||(g.opp.id?espnLogoUrl(g.opp.id):null);
 const logo=g.opp.key
 ?`<img class="records-opp-logo records-logo" data-team="${esc(g.opp.key)}" data-espn="${g.opp.id}" alt="">`
 :src?`<img class="records-opp-logo" src="${esc(src)}" data-filler="${esc(name)}" alt="">`
 :logoFillerHtml("records-opp-logo",name,"");
-return `<span class="ws-opp"${g.opp.key?` data-team="${esc(g.opp.key)}"`:""} title="${tip}"><span class="ws-opp-site">${site}</span>${rank?`<span class="ws-opp-rank">${rank}</span>`:""}${logo}</span>`;
+return `<span class="ws-opp"${g.opp.key?` data-team="${esc(g.opp.key)}"`:""} title="${tip}"><span class="ws-opp-site">${site}</span><span class="ws-opp-rank">${rank}</span>${logo}</span>`;
 };
 fetchResultsBetween(win.start,win.end).then(({byTeam})=>{
 if(!statsTable.isConnected)return;
@@ -4942,8 +4941,9 @@ const want=td.classList.contains("ws-w")?"W":"L";
 const games=id?(byTeam[id]||[]).filter(g=>g.result===want):null;
 td.innerHTML=games===null
 ?`<span class="ws-res-msg" title="No ESPN id for this team">?</span>`
-:games.length?`<div class="ws-res-list">${games.map(oppHtml).join("")}</div>`:"";
+:games.length?`<div class="ws-res-list">${games.map(oppHtml).join("")}</div>`:"—";
 });
+statsTable.classList.toggle("ws-has-seeds",Object.values(byTeam).some(gs=>gs.some(g=>!g.oppRank&&g.oppSeed)));
 initRecordsLogos(statsTable);
 },err=>{
 if(!statsTable.isConnected)return;

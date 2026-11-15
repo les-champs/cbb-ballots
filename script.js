@@ -3283,22 +3283,8 @@ function buildWeekStatsTableHtml(weekId) {
         </tr>`;
     };
 
-    let html = `<colgroup>
-        <col style="width:28px">
-        <col style="width:28px">
-        <col>
-        <col style="width:52px">
-        <col style="width:36px">
-        <col style="width:64px">
-        <col style="width:44px">
-        <col style="width:52px">
-        <col style="width:44px">
-        <col style="width:48px">
-        <col style="width:60px">
-        <col style="width:60px">
-        <col class="ws-res">
-        <col class="ws-res">
-    </colgroup><thead><tr>
+    // No fixed column widths: columns fit their content, like the Records table.
+    let html = `<thead><tr>
         <th>#</th><th></th>
         <th class="team-col">Team</th>
         <th title="Rank change from previous week">Δ</th>
@@ -3375,20 +3361,21 @@ function fillWeekResults(statsTable, weekId) {
     statsTable.querySelector("th.ws-l").title = `Losses since the previous poll (${span})`;
     const cells = () => statsTable.querySelectorAll("td.ws-res");
     cells().forEach(td => { td.innerHTML = `<span class="ws-res-msg">…</span>`; });
-    // One game: site (V home, @ away, N neutral), opponent's AP rank (or seed), opponent logo.
+    // One game: site (vs home, @ away, N neutral), opponent's AP rank (or seed), opponent logo.
+    // The rank span is always there (empty when unranked) so every chip has the same layout.
     const oppHtml = g => {
-        const site = g.site === "H" ? "V" : g.site === "A" ? "@" : "N";
+        const site = g.site === "H" ? "vs" : g.site === "A" ? "@" : "N";
         const siteWord = g.site === "H" ? "vs" : g.site === "A" ? "@" : "neutral vs";
         const name = g.opp.key ? conferenceDisplayName(g.opp.key) : g.opp.name || "?";
-        const rank = g.oppRank ? `#${g.oppRank}` : g.oppSeed ? `(${g.oppSeed})` : "";
+        const rank = g.oppRank ? `${g.oppRank}` : g.oppSeed ? `(${g.oppSeed})` : "";
         const day = new Date(g.date).toLocaleDateString([], { month: "short", day: "numeric" });
-        const tip = esc(`${g.result} ${g.us}-${g.them} ${siteWord} ${rank ? rank + " " : ""}${name} · ${day}${g.note ? ` · ${g.note}` : ""}`);
+        const tip = esc(`${g.result} ${g.us}-${g.them} ${siteWord} ${g.oppRank ? `#${rank} ` : rank ? rank + " " : ""}${name} · ${day}${g.note ? ` · ${g.note}` : ""}`);
         const src = g.opp.key ? null : oppLogoSrc(g.opp) || (g.opp.id ? espnLogoUrl(g.opp.id) : null);
         const logo = g.opp.key
             ? `<img class="records-opp-logo records-logo" data-team="${esc(g.opp.key)}" data-espn="${g.opp.id}" alt="">`
             : src ? `<img class="records-opp-logo" src="${esc(src)}" data-filler="${esc(name)}" alt="">`
             : logoFillerHtml("records-opp-logo", name, "");
-        return `<span class="ws-opp"${g.opp.key ? ` data-team="${esc(g.opp.key)}"` : ""} title="${tip}"><span class="ws-opp-site">${site}</span>${rank ? `<span class="ws-opp-rank">${rank}</span>` : ""}${logo}</span>`;
+        return `<span class="ws-opp"${g.opp.key ? ` data-team="${esc(g.opp.key)}"` : ""} title="${tip}"><span class="ws-opp-site">${site}</span><span class="ws-opp-rank">${rank}</span>${logo}</span>`;
     };
     fetchResultsBetween(win.start, win.end).then(({ byTeam }) => {
         if (!statsTable.isConnected) return;
@@ -3398,8 +3385,10 @@ function fillWeekResults(statsTable, weekId) {
             const games = id ? (byTeam[id] || []).filter(g => g.result === want) : null;
             td.innerHTML = games === null
                 ? `<span class="ws-res-msg" title="No ESPN id for this team">?</span>`
-                : games.length ? `<div class="ws-res-list">${games.map(oppHtml).join("")}</div>` : "";
+                : games.length ? `<div class="ws-res-list">${games.map(oppHtml).join("")}</div>` : "—";
         });
+        // Postseason seeds "(16)" need a wider rank slot than AP ranks "16".
+        statsTable.classList.toggle("ws-has-seeds", Object.values(byTeam).some(gs => gs.some(g => !g.oppRank && g.oppSeed)));
         initRecordsLogos(statsTable);
     }, err => {
         if (!statsTable.isConnected) return;
