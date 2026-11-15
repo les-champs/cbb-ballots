@@ -1982,7 +1982,11 @@ function showWeekHighLowChart(weekId, mode = "stats") {
     const statsTable = document.createElement("table");
     statsTable.className = "week-stats-table";
     statsTable.innerHTML = html;
+    fillWeekResults(statsTable, weekId);
     statsTable.addEventListener("click", e => {
+        // W / L opponent names highlight the opponent, not the row's team.
+        const opp = e.target.closest(".ws-opp[data-team]");
+        if (opp) { toggleTeamHighlight(opp.dataset.team); return; }
         const row = e.target.closest("tr[data-team]");
         if (row) toggleTeamHighlight(row.dataset.team);
     });
@@ -3259,6 +3263,8 @@ function buildWeekStatsTableHtml(weekId) {
         const cellLikely = band ? `<td style="white-space:nowrap">${fmtBand(band.innerHi, band.innerLo)}</td>` : '<td>—</td>';
         const cellOutlook = band ? `<td style="white-space:nowrap">${fmtBand(band.hi, band.lo)}</td>` : '<td>—</td>';
         const teamAttr = team.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+        const espnId = espnIdFor(team);
+        const espnAttr = espnId ? ` data-espn="${espnId}"` : "";
         return `<tr data-team="${teamAttr}">
             <td>${rankDisplay}</td>
             <td style="padding:2px 4px;"><img class="logo-sm" src="${logoSrc(team)}"></td>
@@ -3273,6 +3279,7 @@ function buildWeekStatsTableHtml(weekId) {
             <td>${inTop25 ? (sdRaw != null ? sdRaw.toFixed(1) : "—") : ""}</td>
             ${inTop25 ? cellLikely : "<td></td>"}
             ${inTop25 ? cellOutlook : "<td></td>"}
+            <td class="ws-res ws-w"${espnAttr}></td><td class="ws-res ws-l"></td>
         </tr>`;
     };
 
@@ -3290,6 +3297,8 @@ function buildWeekStatsTableHtml(weekId) {
         <col style="width:48px">
         <col style="width:60px">
         <col style="width:60px">
+        <col class="ws-res">
+        <col class="ws-res">
     </colgroup><thead><tr>
         <th>#</th><th></th>
         <th class="team-col">Team</th>
@@ -3303,14 +3312,62 @@ function buildWeekStatsTableHtml(weekId) {
         <th title="Standard deviation of ranks given by voters this week">Dev</th>
         <th title="Outlook inner band: likely range (~50%) of this team's rank over the next few polls">50%</th>
         <th title="Outlook outer band: wider range (~77.5%) of this team's rank over the next few polls, from voters' best/worst ranks over the last 5 polls">77%</th>
+        <th class="ws-res ws-w">W</th><th class="ws-res ws-l">L</th>
     </tr></thead><tbody>`;
     top25.forEach((team, i) => { html += buildRow(team, i + 1); });
     if (receivingVotes.length > 0) {
-        html += `<tr class="rv-divider"><td colspan="13">Receiving Votes</td></tr>`;
+        html += `<tr class="rv-divider"><td colspan="15">Receiving Votes</td></tr>`;
         receivingVotes.forEach((team, i) => { html += buildRow(team, 26 + i); });
     }
     html += "</tbody>";
     return html;
+}
+
+// W / L columns of the Week Stats table: each team's wins and losses in date order, each as
+// site (V / @ / N) + opponent's AP rank at game time (seed in the postseason) + opponent logo between the previous poll's deadline and this poll's (pollResultsWindow()),
+// i.e. the results voters had seen since their last ballot. Live from ESPN's scoreboard.
+// Weeks without a window (pre-season, AP, pre-2025) hide both columns via .ws-no-results.
+function fillWeekResults(statsTable, weekId) {
+    const win = pollResultsWindow(weekId);
+    if (!win) { statsTable.classList.add("ws-no-results"); return; }
+    const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const fmt = ms => new Date(ms).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    const span = `${fmt(win.start)} – ${fmt(win.end)}`;
+    statsTable.querySelector("th.ws-w").title = `Wins since the previous poll (${span}); hover a game for details`;
+    statsTable.querySelector("th.ws-l").title = `Losses since the previous poll (${span})`;
+    const cells = () => statsTable.querySelectorAll("td.ws-res");
+    cells().forEach(td => { td.innerHTML = `<span class="ws-res-msg">…</span>`; });
+    // One game: site (V home, @ away, N neutral), opponent's AP rank (or seed), opponent logo.
+    const oppHtml = g => {
+        const site = g.site === "H" ? "V" : g.site === "A" ? "@" : "N";
+        const siteWord = g.site === "H" ? "vs" : g.site === "A" ? "@" : "neutral vs";
+        const name = g.opp.key ? conferenceDisplayName(g.opp.key) : g.opp.name || "?";
+        const rank = g.oppRank ? `#${g.oppRank}` : g.oppSeed ? `(${g.oppSeed})` : "";
+        const day = new Date(g.date).toLocaleDateString([], { month: "short", day: "numeric" });
+        const tip = esc(`${g.result} ${g.us}-${g.them} ${siteWord} ${rank ? rank + " " : ""}${name} · ${day}${g.note ? ` · ${g.note}` : ""}`);
+        const src = g.opp.key ? null : oppLogoSrc(g.opp) || (g.opp.id ? espnLogoUrl(g.opp.id) : null);
+        const logo = g.opp.key
+            ? `<img class="records-opp-logo records-logo" data-team="${esc(g.opp.key)}" data-espn="${g.opp.id}" alt="">`
+            : src ? `<img class="records-opp-logo" src="${esc(src)}" data-filler="${esc(name)}" alt="">`
+            : logoFillerHtml("records-opp-logo", name, "");
+        return `<span class="ws-opp"${g.opp.key ? ` data-team="${esc(g.opp.key)}"` : ""} title="${tip}"><span class="ws-opp-site">${site}</span>${rank ? `<span class="ws-opp-rank">${rank}</span>` : ""}${logo}</span>`;
+    };
+    fetchResultsBetween(win.start, win.end).then(({ byTeam }) => {
+        if (!statsTable.isConnected) return;
+        cells().forEach(td => {
+            const id = td.closest("tr")?.querySelector("td.ws-w")?.dataset.espn;
+            const want = td.classList.contains("ws-w") ? "W" : "L";
+            const games = id ? (byTeam[id] || []).filter(g => g.result === want) : null;
+            td.innerHTML = games === null
+                ? `<span class="ws-res-msg" title="No ESPN id for this team">?</span>`
+                : games.length ? `<div class="ws-res-list">${games.map(oppHtml).join("")}</div>` : "";
+        });
+        initRecordsLogos(statsTable);
+    }, err => {
+        if (!statsTable.isConnected) return;
+        const msg = esc(`Couldn't load results from ESPN (${err.message})`);
+        cells().forEach(td => { td.innerHTML = `<span class="ws-res-msg" title="${msg}">!</span>`; });
+    });
 }
 
 // ── Stats › Week › Conference tab (2025+) ────────────────────────────────────
@@ -4302,6 +4359,12 @@ function seasonModalTitleHtml(currentYear, isApMode, mode) {
 //                                   seasontype=3 NCAA/NIT/etc.), sorted by date.
 //   recordAsOf(games, date)      W-L from completed games before `date` (Date or ISO string)
 //   summarizeGames(games, ctx)   splits: overall, home, away, neutral, conf, vsTop25, nonD1, D1
+//   fetchScoreboardDay(day)      → {games: [{id, date, completed, postseason, neutral, note,
+//                                   teams: [{id, home, winner, score, rank, name, logo}] ×2]}}
+//                                   Every D1 game on one US Eastern date ("YYYYMMDD"); one request.
+//   fetchResultsBetween(s, e)    → {byTeam: {espnId: [game]}, stale?}: completed games that
+//                                   started in (s, e] (ms), game in fetchTeamSchedule()'s shape
+//                                   (no state/status). One scoreboard request per ET date.
 //
 // Both fetchers cache for ESPN_TTL_MS and dedupe concurrent calls. Seasons use the project's
 // convention (2027 = 2026-27), which is also ESPN's `season` parameter.
@@ -4473,6 +4536,116 @@ function summarizeGames(games, ctx = {}) {
         }
     });
     return s;
+}
+
+// One US Eastern date of D1 games ("YYYYMMDD"; ESPN's scoreboard dates are Eastern).
+// groups=50 = Division I (incl. D1 vs non-D1 games); a single date per request, since
+// date ranges return HTTP 400. Checked 2026-11-15: Nov 2–9, 2026 matched every D1 team's
+// game count from its schedule.
+function fetchScoreboardDay(day) {
+    return _espnCached(`scoreboard:${day}`, async () => {
+        const json = await _espnJson(`${ESPN_BASE}/scoreboard?dates=${day}&groups=50&limit=1000`);
+        if (!Array.isArray(json.events)) throw new Error("ESPN scoreboard had no events list");
+        const games = [];
+        json.events.forEach(ev => {
+            const c = ev.competitions?.[0];
+            const type = ev.season?.type ?? ev.seasonType?.type;
+            if (!c || c.competitors?.length !== 2 || type === 1) return;   // 1 = preseason / exhibitions
+            games.push({
+                id: ev.id,
+                date: ev.date,
+                completed: !!c.status?.type?.completed,
+                postseason: type === 3,
+                neutral: !!c.neutralSite,
+                note: c.notes?.[0]?.headline || "",
+                teams: c.competitors.map(x => ({
+                    id: x.team?.id ? String(x.team.id) : null,
+                    home: x.homeAway === "home",
+                    winner: !!x.winner,
+                    score: Number(x.score?.value ?? x.score),
+                    rank: x.curatedRank?.current ?? null,
+                    name: x.team?.shortDisplayName || x.team?.location || x.team?.displayName || "",
+                    logo: x.team?.logo || x.team?.logos?.[0]?.href || null,
+                })),
+            });
+        });
+        return { games };
+    });
+}
+
+function fetchResultsBetween(start, end) {
+    const fmt = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" });
+    const days = new Set();
+    // 12 h steps so a DST change can't skip a date
+    for (let t = start; t < end; t += 12 * 3600 * 1000) days.add(fmt.format(t).replace(/-/g, ""));
+    days.add(fmt.format(end).replace(/-/g, ""));
+    return Promise.all([...days].map(fetchScoreboardDay)).then(results => {
+        const byTeam = {}, seen = new Set();
+        results.forEach(r => r.games.forEach(g => {
+            if (seen.has(g.id)) return;
+            seen.add(g.id);
+            const t = Date.parse(g.date);
+            if (!g.completed || !(t > start && t <= end)) return;
+            g.teams.forEach((me, i) => {
+                const op = g.teams[1 - i];
+                if (!me.id) return;
+                if (!byTeam[me.id]) byTeam[me.id] = [];
+                byTeam[me.id].push({
+                    id: g.id,
+                    date: g.date,
+                    site: g.neutral ? "N" : me.home ? "H" : "A",
+                    opp: { id: op.id, name: op.name, key: op.id ? espnTeamKey(op.id) : null, logo: op.logo },
+                    // curatedRank is the AP rank at game time, but the tournament seed in postseason games.
+                    oppRank: !g.postseason && op.rank && op.rank <= 25 ? op.rank : null,
+                    oppSeed: g.postseason && op.rank && op.rank <= 16 ? op.rank : null,
+                    us: me.score,
+                    them: op.score,
+                    result: me.winner ? "W" : "L",
+                    postseason: g.postseason,
+                    note: g.note,
+                });
+            });
+        }));
+        Object.values(byTeam).forEach(list => list.sort((a, b) => a.date.localeCompare(b.date)));
+        return { byTeam, stale: results.find(r => r.stale)?.stale };
+    });
+}
+
+// ── Poll deadlines (Week Stats W / L columns) ───────────────────────────────
+// Week tabs carry no dates, but cbbpoll.net ballot ids are MongoDB ObjectIds whose first
+// 8 hex chars are the ballot's creation time, so a week's latest ballot ≈ its deadline.
+// In-season polls close Mondays at 10 AM ET (2025–2027: latest ballot 14:00–15:00 UTC
+// every week). Legacy cbbpoll.com ballots (2016–2022) have numeric ids and AP ballots none,
+// so those weeks get null. AP week numbers can't borrow userpoll dates: they drift (AP 2026
+// week 18 = Mar 9, userpoll week 19).
+function pollDeadline(weekId) {
+    const block = document.getElementById(weekId);
+    if (!block) return null;
+    let max = 0;
+    block.querySelectorAll("[data-ballot-url]").forEach(el => {
+        const m = /cbbpoll\.net\/ballots\/[^/]+\/([0-9a-f]{24})/.exec(el.dataset.ballotUrl);
+        if (m) max = Math.max(max, parseInt(m[1].slice(0, 8), 16) * 1000);
+    });
+    return max || null;
+}
+
+// {start, end} (ms): games that count toward a week's poll, from the previous poll's deadline
+// to this one's. null for pre-season, AP, and weeks without ballot timestamps. The first
+// in-season week starts at the pre-season deadline; if the previous deadline is missing
+// or later than this one (2025's pre-season ballots were re-saved in Feb), it falls back
+// to POLL_WINDOW_FALLBACK_DAYS before the deadline.
+const POLL_WINDOW_FALLBACK_DAYS = 21;
+function pollResultsWindow(weekId) {
+    if (weekId.startsWith("week-ap-")) return null;
+    const tabs = getSortedTabs();
+    const i = tabs.findIndex(t => t.dataset.week === weekId);
+    if (i === -1 || tabs[i].dataset.weeknum === "0") return null;
+    const end = pollDeadline(weekId);
+    if (!end) return null;
+    const prev = tabs[i + 1];
+    let start = prev && prev.dataset.year === tabs[i].dataset.year ? pollDeadline(prev.dataset.week) : null;
+    if (!start || start >= end) start = end - POLL_WINDOW_FALLBACK_DAYS * 86400000;
+    return { start, end };
 }
 
 // ── Quadrant data (NET / BPI) ───────────────────────────────────────────────
@@ -4746,7 +4919,6 @@ function buildTeamGamesHtml(sched, teamId, records, season) {
         ? `<span class="records-split"${title ? ` title="${title}"` : ""}>${label} <b>${wl(x)}</b></span>` : "";
     const summary = [
         split("Conf", s.conf, "Regular-season games vs. the same ESPN conference"),
-        split("vs non-D1", s.nonD1),
     ].filter(Boolean).join("");
     const fmtDate = iso => new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
     // Quadrant tag per game (only when per-game quads exist for this season; see fetchQuads()).
@@ -4757,8 +4929,8 @@ function buildTeamGamesHtml(sched, teamId, records, season) {
     const lines = games.map(g => {
         const site = g.site === "H" ? "vs" : g.site === "A" ? "@" : "N";
         const quad = showQuads ? quadOfGame(season, teamKey, g) : null;
-        const quadCell = showQuads
-            ? `<td class="rg-quad">${quad ? `<span class="rg-quad-tag rg-q${quad}" title="${quadTip}">Q${quad}</span>` : ""}</td>` : "";
+        // Always emit the quad cell (empty when there's no data) so every team's list has the same columns.
+        const quadCell = `<td class="rg-quad">${quad ? `<span class="rg-quad-tag rg-q${quad}" title="${quadTip}">Q${quad}</span>` : ""}</td>`;
         const logo = g.opp.key
             ? `<img class="records-games-logo records-logo" data-team="${esc(g.opp.key)}" data-espn="${g.opp.id}" alt="">`
             : oppLogoSrc(g.opp) ? `<img class="records-games-logo" src="${esc(oppLogoSrc(g.opp))}" data-filler="${esc(g.opp.name)}" alt="">`
@@ -4772,7 +4944,7 @@ function buildTeamGamesHtml(sched, teamId, records, season) {
         return `<tr class="${g.result ? "" : "records-game-pending"}">
             <td class="rg-date">${fmtDate(g.date)}</td>
             <td class="rg-site" title="${g.site === "N" ? "Neutral site" : g.site === "H" ? "Home" : "Away"}">${site}</td>
-            <td class="rg-opp">${logo}${g.oppRank ? `<span class="rg-rank" title="AP rank at game time">${g.oppRank}</span>` : ""}${g.oppSeed ? `<span class="rg-rank" title="Seed">(${g.oppSeed})</span>` : ""}${esc(name)}${nonD1}</td>${quadCell}
+            <td class="rg-opp" title="${esc(name)}">${logo}${g.oppRank ? `<span class="rg-rank" title="AP rank at game time">${g.oppRank}</span>` : ""}${g.oppSeed ? `<span class="rg-rank" title="Seed">(${g.oppSeed})</span>` : ""}${esc(name)}${nonD1}</td>${quadCell}
             <td class="rg-res">${res}</td>
             <td class="rg-note">${esc(g.note)}${g.postseason && !g.note ? "Postseason" : ""}</td>
         </tr>`;
@@ -4780,7 +4952,7 @@ function buildTeamGamesHtml(sched, teamId, records, season) {
     const stale = sched.stale ? `<span class="records-note"> · couldn't refresh (${esc(sched.stale)})</span>` : "";
     return `<div class="records-games">
         <div class="records-splits">${summary}${stale}</div>
-        <table class="records-games-table"><tbody>${lines}</tbody></table>
+        <table class="records-games-table"><colgroup><col class="rg-c-date"><col class="rg-c-site"><col class="rg-c-opp"><col class="rg-c-quad"><col class="rg-c-res"><col class="rg-c-note"></colgroup><tbody>${lines}</tbody></table>
     </div>`;
 }
 

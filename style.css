@@ -764,9 +764,22 @@ kbd {
 #voter-history-table .week-stats-table th:nth-child(9), #voter-history-table .week-stats-table td:nth-child(9),
 #voter-history-table .week-stats-table th:nth-child(10), #voter-history-table .week-stats-table td:nth-child(10),
 #voter-history-table .week-stats-table th:nth-child(12), #voter-history-table .week-stats-table td:nth-child(12),
-#voter-history-table .week-stats-table th:nth-child(13), #voter-history-table .week-stats-table td:nth-child(13) { border-right: none; }
+#voter-history-table .week-stats-table th:nth-child(14), #voter-history-table .week-stats-table td:nth-child(14),
+#voter-history-table .week-stats-table th:nth-child(15), #voter-history-table .week-stats-table td:nth-child(15) { border-right: none; }
 #voter-history-table .week-stats-table th:nth-child(7), #voter-history-table .week-stats-table td:nth-child(7),
-#voter-history-table .week-stats-table th:nth-child(11), #voter-history-table .week-stats-table td:nth-child(11) { border-right: 1px solid var(--color-border-strong); }
+#voter-history-table .week-stats-table th:nth-child(11), #voter-history-table .week-stats-table td:nth-child(11),
+#voter-history-table .week-stats-table th:nth-child(13), #voter-history-table .week-stats-table td:nth-child(13) { border-right: 1px solid var(--color-border-strong); }
+/* W / L (last two columns): opponents beaten / lost to since the previous poll (fillWeekResults() in script.js) */
+#voter-history-table .week-stats-table td.ws-res { white-space: normal; text-align: left; font-size: 11px; line-height: 1.3; padding: 2px 6px; max-width: 170px; }
+#voter-history-table .week-stats-table th.ws-res { text-align: left; padding-left: 6px; }
+#voter-history-table .week-stats-table .ws-res-list { display: flex; flex-wrap: wrap; gap: 3px 8px; justify-content: flex-start; }
+#voter-history-table .week-stats-table .ws-opp { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+#voter-history-table .week-stats-table .ws-opp[data-team] { cursor: pointer; }
+#voter-history-table .week-stats-table .ws-opp-site { opacity: 0.55; min-width: 9px; text-align: center; }
+#voter-history-table .week-stats-table .ws-opp-rank { opacity: 0.75; font-variant-numeric: tabular-nums; }
+#voter-history-table .week-stats-table .ws-res-msg { opacity: 0.45; }
+#voter-history-table .week-stats-table.ws-no-results .ws-res { display: none; }
+#voter-history-table .week-stats-table.ws-no-results th:nth-child(13), #voter-history-table .week-stats-table.ws-no-results td:nth-child(13) { border-right: none; }
 
 
 /* Stats › Week › Conference tab (buildConferenceView() in script.js) */
@@ -870,11 +883,28 @@ kbd {
 #season-stats-table.season-records tr.records-team-row:hover > td,
 #season-stats-table.season-records tr.records-team-row.expanded > td { background: var(--color-bg-spread-hover); }
 /* Expanded game list (Records row click) */
+/* The game-list row itself is never striped: when it landed on an even row its shading matched the
+   inner table's even-row stripes and hid them. Inner rows keep the normal tbody zebra striping. */
+#season-stats-table tr.records-games-row { background-color: transparent; }
+/* Zebra-stripe the Records rows as if the open game-list rows weren't there, so opening a team's
+   games doesn't flip the stripes of every row below it. Old browsers keep the plain striping. */
+@supports selector(:nth-child(1 of a)) {
+    #season-stats-table.season-records > tbody > tr:nth-child(even) { background-color: transparent; }
+    #season-stats-table.season-records > tbody > tr:nth-child(even of :not(.records-games-row)) { background-color: var(--color-bg-row-alt); }
+}
 #season-stats-table.season-records tr.records-games-row > td { padding: 2px 8px 8px 16px; text-align: left; border-right: none; white-space: normal; }
 .records-games-msg { font-size: 11px; opacity: 0.7; padding: 4px 0; }
 .records-splits { font-size: 11px; display: flex; flex-wrap: wrap; gap: 2px 12px; padding: 2px 0 3px; opacity: 0.85; }
 .records-split b { font-weight: bold; }
-#season-stats-table .records-games-table { border-collapse: collapse; font-size: 12px; width: auto; }
+/* Fixed column widths so every team's schedule lines up the same, whatever its opponents, quads or notes */
+#season-stats-table .records-games-table { border-collapse: collapse; font-size: 12px; table-layout: fixed; width: 690px; }
+#season-stats-table .records-games-table col.rg-c-date { width: 46px; }
+#season-stats-table .records-games-table col.rg-c-site { width: 24px; }
+#season-stats-table .records-games-table col.rg-c-opp { width: 230px; }
+#season-stats-table .records-games-table col.rg-c-quad { width: 30px; }
+#season-stats-table .records-games-table col.rg-c-res { width: 90px; }
+#season-stats-table .records-games-table col.rg-c-note { width: 270px; }
+#season-stats-table .records-games-table td.rg-opp { overflow: hidden; text-overflow: ellipsis; }
 #season-stats-table .records-games-table td {
     padding: 1px 6px 1px 0; border: none; text-align: left; font-size: 12px; line-height: 1.3; white-space: nowrap; vertical-align: middle;
 }
