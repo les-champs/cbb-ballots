@@ -3886,10 +3886,15 @@ function saveTableAsPng() {
         // Even rows are transparent; html2canvas fills those with white by default,
         // which leaves dark-mode text unreadable. Use the page background instead.
         backgroundColor: getComputedStyle(document.body).backgroundColor,
-        // Edit only the clone: hide veteran tags and drop the hover state so the
-        // row under the cursor doesn't show its pin/history buttons.
+        // Edit only the clone: hide veteran tags, blank the header's default
+        // "Functions" label (other sort labels stay, so the image says how it's sorted),
+        // and drop the hover state so the row under the cursor doesn't show its
+        // pin/history buttons.
         onclone: doc => {
             doc.body.classList.add("hide-veteran-tags");
+            doc.querySelectorAll(".voters-toggle").forEach(el => {
+                if (el.textContent.trim() === SORT_LABELS.alphabetic) el.style.visibility = "hidden";
+            });
             doc.querySelectorAll(".voter-cell-hover").forEach(el => el.classList.remove("voter-cell-hover"));
         },
     })).then(canvas => {
