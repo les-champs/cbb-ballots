@@ -1493,3 +1493,47 @@ h1 span, .week-arrow, .picker-btn, .week-tab, .voter-name, .pin-btn, .history-bt
     user-select: none;
     -webkit-tap-highlight-color: transparent;
 }
+
+/* ─── Ballot submission times (Shift+S) ──────────────────── */
+:root {
+    --color-bt-official:     #2277cc;
+    --color-bt-provisional:  #e08a1e;
+    --color-bt-grid:         rgba(0,0,0,0.08);
+    --color-bt-grid-day:     rgba(0,0,0,0.22);
+    --color-bt-season:       rgba(34,119,204,0.28);
+}
+body.dark {
+    --color-bt-official:     #5aa6f0;
+    --color-bt-provisional:  #f0a64a;
+    --color-bt-grid:         rgba(255,255,255,0.08);
+    --color-bt-grid-day:     rgba(255,255,255,0.22);
+    --color-bt-season:       rgba(90,166,240,0.3);
+}
+.ballot-times-svg { width: min(860px, 90vw); display: block; margin: 0 auto; font-family: inherit; }
+.ballot-times-svg .bt-grid { stroke: var(--color-bt-grid); stroke-width: 1; }
+.ballot-times-svg .bt-grid-day { stroke: var(--color-bt-grid-day); }
+.ballot-times-svg .bt-axis-line { stroke: var(--color-heading); stroke-width: 1; }
+.ballot-times-svg .bt-axis { fill: var(--color-avg-label); font-size: 11px; }
+.ballot-times-svg .bt-axis-minor { fill: var(--color-section-title); }
+.ballot-times-svg .bt-legend { fill: var(--color-heading); font-size: 12px; }
+.ballot-times-svg .bt-deadline { stroke: var(--color-loss); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.ballot-times-svg .bt-line { fill: none; stroke-width: 2; }
+.ballot-times-svg .bt-line.bt-official { stroke: var(--color-bt-official); }
+.ballot-times-svg .bt-line.bt-provisional { stroke: var(--color-bt-provisional); }
+.ballot-times-svg .bt-dot { stroke: var(--color-bg-modal); stroke-width: 1; cursor: default; }
+.ballot-times-svg .bt-dot.bt-official { fill: var(--color-bt-official); }
+.ballot-times-svg .bt-dot.bt-provisional { fill: var(--color-bt-provisional); }
+.ballot-times-svg .bt-dot:hover { r: 5; }
+.ballot-times-svg .bt-season-line { stroke: var(--color-bt-season); stroke-width: 1.5; }
+.ballot-times-svg .bt-season-line:hover { stroke: var(--color-bt-official); }
+.ballot-times-svg .bt-season-active { stroke: var(--color-bt-official); stroke-width: 2.5; }
+.ballot-times-svg .bt-season-label-active { fill: var(--color-bt-official); font-weight: bold; }
+.ballot-times-note, .ballot-times-empty {
+    text-align: center; font-size: 12px; color: var(--color-avg-label); margin: 6px auto 0; max-width: 860px; white-space: normal;
+}
+.ballot-times-empty { padding: 40px 0; font-size: 14px; }
+.ballot-times-table { border-collapse: collapse; margin: 14px auto 0; font-size: 13px; color: var(--color-heading); }
+.ballot-times-table th, .ballot-times-table td { padding: 3px 10px; text-align: right; }
+.ballot-times-table th { font-weight: 600; border-bottom: 1px solid var(--color-heading); }
+.ballot-times-table .name-col { text-align: left; }
+.ballot-times-table tr.bt-row-active td { font-weight: bold; color: var(--color-bt-official); }

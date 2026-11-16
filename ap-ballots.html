@@ -1514,6 +1514,50 @@ h1 span, .week-arrow, .picker-btn, .week-tab, .voter-name, .pin-btn, .history-bt
     -webkit-tap-highlight-color: transparent;
 }
 
+/* ─── Ballot submission times (Shift+S) ──────────────────── */
+:root {
+    --color-bt-official:     #2277cc;
+    --color-bt-provisional:  #e08a1e;
+    --color-bt-grid:         rgba(0,0,0,0.08);
+    --color-bt-grid-day:     rgba(0,0,0,0.22);
+    --color-bt-season:       rgba(34,119,204,0.28);
+}
+body.dark {
+    --color-bt-official:     #5aa6f0;
+    --color-bt-provisional:  #f0a64a;
+    --color-bt-grid:         rgba(255,255,255,0.08);
+    --color-bt-grid-day:     rgba(255,255,255,0.22);
+    --color-bt-season:       rgba(90,166,240,0.3);
+}
+.ballot-times-svg { width: min(860px, 90vw); display: block; margin: 0 auto; font-family: inherit; }
+.ballot-times-svg .bt-grid { stroke: var(--color-bt-grid); stroke-width: 1; }
+.ballot-times-svg .bt-grid-day { stroke: var(--color-bt-grid-day); }
+.ballot-times-svg .bt-axis-line { stroke: var(--color-heading); stroke-width: 1; }
+.ballot-times-svg .bt-axis { fill: var(--color-avg-label); font-size: 11px; }
+.ballot-times-svg .bt-axis-minor { fill: var(--color-section-title); }
+.ballot-times-svg .bt-legend { fill: var(--color-heading); font-size: 12px; }
+.ballot-times-svg .bt-deadline { stroke: var(--color-loss); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.ballot-times-svg .bt-line { fill: none; stroke-width: 2; }
+.ballot-times-svg .bt-line.bt-official { stroke: var(--color-bt-official); }
+.ballot-times-svg .bt-line.bt-provisional { stroke: var(--color-bt-provisional); }
+.ballot-times-svg .bt-dot { stroke: var(--color-bg-modal); stroke-width: 1; cursor: default; }
+.ballot-times-svg .bt-dot.bt-official { fill: var(--color-bt-official); }
+.ballot-times-svg .bt-dot.bt-provisional { fill: var(--color-bt-provisional); }
+.ballot-times-svg .bt-dot:hover { r: 5; }
+.ballot-times-svg .bt-season-line { stroke: var(--color-bt-season); stroke-width: 1.5; }
+.ballot-times-svg .bt-season-line:hover { stroke: var(--color-bt-official); }
+.ballot-times-svg .bt-season-active { stroke: var(--color-bt-official); stroke-width: 2.5; }
+.ballot-times-svg .bt-season-label-active { fill: var(--color-bt-official); font-weight: bold; }
+.ballot-times-note, .ballot-times-empty {
+    text-align: center; font-size: 12px; color: var(--color-avg-label); margin: 6px auto 0; max-width: 860px; white-space: normal;
+}
+.ballot-times-empty { padding: 40px 0; font-size: 14px; }
+.ballot-times-table { border-collapse: collapse; margin: 14px auto 0; font-size: 13px; color: var(--color-heading); }
+.ballot-times-table th, .ballot-times-table td { padding: 3px 10px; text-align: right; }
+.ballot-times-table th { font-weight: 600; border-bottom: 1px solid var(--color-heading); }
+.ballot-times-table .name-col { text-align: left; }
+.ballot-times-table tr.bt-row-active td { font-weight: bold; color: var(--color-bt-official); }
+
 </style>
 </head>
 <body>
@@ -1677,6 +1721,7 @@ h1 span, .week-arrow, .picker-btn, .week-tab, .voter-name, .pin-btn, .history-bt
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>W</kbd></span><span>Season voters</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>H</kbd></span><span>Season rank heatmap</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>K</kbd></span><span>Conference table</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>S</kbd></span><span>Ballot submission times (2027+)</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>P</kbd></span><span>Save as PNG</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>?</kbd></span><span>Show legend</span></div>
     </div>
@@ -6777,6 +6822,227 @@ html +=`</tbody>`;
 table.innerHTML=html;
 modal.classList.add("open");
 }
+const BALLOT_TIMES_FIRST_YEAR=2027;
+const BALLOT_TIMES_TZ="America/New_York";
+const BALLOT_TIMES_WINDOW_MS=7*864e5;
+const BALLOT_TIMES_SEASON_HOURS=72;
+let _ballotTimesMode="week";
+const _btFmt=new Intl.DateTimeFormat("en-US",{timeZone:BALLOT_TIMES_TZ,weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+const _btTimeFmt=new Intl.DateTimeFormat("en-US",{timeZone:BALLOT_TIMES_TZ,hour:"numeric",minute:"2-digit"});
+const _btDayFmt=new Intl.DateTimeFormat("en-US",{timeZone:BALLOT_TIMES_TZ,weekday:"short",month:"short",day:"numeric"});
+const _btHourFmt=new Intl.DateTimeFormat("en-US",{timeZone:BALLOT_TIMES_TZ,hour:"numeric",hourCycle:"h23"});
+function weekBallotTimes(weekId){
+const out=[];
+["official","provisional"].forEach(sec=>{
+document.querySelectorAll(`#${weekId}-${sec} .voter-cell[data-ballot-url]`).forEach(el=>{
+const m=/cbbpoll\.net\/ballots\/[^/]+\/([0-9a-f]{24})/.exec(el.dataset.ballotUrl);
+if(!m)return;
+out.push({
+name:el.querySelector(".voter-name")?.textContent||"?",
+time:parseInt(m[1].slice(0,8),16)*1000,
+official:sec==="official",
+});
+});
+});
+return out.sort((a,b)=>a.time - b.time);
+}
+function ballotTimesDeadline(ballots){
+const last=ballots[ballots.length - 1].time;
+return Math.ceil(last / 36e5)*36e5;
+}
+function ballotTimesWeekName(tab){
+if(isPreseasonTab(tab))return "Pre-Season";
+return weekTextLabel(tab)||`Week ${String(displayWeekNum(tab)).padStart(2,"0")}`;
+}
+function _btSvg(W,H){
+const svg=document.createElementNS(SVG_NS,"svg");
+svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+svg.classList.add("ballot-times-svg");
+return svg;
+}
+function _btEl(svg,tag,attrs,text){
+const el=document.createElementNS(SVG_NS,tag);
+for(const k in attrs)el.setAttribute(k,attrs[k]);
+if(text!==undefined)el.textContent=text;
+svg.appendChild(el);
+return el;
+}
+async function showBallotTimesChart(mode){
+if(_apCurrentYear!==null||ON_AP_PAGE)return;
+const activeTab=document.querySelector(".week-tab.active");
+if(!activeTab)return;
+const year=activeTab.dataset.year;
+if(Number(year)<BALLOT_TIMES_FIRST_YEAR)return;
+if(mode)_ballotTimesMode=mode;
+await loadYear(year);
+const modal=document.getElementById("voter-history-modal");
+const title=document.getElementById("voter-history-title");
+const table=document.getElementById("voter-history-table");
+table.classList.remove("week-stats-table");
+table.style.cssText="display:block; white-space:normal; width:100%;";
+table.innerHTML="";
+const tabsHtml=[{key:"week",label:"Week"},{key:"season",label:"Season"}].map(m=>
+`<span class="modal-mode-tab${_ballotTimesMode===m.key?" active":""}" onclick="showBallotTimesChart('${m.key}')">${m.label}</span>`
+).join("");
+const heading=_ballotTimesMode==="week"?`${year} ${ballotTimesWeekName(activeTab)}`:`${year}`;
+title.innerHTML=`${_ballotTimesMode==="week"?modalWeekArrowsHtml():""}${heading} Ballot Times — ${tabsHtml}`;
+const body=_ballotTimesMode==="week"
+?buildBallotTimesWeek(activeTab.dataset.week)
+:buildBallotTimesSeason(year,activeTab.dataset.week);
+table.appendChild(body);
+modal.dataset.chartType="ballottimes";
+modal.classList.add("open");
+}
+function _btEmpty(msg){
+const d=document.createElement("div");
+d.className="ballot-times-empty";
+d.textContent=msg;
+return d;
+}
+function buildBallotTimesWeek(weekId){
+const ballots=weekBallotTimes(weekId);
+if(ballots.length===0)return _btEmpty("No ballot times for this week.");
+const deadline=ballotTimesDeadline(ballots);
+const start=Math.max(ballots[0].time,deadline - BALLOT_TIMES_WINDOW_MS);
+const x0=Math.floor(start / 36e5)*36e5;
+const clipped=ballots.filter(b=>b.time<x0).length;
+const W=900,H=440,mL=44,mR=24,mT=36,mB=46;
+const cW=W - mL - mR,cH=H - mT - mB;
+const nOff=ballots.filter(b=>b.official).length;
+const nProv=ballots.length - nOff;
+const yMax=Math.max(5,Math.ceil(Math.max(nOff,nProv)/ 10)*10);
+const xs=t=>mL +(Math.max(t,x0)- x0)/(deadline - x0)*cW;
+const ys=n=>mT + cH - n / yMax*cH;
+const svg=_btSvg(W,H);
+const yStep=yMax>50?20:10;
+for(let n=0;n<=yMax;n +=yStep){
+_btEl(svg,"line",{x1:mL,x2:mL + cW,y1:ys(n),y2:ys(n),class:"bt-grid"});
+_btEl(svg,"text",{x:mL - 8,y:ys(n)+ 4,"text-anchor":"end",class:"bt-axis"},n);
+}
+const spanH=(deadline - x0)/ 36e5;
+const dayStarts=[x0];
+for(let t=x0;t<=deadline;t +=36e5){
+const hr=parseInt(_btHourFmt.format(t),10)%24;
+if(hr===0&&t>x0){
+dayStarts.push(t);
+_btEl(svg,"line",{x1:xs(t),x2:xs(t),y1:mT,y2:mT + cH,class:"bt-grid bt-grid-day"});
+}
+if(hr===12||(spanH<=60&&(hr===6||hr===18))){
+_btEl(svg,"text",{x:xs(t),y:mT + cH + 16,"text-anchor":"middle",class:"bt-axis bt-axis-minor"},
+hr===12?"noon":(hr===6?"6a":"6p"));
+}
+}
+dayStarts.forEach((t,i)=>{
+const end=dayStarts[i + 1]??deadline;
+if(xs(end)- xs(t)<70)return;
+_btEl(svg,"text",{x:(xs(t)+ xs(end))/ 2,y:mT + cH + 32,"text-anchor":"middle",class:"bt-axis"},
+_btDayFmt.format(t + 1));
+});
+_btEl(svg,"line",{x1:mL,x2:mL + cW,y1:mT + cH,y2:mT + cH,class:"bt-axis-line"});
+_btEl(svg,"line",{x1:xs(deadline),x2:xs(deadline),y1:mT - 6,y2:mT + cH,class:"bt-deadline"});
+_btEl(svg,"text",{x:xs(deadline)- 4,y:mT - 10,"text-anchor":"end",class:"bt-axis"},
+`Deadline ≈ ${_btTimeFmt.format(deadline)} ET`);
+[[true,"bt-official"],[false,"bt-provisional"]].forEach(([official,cls])=>{
+const list=ballots.filter(b=>b.official===official);
+if(list.length===0)return;
+let n=list.filter(b=>b.time<x0).length;
+let d=`M${xs(x0)},${ys(n)}`;
+const dots=[];
+list.forEach(b=>{
+if(b.time<x0)return;
+d +=`H${xs(b.time)}V${ys(n + 1)}`;
+n++;
+dots.push([b,xs(b.time),ys(n)]);
+});
+d +=`H${xs(deadline)}`;
+_btEl(svg,"path",{d,class:`bt-line ${cls}`});
+dots.forEach(([b,x,y])=>{
+const c=_btEl(svg,"circle",{cx:x,cy:y,r:3.2,class:`bt-dot ${cls}`});
+_btEl(c,"title",{},`${b.name} — ${_btFmt.format(b.time)} ET (${official?"official":"provisional"})`);
+});
+});
+[[`Official (${nOff})`,"bt-official"],[`Provisional (${nProv})`,"bt-provisional"]].forEach(([label,cls],i)=>{
+const lx=mL + 10 + i*150;
+_btEl(svg,"circle",{cx:lx,cy:mT + 10,r:4,class:`bt-dot ${cls}`});
+_btEl(svg,"text",{x:lx + 9,y:mT + 14,class:"bt-legend"},label);
+});
+const wrap=document.createElement("div");
+wrap.appendChild(svg);
+const note=document.createElement("div");
+note.className="ballot-times-note";
+const last3=ballots.filter(b=>b.time>=deadline - 3*36e5).length;
+note.textContent=`${ballots.length} ballots · first ${_btFmt.format(ballots[0].time)} ET · `
++ `last ${_btFmt.format(ballots[ballots.length - 1].time)} ET · ${last3} in the final 3 hours`
++(clipped?` · ${clipped} earlier ballot${clipped===1?"":"s"} not shown`:"")
++ ". Times are when each ballot was first created.";
+wrap.appendChild(note);
+return wrap;
+}
+function buildBallotTimesSeason(year,activeWeekId){
+const weeks=getSortedTabs().filter(t=>t.dataset.year===year).reverse().map(tab=>{
+const ballots=weekBallotTimes(tab.dataset.week);
+return ballots.length?{tab,ballots,deadline:ballotTimesDeadline(ballots)}:null;
+}).filter(Boolean);
+if(weeks.length===0)return _btEmpty("No ballot times for this season.");
+const W=900,H=420,mL=48,mR=24,mT=24,mB=40;
+const cW=W - mL - mR,cH=H - mT - mB;
+const span=BALLOT_TIMES_SEASON_HOURS;
+const xs=h=>mL +(span - Math.min(h,span))/ span*cW;
+const ys=p=>mT + cH - p*cH;
+const svg=_btSvg(W,H);
+for(let p=0;p<=1.0001;p +=0.25){
+_btEl(svg,"line",{x1:mL,x2:mL + cW,y1:ys(p),y2:ys(p),class:"bt-grid"});
+_btEl(svg,"text",{x:mL - 8,y:ys(p)+ 4,"text-anchor":"end",class:"bt-axis"},`${Math.round(p*100)}%`);
+}
+for(let h=0;h<=span;h +=12){
+_btEl(svg,"line",{x1:xs(h),x2:xs(h),y1:mT,y2:mT + cH,class:h%24===0?"bt-grid bt-grid-day":"bt-grid"});
+_btEl(svg,"text",{x:xs(h),y:mT + cH + 18,"text-anchor":"middle",class:"bt-axis"},h===0?"deadline":`−${h}h`);
+}
+_btEl(svg,"line",{x1:mL,x2:mL + cW,y1:mT + cH,y2:mT + cH,class:"bt-axis-line"});
+_btEl(svg,"text",{x:mL + cW / 2,y:H - 4,"text-anchor":"middle",class:"bt-axis bt-axis-minor"},"hours before deadline");
+const labels=[];
+const ordered=weeks.filter(w=>w.tab.dataset.week!==activeWeekId)
+.concat(weeks.filter(w=>w.tab.dataset.week===activeWeekId));
+ordered.forEach(w=>{
+const active=w.tab.dataset.week===activeWeekId;
+const total=w.ballots.length;
+const hrs=w.ballots.map(b=>(w.deadline - b.time)/ 36e5);
+let n=hrs.filter(h=>h>span).length;
+let d=`M${xs(span)},${ys(n / total)}`;
+hrs.forEach(h=>{
+if(h>span)return;
+d +=`H${xs(h)}V${ys(++n / total)}`;
+});
+d +=`H${xs(0)}`;
+const path=_btEl(svg,"path",{d,class:`bt-line bt-season-line${active?" bt-season-active":""}`});
+_btEl(path,"title",{},`${ballotTimesWeekName(w.tab)} — ${total} ballots`);
+labels.push({y:ys(hrs.filter(h=>h>span).length / total)- 4,text:ballotTimesWeekName(w.tab),active});
+});
+labels.sort((a,b)=>b.y - a.y);
+labels.forEach((l,i)=>{
+if(i>0)l.y=Math.min(l.y,labels[i - 1].y - 13);
+_btEl(svg,"text",{x:xs(span)+ 4,y:l.y,class:`bt-legend${l.active?" bt-season-label-active":" bt-axis-minor"}`},l.text);
+});
+const median=arr=>{const s=arr.slice().sort((a,b)=>a - b);const m=s.length>>1;return s.length%2?s[m]:(s[m - 1]+ s[m])/ 2;};
+const fmtH=h=>h>=24?`${(h / 24).toFixed(1)}d`:`${h.toFixed(1)}h`;
+let rows="";
+weeks.slice().reverse().forEach(w=>{
+const hrs=w.ballots.map(b=>(w.deadline - b.time)/ 36e5);
+const pct=lim=>`${Math.round(hrs.filter(h=>h<=lim).length / hrs.length*100)}%`;
+const off=w.ballots.filter(b=>b.official).length;
+const active=w.tab.dataset.week===activeWeekId?" class=\"bt-row-active\"":"";
+rows +=`<tr${active}><td class="name-col">${ballotTimesWeekName(w.tab)}</td><td>${w.ballots.length}</td><td>${off}</td>`
++ `<td>${_btFmt.format(w.deadline)}</td><td>${fmtH(median(hrs))}</td><td>${pct(24)}</td><td>${pct(12)}</td><td>${pct(3)}</td><td>${pct(1)}</td></tr>`;
+});
+const tbl=document.createElement("table");
+tbl.className="ballot-times-table";
+tbl.innerHTML=`<thead><tr><th class="name-col">Week</th><th>Ballots</th><th>Official</th><th title="Last ballot rounded up to the hour (ET)">Deadline ≈</th>`
++ `<th title="Median time before the deadline">Median</th><th title="Share submitted in the final 24 hours">≤24h</th><th>≤12h</th><th>≤3h</th><th>≤1h</th></tr></thead><tbody>${rows}</tbody>`;
+const wrap=document.createElement("div");
+wrap.appendChild(svg);
+wrap.appendChild(tbl);
+return wrap;
+}
 function conferenceDisplayName(team){
 const names=CONFERENCE_DATA.names;
 if(names[team])return names[team];
@@ -7021,6 +7287,8 @@ if(weekPickerPinned)rebuildWeekPicker();
 const vhm=document.getElementById("voter-history-modal");
 if(vhm.classList.contains("open")&&vhm.dataset.chartType==="highlow")
 showWeekHighLowChart(target.dataset.week,vhm.dataset.chartMode||"highlow");
+if(vhm.classList.contains("open")&&vhm.dataset.chartType==="ballottimes")
+showBallotTimesChart();
 backgroundLoad();
 }).catch(()=>{});
 }
@@ -7037,7 +7305,7 @@ try{localStorage.setItem("showWeekArrows",on?"1":"0");}catch(e){}
 setWeekArrowsVisible(_showWeekArrows);
 document.getElementById("week-arrow-prev").addEventListener("click",()=>navigateWeek(-1));
 document.getElementById("week-arrow-next").addEventListener("click",()=>navigateWeek(1));
-const LOCKED_KEYS=new Set(["D","X","R","T","Y","G","U","W","H","K","P","?"]);
+const LOCKED_KEYS=new Set(["D","X","R","T","Y","G","U","W","H","K","P","S","?"]);
 const PIN_SALT="3257a8d4b7c69c8ae5b2dd12961baa35";
 const PIN_HASH="20588ee36e7cdd384e92ceef66b5382d45fb006d4fea1d93059a20d679aa9a22";
 const PIN_LENGTH=9;
@@ -7225,6 +7493,11 @@ e.preventDefault();
 showHeatmapModal();
 return;
 }
+if(e.key==="S"||e.key==="s"){
+e.preventDefault();
+showBallotTimesChart();
+return;
+}
 if(e.key==="B"||e.key==="b"){
 e.preventDefault();
 showBumpChartModal();
@@ -7318,6 +7591,8 @@ if(weekPickerPinned)rebuildWeekPicker();
 const vhm2=document.getElementById("voter-history-modal");
 if(vhm2.classList.contains("open")&&vhm2.dataset.chartType==="highlow")
 showWeekHighLowChart(target.dataset.week,vhm2.dataset.chartMode||"highlow");
+if(vhm2.classList.contains("open")&&vhm2.dataset.chartType==="ballottimes")
+showBallotTimesChart();
 backgroundLoad();
 }
 }).catch(()=>{});
