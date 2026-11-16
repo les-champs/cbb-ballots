@@ -4774,6 +4774,15 @@ function fetchQuads(season) {
                 quad: g.quad,
             }));
         });
+        // Completed games per team (schedule-game shape, date = UTC day), for the Picker's wins.
+        const played = {};
+        if (q) Object.entries(q.teams).forEach(([k, t]) => {
+            played[k] = t.games.filter(g => g.result).map(g => ({
+                date: g.date, site: g.site, result: g.result, us: Math.round(g.us), them: Math.round(g.them),
+                opp: { id: g.oppId, key: g.opp || espnTeamKey(g.oppId), name: g.oppName || (g.opp ? null : "non-D1"), logo: null },
+                quad: g.quad,
+            }));
+        });
         const games = {};
         if (q && q.rankSource === source) {
             Object.entries(q.teams).forEach(([k, t]) => {
@@ -4781,7 +4790,8 @@ function fetchQuads(season) {
                 t.games.forEach(g => { if (g.quad) m[`${g.date}:${g.oppId}`] = g.quad; });
             });
         }
-        return (_quadsData[season] = { source, official: !!net, asOf: net ? net.through : q.ranksAsOf, teams, games, upcoming });
+        return (_quadsData[season] = { source, official: !!net, asOf: net ? net.through : q.ranksAsOf, teams, games, upcoming, played,
+            fetched: q ? Date.parse(q.fetched) : null });
     });
     p.catch(err => { _quadsData[season] = { error: err.message }; delete _quadsPromise[season]; });
     return (_quadsPromise[season] = p);
@@ -4842,8 +4852,12 @@ function showSeasonRecords(currentYear, isApMode, activeTab) {
     const modal = document.getElementById("season-stats-modal");
     const title = document.getElementById("season-stats-title");
     const table = document.getElementById("season-stats-table");
-    // Title: "YYYY Records — Voted All", the Voted / All switch styled like the Week window's tabs.
-    const switcher = `<span class="records-switch">${[["week", "Voted"], ["all", "All"]].map(([k, l]) =>
+    // Title: "YYYY Records — Voted All Picker (beta)", the switch styled like the Week window's tabs.
+    // Picker only where it has its data (pickerAvailable()).
+    const hasPicker = pickerAvailable(currentYear);
+    if (_recordsView === "picker" && !hasPicker) _recordsView = "week";
+    const views = [["week", "Voted"], ["all", "All"], ...(hasPicker ? [["picker", "Picker (beta)"]] : [])];
+    const switcher = `<span class="records-switch">${views.map(([k, l]) =>
         `<span class="records-view${_recordsView === k ? " active" : ""}" data-view="${k}">${l}</span>`).join("")}</span>`;
     title.innerHTML = `<span class="records-title-main">${currentYear}${isApMode ? " AP" : ""} Records — ${switcher}</span>`
         + `<span class="records-note records-title-note"></span>`;
@@ -4868,14 +4882,30 @@ function showSeasonRecords(currentYear, isApMode, activeTab) {
     const render = (data, error) => {
         if (token !== _recordsRenderToken || !table.classList.contains("season-records")) return;
         last = [data, error];
-        table.innerHTML = buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error);
+        const isPicker = _recordsView === "picker";
+        table.classList.toggle("season-teampicker", isPicker);
+        table.innerHTML = isPicker
+            ? buildPickerTableHtml(currentYear, data, error)
+            : buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error);
         const noteEl = title.querySelector(".records-title-note");
-        if (noteEl) noteEl.innerHTML = recordsNoteHtml(currentYear, data);
+        if (noteEl) {
+            noteEl.innerHTML = (isPicker && pickerSavedOrder(currentYear)
+                ? `<span class="records-retry tp-reset" title="Put the teams back in eligibility order">Reset order</span> · ` : "")
+                + recordsNoteHtml(currentYear, data);
+            noteEl.querySelector(".tp-reset")?.addEventListener("click", () => {
+                pickerSaveOrder(currentYear, null);
+                render(...last);
+            });
+        }
         table.querySelector(".records-retry")?.addEventListener("click", () =>
             showSeasonRecords(currentYear, isApMode, activeTab));
         initRecordsLogos(table);
         if (!data) return;
         const tbody = table.querySelector("tbody");
+        if (isPicker) initPickerDrag(tbody, currentYear, () => {
+            // The first drag adds the Reset link to the note.
+            if (noteEl && !noteEl.querySelector(".tp-reset")) render(...last);
+        });
         tbody.addEventListener("click", e => {
             // Next-game opponent logos highlight the team everywhere instead of opening the game list.
             const opp = e.target.closest("img.records-opp-logo[data-team]");
@@ -4899,6 +4929,11 @@ function showSeasonRecords(currentYear, isApMode, activeTab) {
     }
     if (!cached || Date.now() - cached.at >= ESPN_TTL_MS) {
         fetchSeasonRecords(currentYear).then(d => render(d, null), err => render(null, err.message));
+    }
+    // Picker: games finished since the quads snapshot (scoreboard), so recent wins are current.
+    if (_recordsView === "picker") {
+        const again = () => render(...last);
+        fetchQuads(currentYear).then(() => pickerFetchRecent(currentYear)).then(again, () => {});
     }
 }
 
@@ -5193,6 +5228,243 @@ function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
         });
     }
     return `${head}<tbody>${body}</tbody>`;
+}
+
+// ── Records › Picker ────────────────────────────────────────────────────────
+// The PICKER_COUNT most eligible teams for a Top 25, for a voter to drag into their own order.
+// Eligibility = average of three ranks among D1 teams: ESPN SOR rank (quads-YEAR.json), BPI rank
+// (by BPI score, quads-YEAR.json) and W-L rank (ESPN standings win %, then more wins, then fewer
+// losses); lower is better, ties by SOR then BPI. Current season only, from RESUME_FROM_SEASON
+// (needs SOR). The # column is positional: dragging moves the team, the numbers stay put.
+// A dragged order is saved per viewer in localStorage for the poll it's being picked for (next
+// Monday 10 AM ET deadline, pickerPollKey()), so a new week starts fresh; Reset in the title
+// note clears it. Teams that enter the top PICKER_COUNT later slot in at their eligibility spot.
+// Last PICKER_GAMES games (wins and losses): quads-YEAR.json's completed games plus the ESPN scoreboard since that
+// snapshot (pickerFetchRecent()), as Week Stats Games chips.
+const PICKER_COUNT = 100;
+const PICKER_GAMES = 7;
+const _pickerRecent = {};   // season → {espnId: [game]} finished since the quads snapshot
+let _pickerSuppressClickUntil = 0;
+
+function pickerAvailable(season) {
+    if (!quadsAvailable(season) || !QUAD_FILES[season]?.quads || Number(season) < RESUME_FROM_SEASON) return false;
+    return Number(season) >= Math.max(...getSortedTabs().map(t => Number(t.dataset.year)));
+}
+
+// "YYYY-MM-DD" of the next poll deadline (Mondays 10 AM ET).
+function pickerPollKey() {
+    const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
+        weekday: "short", hour: "numeric", hourCycle: "h23",
+    }).formatToParts(new Date()).map(x => [x.type, x.value]));
+    const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(p.weekday);
+    let add = (8 - dow) % 7;
+    if (add === 0 && Number(p.hour) >= 10) add = 7;
+    return new Date(Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day) + add)).toISOString().slice(0, 10);
+}
+function pickerStorageKey(season) { return `pickerOrder:${season}:${pickerPollKey()}`; }
+function pickerSavedOrder(season) {
+    try {
+        const v = JSON.parse(localStorage.getItem(pickerStorageKey(season)) || "null");
+        return Array.isArray(v) && v.length ? v : null;
+    } catch { return null; }
+}
+function pickerSaveOrder(season, keys) {
+    try {
+        const k = pickerStorageKey(season);
+        // Drop orders saved for earlier polls.
+        Object.keys(localStorage).filter(x => x.startsWith("pickerOrder:") && x !== k).forEach(x => localStorage.removeItem(x));
+        if (keys) localStorage.setItem(k, JSON.stringify(keys));
+        else localStorage.removeItem(k);
+    } catch { /* storage unavailable: the order just isn't remembered */ }
+}
+
+// Top PICKER_COUNT teams by eligibility: [{key, id, r (standings), t (quads), sorRank, bpiRank, wlRank, score}].
+function pickerCandidates(season, records) {
+    const qd = _quadsData[season];
+    if (!qd?.teams) return [];
+    const list = [];
+    Object.entries(qd.teams).forEach(([key, t]) => {
+        if (t.sor == null || t.bpi == null) return;
+        const id = espnIdFor(key);
+        const r = id ? records.byId[id] : null;
+        if (!r) return;
+        const gp = r.wins + r.losses;
+        list.push({ key, id, r, t, pct: gp ? r.wins / gp : 0, sorRank: t.sor });
+    });
+    // Competition ranking (1, 2, 2, 4) by cmp.
+    const rankBy = (cmp, field) => {
+        const s = list.slice().sort(cmp);
+        s.forEach((x, i) => { x[field] = i && cmp(s[i - 1], x) === 0 ? s[i - 1][field] : i + 1; });
+    };
+    rankBy((a, b) => b.t.bpi - a.t.bpi, "bpiRank");
+    rankBy((a, b) => (b.pct - a.pct) || (b.r.wins - a.r.wins) || (a.r.losses - b.r.losses), "wlRank");
+    list.forEach(x => { x.score = (x.sorRank + x.bpiRank + x.wlRank) / 3; });
+    list.sort((a, b) => (a.score - b.score) || (a.sorRank - b.sorRank) || (a.bpiRank - b.bpiRank));
+    return list.slice(0, PICKER_COUNT);
+}
+
+// Games finished since the quads snapshot (6 h overlap catches games in progress then;
+// pickerGames() drops duplicates). Results land in _pickerRecent[season].
+function pickerFetchRecent(season) {
+    const qd = _quadsData[season];
+    if (!qd?.fetched) return Promise.resolve();
+    return fetchResultsBetween(qd.fetched - 6 * 3600 * 1000, Date.now())
+        .then(r => { _pickerRecent[season] = r.byTeam; });
+}
+function pickerGames(season, key, id) {
+    const base = _quadsData[season]?.played?.[key] || [];
+    const tag = g => `${g.date.slice(0, 10)}:${g.opp.id}`;
+    const seen = new Set(base.map(tag));
+    const extra = (_pickerRecent[season]?.[id] || []).filter(g => !seen.has(tag(g)));
+    return base.concat(extra).filter(g => g.result === "W" || g.result === "L")
+        .sort((a, b) => a.date.localeCompare(b.date)).slice(-PICKER_GAMES);
+}
+
+function buildPickerTableHtml(season, data, error) {
+    const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const qd = _quadsData[season];
+    const COLS = 11;
+    const quadTip = qd?.source === "net"
+        ? "Official NCAA quadrant record (D1 games only)"
+        : "Unofficial: NCAA quadrant cutoffs with ESPN BPI ranks in place of NET (D1 games only)";
+    const head = `<colgroup>
+        <col style="width:28px"><col style="width:26px"><col>
+        <col style="width:52px"><col style="width:40px"><col style="width:46px">
+        ${"<col style=\"width:40px\">".repeat(4)}<col>
+    </colgroup><thead><tr>
+        <th>#</th><th></th><th class="team-col">Team</th><th>W-L</th>
+        <th title="ESPN Strength of Record rank (lower is better)">SOR</th>
+        <th title="ESPN BPI: points better than an average D1 team per 70 possessions, neutral court">BPI</th>
+        ${[1, 2, 3, 4].map(q => `<th class="records-quad-col${q === 1 ? " records-q1-col" : ""}${q === 4 ? " records-q4-col" : ""}" title="${quadTip}">Q${q}</th>`).join("")}
+        <th class="records-opps-col tp-wins-col" title="Each team's ${PICKER_GAMES} most recent games: wins in green, losses in red (hover for details)">Last ${PICKER_GAMES} Games</th>
+    </tr></thead>`;
+    const msg = text => `${head}<tbody><tr><td colspan="${COLS}" class="records-msg">${text}</td></tr></tbody>`;
+    if (!data) return msg(error ? `Couldn't load records from ESPN (${esc(error)}). <span class="records-retry">Retry</span>` : "Loading");
+    if (qd?.error) return msg(`Couldn't load SOR / BPI (${esc(qd.error)}).`);
+    if (!qd) return msg("Loading");
+
+    const cands = pickerCandidates(season, data);
+    if (!cands.length) return msg("No SOR / BPI data yet.");
+    const byKey = new Map(cands.map(c => [c.key, c]));
+    let order = cands.map(c => c.key);
+    const saved = pickerSavedOrder(season);
+    if (saved) {
+        const kept = saved.filter(k => byKey.has(k));
+        const keptSet = new Set(kept);
+        cands.forEach((c, i) => { if (!keptSet.has(c.key)) kept.splice(Math.min(i, kept.length), 0, c.key); });
+        order = kept;
+    }
+
+    const rankLabel = qd.source === "net" ? "NET" : "BPI";
+    const chip = g => {
+        const siteWord = g.site === "H" ? "vs" : g.site === "A" ? "@" : "neutral vs";
+        const name = g.opp.key ? conferenceDisplayName(g.opp.key) : g.opp.name || "?";
+        const oppRank = g.opp.key ? qd.teams[g.opp.key]?.rank : null;
+        const dateOnly = g.date.length <= 10;
+        const day = new Date(dateOnly ? `${g.date}T12:00:00Z` : g.date)
+            .toLocaleDateString([], { month: "short", day: "numeric", ...(dateOnly ? { timeZone: "UTC" } : {}) });
+        const tip = esc(`${g.result} ${g.us}-${g.them} ${siteWord} ${name}${oppRank ? ` (${rankLabel} #${oppRank})` : g.opp.key ? "" : " (non-D1)"} · ${day}${g.quad ? ` · Q${g.quad}` : ""}${g.note ? ` · ${g.note}` : ""}`);
+        const src = g.opp.key ? null : oppLogoSrc(g.opp) || (g.opp.id ? espnLogoUrl(g.opp.id) : null);
+        const logo = g.opp.key
+            ? `<img class="records-opp-logo records-logo" data-team="${esc(g.opp.key)}" data-espn="${g.opp.id}" alt="">`
+            : src ? `<img class="records-opp-logo" src="${esc(src)}" data-filler="${esc(name)}" alt="">`
+            : logoFillerHtml("records-opp-logo", name, "");
+        return `<span class="ws-opp ${g.result === "W" ? "ws-win" : "ws-loss"}"${g.opp.key ? ` data-team="${esc(g.opp.key)}"` : ""} title="${tip}"><span class="ws-opp-site">${g.site === "H" ? "vs" : g.site === "A" ? "@" : "N"}</span>${logo}<span class="ws-opp-score">${g.us}-${g.them}</span></span>`;
+    };
+    const num = v => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(1);
+    const body = order.map((k, i) => {
+        const c = byKey.get(k);
+        const fullName = conferenceDisplayName(c.key);
+        const name = fullName.length > RECORDS_NAME_MAX && c.r.name && c.r.name.length < fullName.length ? c.r.name : fullName;
+        const tip = `Eligibility ${c.score.toFixed(1)} (#${cands.indexOf(c) + 1}): average of SOR #${c.sorRank}, BPI #${c.bpiRank}, W-L #${c.wlRank}`;
+        const games = pickerGames(season, c.key, c.id);
+        return `<tr class="tp-row${i === 24 ? " records-t25-end" : ""}" data-team="${esc(c.key)}" data-espn="${c.id}">
+            <td class="tp-num tp-handle">${i + 1}</td>
+            <td class="tp-handle"><img class="logo-sm records-logo" data-team="${esc(c.key)}" data-espn="${c.id}" alt=""></td>
+            <td class="team-col tp-handle" title="${esc(`${fullName} · ${tip}`)}">${esc(name)}</td>
+            <td class="records-wl">${c.r.wins}-${c.r.losses}</td>
+            <td class="records-resume">${c.sorRank}</td>
+            <td class="records-bpi records-bpi-main" title="BPI #${c.bpiRank}">${num(c.t.bpi)}</td>
+            ${[1, 2, 3, 4].map(q => `<td class="records-quad${q === 1 ? " records-q1" : ""}${q === 4 ? " records-q4" : ""}">${esc(c.t[`q${q}`] ?? "—")}</td>`).join("")}
+            <td class="ws-res tp-wins">${games.length ? `<div class="ws-res-list">${games.map(chip).join("")}</div>` : `<span class="records-opps-msg">—</span>`}</td>
+        </tr>`;
+    }).join("");
+    return `${head}<tbody class="tp-body">${body}</tbody>`;
+}
+
+// Drag-to-reorder for the Picker rows. Mouse: drag anywhere on a row; touch/pen: drag by the
+// #, logo or name cells (touch-action: none there) so the rest of the row still scrolls.
+// Rows move live as the pointer passes other rows' midpoints; the # cells and the line after
+// #25 stay with the position, not the team. Near the window's top/bottom edge it autoscrolls.
+function initPickerDrag(tbody, season, onDrop) {
+    const box = tbody.closest("#season-stats-box") || document.scrollingElement;
+    let drag = null;
+    const rows = () => [...tbody.querySelectorAll("tr.tp-row")];
+    const renumber = () => rows().forEach((tr, i) => {
+        tr.firstElementChild.textContent = i + 1;
+        tr.classList.toggle("records-t25-end", i === 24);
+    });
+    const place = y => {
+        let before = null;
+        for (const r of rows()) {
+            if (r === drag.tr) continue;
+            const b = r.getBoundingClientRect();
+            if (y < b.top + b.height / 2) { before = r; break; }
+        }
+        if (before ? drag.tr.nextElementSibling === before : tbody.lastElementChild === drag.tr) return;
+        tbody.insertBefore(drag.tr, before);
+        renumber();
+    };
+    const autoScroll = () => {
+        if (!drag?.started || !tbody.isConnected) return;
+        const b = box.getBoundingClientRect();
+        const edge = 48;
+        const dy = drag.lastY < b.top + edge ? drag.lastY - (b.top + edge)
+            : drag.lastY > b.bottom - edge ? drag.lastY - (b.bottom - edge) : 0;
+        if (dy) {
+            box.scrollTop += Math.max(-24, Math.min(24, dy / 2));
+            place(drag.lastY);
+        }
+        requestAnimationFrame(autoScroll);
+    };
+    tbody.addEventListener("pointerdown", e => {
+        if (e.button !== 0) return;
+        const tr = e.target.closest("tr.tp-row");
+        if (!tr) return;
+        if (e.pointerType !== "mouse" && !e.target.closest(".tp-handle")) return;
+        drag = { tr, id: e.pointerId, x: e.clientX, y: e.clientY, lastY: e.clientY, started: false };
+    });
+    tbody.addEventListener("pointermove", e => {
+        if (!drag || e.pointerId !== drag.id) return;
+        drag.lastY = e.clientY;
+        if (!drag.started) {
+            if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 5) return;
+            drag.started = true;
+            drag.tr.classList.add("tp-dragging");
+            tbody.classList.add("tp-drag-active");
+            try { tbody.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
+            requestAnimationFrame(autoScroll);
+        }
+        e.preventDefault();
+        place(e.clientY);
+    });
+    const end = e => {
+        if (!drag || e.pointerId !== drag.id) return;
+        const d = drag;
+        drag = null;
+        if (!d.started) return;
+        d.tr.classList.remove("tp-dragging");
+        tbody.classList.remove("tp-drag-active");
+        _pickerSuppressClickUntil = Date.now() + 300;   // the click that ends a drag isn't a logo click
+        pickerSaveOrder(season, rows().map(r => r.dataset.team));
+        onDrop?.();
+    };
+    tbody.addEventListener("pointerup", end);
+    tbody.addEventListener("pointercancel", end);
+    tbody.addEventListener("click", e => {
+        if (Date.now() < _pickerSuppressClickUntil) { e.stopImmediatePropagation(); e.preventDefault(); }
+    }, true);
 }
 
 // Voters tab of the Year window: one row per voter on official ballots this season.
