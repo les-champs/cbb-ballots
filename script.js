@@ -3866,6 +3866,179 @@ function backgroundLoad() {
     }
 }
 
+// Save as PNG lays a long table out as side-by-side panels so the image is
+// roughly screen-shaped (Reddit/Discord shrink tall images until logos are
+// unreadable). Each panel repeats the rank header and, if shown, the Overall row.
+const PNG_TARGET_ASPECT = 16 / 9;
+const PNG_MAX_PANELS = 4;
+const PNG_PANEL_GAP = 16;       // between panels, and as the image's right margin
+// Capture scale: as sharp as possible while keeping the canvas under Safari's
+// 16.7 MP limit (also keeps the PNG small enough for Discord/Reddit uploads).
+const PNG_MAX_PIXELS = 16e6;
+const PNG_MIN_SCALE = 2;
+const PNG_MAX_SCALE = 4;
+
+// Width the voter-name column needs in the image: the widest visible flair +
+// name (veteran tags and hover buttons are hidden in the image), plus the
+// sort label when it is shown. Never wider than the column already is.
+function pngNameColumnWidth(table, rowIdx) {
+    const rows = table.tBodies[0].rows;
+    const firstTh = table.tHead?.rows[0]?.cells[0];
+    const current = parseFloat(getComputedStyle(firstTh || rows[0].cells[0]).width);
+    let max = 0;
+    // Measure text and image boxes directly: veteran tags sit inside the name
+    // span, and a range's box isn't clipped by the cell's overflow.
+    // Consensus-sort distances are dropped from the image (preparePngClone).
+    const skip = ".veteran-tag, .pin-btn, .history-btn, .ballot-link-btn, .consensus-dist";
+    const range = document.createRange();
+    const measure = (cell, root) => {
+        const left = cell.getBoundingClientRect().left + parseFloat(getComputedStyle(cell).paddingLeft);
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+        for (let n = walker.currentNode; n; n = walker.nextNode()) {
+            let r;
+            if (n.nodeType === Node.TEXT_NODE) {
+                if (!n.textContent.trim() || n.parentElement.closest(skip)) continue;
+                range.selectNodeContents(n);
+                r = range.getBoundingClientRect();
+            } else if (n.tagName === "IMG" && !n.closest(skip)) {
+                r = n.getBoundingClientRect();
+            } else continue;
+            if (r.width) max = Math.max(max, r.right - left);
+        }
+    };
+    rowIdx.forEach(i => {
+        const cell = rows[i].cells[0];
+        const vc = cell.querySelector(".voter-cell");
+        if (vc) measure(cell, vc);
+    });
+    const label = firstTh?.querySelector(".voters-toggle");
+    if (label && label.textContent.trim() !== SORT_LABELS.alphabetic) measure(firstTh, label);
+    return { current, width: max ? Math.min(current, Math.ceil(max) + 2) : current };
+}
+
+// Measure the live table and pick the panel count whose image aspect ratio is
+// closest to PNG_TARGET_ASPECT. Rows are given as tbody indices so the same
+// split can be applied to html2canvas's structurally identical clone.
+function pngPanelPlan(table) {
+    const rows = Array.from(table.tBodies[0]?.rows || []);
+    const repeat = [], body = [];
+    let bodyHeight = 0;
+    rows.forEach((r, i) => {
+        if (r.offsetParent === null) return; // hidden row
+        if (r.classList.contains("overall-row")) repeat.push(i);
+        else { body.push(i); bodyHeight += r.offsetHeight; }
+    });
+    const nameCol = rows.length ? pngNameColumnWidth(table, repeat.concat(body)) : { current: 0, width: 0 };
+    const tableWidth = table.offsetWidth - (nameCol.current - nameCol.width);
+    const fixedHeight = (table.tHead?.offsetHeight || 0) +
+        repeat.reduce((h, i) => h + rows[i].offsetHeight, 0);
+    const rowHeight = body.length ? bodyHeight / body.length : 1;
+    const size = n => ({
+        w: n * tableWidth + n * PNG_PANEL_GAP, // gaps between panels + right margin
+        h: fixedHeight + Math.ceil(body.length / n) * rowHeight,
+    });
+    let panels = 1, best = Infinity;
+    for (let n = 1; n <= Math.min(PNG_MAX_PANELS, body.length); n++) {
+        const { w, h } = size(n);
+        const miss = Math.abs(Math.log((w / h) / PNG_TARGET_ASPECT));
+        if (miss < best) { best = miss; panels = n; }
+    }
+    const { w, h } = size(panels);
+    const fit = Math.floor(Math.sqrt(PNG_MAX_PIXELS / (w * h)) * 4) / 4;
+    const scale = Math.max(PNG_MIN_SCALE, Math.min(PNG_MAX_SCALE, fit));
+    return { panels, repeat, body, nameWidth: nameCol.width, width: w, scale };
+}
+
+// Downscale an image to w×h by repeated halving with high-quality smoothing.
+// html2canvas draws a 500 px logo straight into a ~50 px box, which aliases
+// ("grainy" logos); handing it a pre-resampled copy at the exact pixel size avoids that.
+function resampleImage(img, w, h) {
+    let src = img, cw = img.naturalWidth, ch = img.naturalHeight;
+    const step = (nw, nh) => {
+        const c = document.createElement("canvas");
+        c.width = nw; c.height = nh;
+        const ctx = c.getContext("2d");
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(src, 0, 0, nw, nh);
+        src = c; cw = nw; ch = nh;
+    };
+    while (cw / 2 >= w && ch / 2 >= h) step(Math.round(cw / 2), Math.round(ch / 2));
+    step(w, h);
+    return src.toDataURL("image/png");
+}
+
+// src → resampled data URL for every loaded logo in the table, at its displayed
+// size × scale. Logos that fail (e.g. tainted canvas) keep their original src.
+function pngSharpLogos(table, scale) {
+    const out = new Map();
+    table.querySelectorAll("img.logo").forEach(img => {
+        const src = img.currentSrc || img.src;
+        if (!src || out.has(src) || !img.complete || !img.naturalWidth || !img.offsetWidth) return;
+        try {
+            out.set(src, resampleImage(img, Math.round(img.offsetWidth * scale), Math.round(img.offsetHeight * scale)));
+        } catch (e) { /* leave as is */ }
+    });
+    return out;
+}
+
+// onclone step: size the capture to the content, narrow the name column, swap
+// in the resampled logos, and replace the table with plan.panels tables in a row.
+function preparePngClone(doc, plan, logos) {
+    const container = doc.querySelector("[data-png-target]");
+    const table = container?.querySelector("table");
+    if (!table || !table.tBodies[0]) return;
+    // Let the panels overflow the page width instead of being clipped/squeezed,
+    // and capture only the content plus a right margin.
+    const scroll = container.closest(".table-scroll");
+    if (scroll) scroll.style.overflow = "visible";
+    container.style.width = "max-content";
+    container.style.paddingRight = `${PNG_PANEL_GAP}px`;
+    // Positioned for the on-screen table; wrong once the columns move.
+    container.querySelectorAll(".avg-rank-line").forEach(el => el.remove());
+    // Consensus-sort distances: the row order already shows the sort, and
+    // dropping them lets the name column shrink.
+    container.querySelectorAll(".consensus-dist").forEach(el => el.remove());
+    const nw = `${plan.nameWidth}px`;
+    const style = doc.createElement("style");
+    style.textContent = `[data-png-target] th:first-child, [data-png-target] td:first-child { width: ${nw} !important; min-width: ${nw} !important; max-width: ${nw} !important; }`;
+    doc.head.appendChild(style);
+    // html2canvas reads each image's naturalWidth/currentSrc, which stay 0/old
+    // until the new src decodes, so the caller must wait for these loads.
+    const loads = [];
+    container.querySelectorAll("img.logo").forEach(img => {
+        const sharp = logos.get(img.currentSrc || img.src);
+        if (!sharp) return;
+        img.removeAttribute("srcset");
+        img.src = sharp;
+        loads.push(img.decode().catch(() => {}));
+    });
+    splitPngTable(doc, table, plan);
+    return Promise.all(loads);
+}
+
+function splitPngTable(doc, table, plan) {
+    if (plan.panels < 2) return;
+    const rows = Array.from(table.tBodies[0].rows);
+    const perPanel = Math.ceil(plan.body.length / plan.panels);
+    const wrap = doc.createElement("div");
+    wrap.style.cssText = `display:flex;align-items:flex-start;gap:${PNG_PANEL_GAP}px`;
+    for (let p = 0; p < plan.panels; p++) {
+        const panel = table.cloneNode(false);
+        panel.style.minWidth = "0";
+        const head = table.tHead.cloneNode(true);
+        head.querySelectorAll("th").forEach(th => { th.style.position = "static"; });
+        // Only the first panel keeps the Functions/sort label.
+        if (p > 0) head.querySelectorAll(".voters-toggle").forEach(el => { el.style.visibility = "hidden"; });
+        const tbody = doc.createElement("tbody");
+        plan.repeat.forEach(i => tbody.appendChild(rows[i].cloneNode(true)));
+        plan.body.slice(p * perPanel, (p + 1) * perPanel).forEach(i => tbody.appendChild(rows[i]));
+        panel.append(head, tbody);
+        wrap.appendChild(panel);
+    }
+    table.replaceWith(wrap);
+}
+
 // Save table as PNG (Shift+P)
 function saveTableAsPng() {
     // In AP mode on index.html the visible table lives in the AP block, not the
@@ -3880,9 +4053,15 @@ function saveTableAsPng() {
     const section = block.querySelector(".ballot-section[style*='block'], .ballot-section:not([style])");
     const table = section ? section.querySelector("table") : null;
     if (!table) return;
-    loadHtml2canvas().then(() => html2canvas(table, {
+    const container = table.closest(".table-container") || table;
+    const plan = pngPanelPlan(table);
+    const logos = pngSharpLogos(table, plan.scale);
+    container.dataset.pngTarget = "1";
+    loadHtml2canvas().then(() => html2canvas(container, {
         useCORS: true,
-        scale: 2,
+        scale: plan.scale,
+        // The clone's iframe must be wide enough to lay the panels out side by side.
+        windowWidth: Math.max(window.innerWidth, plan.width + 100),
         // Even rows are transparent; html2canvas fills those with white by default,
         // which leaves dark-mode text unreadable. Use the page background instead.
         backgroundColor: getComputedStyle(document.body).backgroundColor,
@@ -3896,8 +4075,11 @@ function saveTableAsPng() {
                 if (el.textContent.trim() === SORT_LABELS.alphabetic) el.style.visibility = "hidden";
             });
             doc.querySelectorAll(".voter-cell-hover").forEach(el => el.classList.remove("voter-cell-hover"));
+            return preparePngClone(doc, plan, logos);
         },
-    })).then(canvas => {
+    })).finally(() => {
+        delete container.dataset.pngTarget;
+    }).then(canvas => {
         const link = document.createElement("a");
         const week = tab ? (weekTextLabel(tab) || padWeekNum(displayWeekNum(tab))) : _apCurrentWeekNum;
         const year = tab ? tab.dataset.year : _apCurrentYear;
