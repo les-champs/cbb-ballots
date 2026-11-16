@@ -1912,7 +1912,7 @@ body.dark {
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>A</kbd></span><span>Sort Alphabetically</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>C</kbd></span><span>Sort by Consensus</span></div>
     </div>
-    <div class="keybind-section">
+    <div class="keybind-section" id="keybind-locked-section">
       <div class="keybind-section-title">Locked</div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>D</kbd></span><span>Jump to Data Ballots</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>X</kbd></span><span>Toggle AP Ballots</span></div>
@@ -3095,7 +3095,7 @@ case "savePng":
 saveTableAsPng();
 break;
 case "legend":
-document.getElementById("keybind-legend-modal").classList.toggle("open");
+toggleKeybindLegend();
 break;
 case "devPin":
 openPinModal();
@@ -7678,6 +7678,12 @@ try{
 _keybindsUnlockedDate=localStorage.getItem("keybindsUnlockedDate");
 localStorage.removeItem("keybindsUnlocked");
 }catch(e){}
+function toggleKeybindLegend(){
+const modal=document.getElementById("keybind-legend-modal");
+const lockedSection=document.getElementById("keybind-locked-section");
+if(lockedSection)lockedSection.hidden=!isKeybindsUnlocked();
+modal.classList.toggle("open");
+}
 function isKeybindsUnlocked(){return _keybindsUnlockedDate===_localDateStr();}
 const _pinModal=document.getElementById("pin-modal");
 const _pinInput=document.getElementById("pin-input");
@@ -7950,7 +7956,7 @@ backgroundLoad();
 }
 if(e.key==="?"){
 e.preventDefault();
-document.getElementById("keybind-legend-modal").classList.toggle("open");
+toggleKeybindLegend();
 }
 });
 const _omissionTip=document.createElement("div");

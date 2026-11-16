@@ -942,7 +942,7 @@ function handlePickerAction(action) {
             saveTableAsPng();
             break;
         case "legend":
-            document.getElementById("keybind-legend-modal").classList.toggle("open");
+            toggleKeybindLegend();
             break;
         case "devPin":
             openPinModal();
@@ -6466,6 +6466,15 @@ try {
     _keybindsUnlockedDate = localStorage.getItem("keybindsUnlockedDate");
     localStorage.removeItem("keybindsUnlocked");  // old never-expiring unlock flag
 } catch (e) {}
+// Keybind legend (Shift+? or Functions › Legend). The Locked section only shows while
+// Dev is unlocked today; checked on every open so it follows unlocks and midnight re-locks.
+function toggleKeybindLegend() {
+    const modal = document.getElementById("keybind-legend-modal");
+    const lockedSection = document.getElementById("keybind-locked-section");
+    if (lockedSection) lockedSection.hidden = !isKeybindsUnlocked();
+    modal.classList.toggle("open");
+}
+
 function isKeybindsUnlocked() { return _keybindsUnlockedDate === _localDateStr(); }
 const _pinModal = document.getElementById("pin-modal");
 const _pinInput = document.getElementById("pin-input");
@@ -6773,7 +6782,7 @@ document.addEventListener("keydown", e => {
 
     if (e.key === "?") {
         e.preventDefault();
-        document.getElementById("keybind-legend-modal").classList.toggle("open");
+        toggleKeybindLegend();
     }
 });
 
