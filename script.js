@@ -6062,7 +6062,8 @@ const BALLOT_TIMES_SEASON_HOURS = 72;       // Season tab x-axis span
 let _ballotTimesMode = "week";
 
 const _btFmt = new Intl.DateTimeFormat("en-US", { timeZone: BALLOT_TIMES_TZ, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-const _btTimeFmt = new Intl.DateTimeFormat("en-US", { timeZone: BALLOT_TIMES_TZ, hour: "numeric", minute: "2-digit" });
+const _btFmtSec = new Intl.DateTimeFormat("en-US", { timeZone: BALLOT_TIMES_TZ, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit" });
+const _btTimeFmt =new Intl.DateTimeFormat("en-US", { timeZone: BALLOT_TIMES_TZ, hour: "numeric", minute: "2-digit" });
 const _btDayFmt = new Intl.DateTimeFormat("en-US", { timeZone: BALLOT_TIMES_TZ, weekday: "short", month: "short", day: "numeric" });
 const _btHourFmt = new Intl.DateTimeFormat("en-US", { timeZone: BALLOT_TIMES_TZ, hour: "numeric", hourCycle: "h23" });
 
@@ -6233,6 +6234,31 @@ function buildBallotTimesWeek(weekId) {
         + (clipped ? ` · ${clipped} earlier ballot${clipped === 1 ? "" : "s"} not shown` : "")
         + ". Times are when each ballot was first created.";
     wrap.appendChild(note);
+
+    // Every ballot of the week (incl. any clipped from the chart), in submission order
+    const fmtBefore = ms => {
+        const m = Math.round(ms / 6e4), h = Math.floor(m / 60);
+        return h >= 24 ? `${Math.floor(h / 24)}d ${h % 24}h` : (h ? `${h}h ${m % 60}m` : `${m}m`);
+    };
+    const tbl = document.createElement("table");
+    tbl.className = "ballot-times-table bt-week-table";
+    tbl.innerHTML = `<thead><tr><th>#</th><th class="name-col">Voter</th><th class="name-col">Type</th>`
+        + `<th title="When the ballot was first created (ET)">Submitted (ET)</th><th title="Time before the estimated deadline">Before deadline</th></tr></thead><tbody></tbody>`;
+    const tbody = tbl.querySelector("tbody");
+    ballots.forEach((b, i) => {
+        const tr = document.createElement("tr");
+        const cls = b.official ? "bt-official" : "bt-provisional";
+        [String(i + 1), b.name, b.official ? "Official" : "Provisional", _btFmtSec.format(b.time), fmtBefore(deadline - b.time)]
+            .forEach((v, c) => {
+                const td = document.createElement("td");
+                if (c === 1 || c === 2) td.className = "name-col";
+                if (c === 2) td.innerHTML = `<span class="bt-type-dot ${cls}"></span>`;
+                td.appendChild(document.createTextNode(v));
+                tr.appendChild(td);
+            });
+        tbody.appendChild(tr);
+    });
+    wrap.appendChild(tbl);
     return wrap;
 }
 
