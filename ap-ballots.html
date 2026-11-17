@@ -7523,8 +7523,9 @@ let last=[null,null];
 const render=(data,error)=>{
 if(token!==_mmToken||!table.classList.contains("season-mmp12"))return;
 last=[data,error];
+const stale=data?.stale?`couldn't refresh ESPN (${String(data.stale).replace(/[<>&]/g,"")})`:"";
 title.innerHTML=`<span class="records-title-main">${season}${isApMode?" AP":""} ${weekLabel} — Mid-Major + Pac-12</span>`
-+ `<span class="records-note records-title-note">${recordsNoteHtml(season,data)}</span>`;
++(stale?`<span class="records-note records-title-note">${stale}</span>`:"");
 table.innerHTML=buildMmP12TableHtml(season,weekId,prevTab?.dataset.week||null,showAp,data,error);
 table.querySelector(".records-retry")?.addEventListener("click",()=>showMmP12Report());
 table.querySelectorAll("th[data-sort]").forEach(th=>th.addEventListener("click",()=>{
