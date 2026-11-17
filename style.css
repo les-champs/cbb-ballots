@@ -545,7 +545,6 @@ thead th {
     z-index: 2;
 }
 #season-stats-table thead th,
-#precision-table thead th,
 #tenure-table thead th,
 #voter-history-table thead th,
 .heatmap-table thead th {
@@ -1003,7 +1002,7 @@ kbd {
 #season-stats-table.season-teampicker .ws-opp-site { opacity: 0.55; min-width: 13px; text-align: right; }
 #season-stats-table.season-teampicker img.records-opp-logo[data-team] { cursor: pointer; }
 
-#precision-modal, #tenure-modal {
+#tenure-modal {
     display: none;
     position: fixed;
     inset: 0;
@@ -1012,10 +1011,10 @@ kbd {
     justify-content: center;
     align-items: center;
 }
-#precision-modal.open, #tenure-modal.open {
+#tenure-modal.open {
     display: flex;
 }
-#precision-box, #tenure-box {
+#tenure-box {
     background: var(--color-bg-modal);
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.25);
@@ -1025,34 +1024,34 @@ kbd {
     overflow: auto;
     padding: 20px 24px 16px;
 }
-#precision-box h2, #tenure-box h2 {
+#tenure-box h2 {
     margin: 0 0 12px;
     font-size: 1.1rem;
     color: var(--color-modal-h2);
 }
-#precision-table, #tenure-table {
+#tenure-table {
     border-collapse: collapse;
     width: 100%;
     font-size: 13px;
     table-layout: auto;
 }
-#precision-table th, #tenure-table th {
+#tenure-table th {
     font-size: 11px;
     font-weight: normal;
     padding: 4px 8px;
     text-align: center;
     white-space: nowrap;
 }
-#precision-table th.name-col, #tenure-table th.name-col { text-align: left; }
-#precision-table td, #tenure-table td {
+#tenure-table th.name-col { text-align: left; }
+#tenure-table td {
     padding: 3px 6px;
     text-align: center;
     border-bottom: 1px solid var(--color-border-subtle);
     white-space: nowrap;
     vertical-align: middle;
 }
-#precision-table td.name-col, #tenure-table td.name-col { text-align: left; }
-#precision-table td:first-child, #tenure-table td:first-child { font-size: 11px; }
+#tenure-table td.name-col { text-align: left; }
+#tenure-table td:first-child { font-size: 11px; }
 
 body.year-loading::after {
     content: "Loading…";

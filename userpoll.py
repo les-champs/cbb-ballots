@@ -1773,7 +1773,6 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
       <div class="keybind-section-title">Locked</div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>D</kbd></span><span>Jump to Data Ballots</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>X</kbd></span><span>Toggle AP Ballots</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>R</kbd></span><span>Précision leaderboard</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>T</kbd></span><span>Tenure leaderboard</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>Y</kbd></span><span>Week stats table</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>G</kbd></span><span>Week stats with chart</span></div>
@@ -1808,13 +1807,6 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
   <div id="heatmap-box">
     <h2 id="heatmap-title"></h2>
     <div id="heatmap-container"></div>
-  </div>
-</div>
-
-<div id="precision-modal">
-  <div id="precision-box">
-    <h2 id="precision-title"></h2>
-    <table id="precision-table"></table>
   </div>
 </div>
 

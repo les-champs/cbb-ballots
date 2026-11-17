@@ -928,9 +928,6 @@ function handlePickerAction(action) {
             showVoterHistory(isAp ? "AP Overall" : "Official Overall");
             break;
         }
-        case "precisionLeaderboard":
-            showPrecisionModal();
-            break;
         case "toggleOverall":
             toggleOverallRow();
             break;
@@ -2922,6 +2919,7 @@ function injectWeightedRankingRow(activeTab, activeBlock) {
     applyDataBallotOrder(activeBlock);
     injectEspnApRow(activeBlock, activeTab.dataset.week);
     injectBpiRow(activeBlock, activeTab.dataset.week);
+    injectSorRow(activeBlock, activeTab.dataset.week);
 }
 
 // {conf: [teams]} for a season (later seasons reuse the last defined one), or null before 2025.
@@ -3124,9 +3122,9 @@ async function injectEspnApRow(block, weekId) {
     _insertSourceRow(block, aggTbody, tr);
 }
 
-// Rows from outside sources (ESPN AP poll, BPI) go right after Overall, in this order,
+// Rows from outside sources (ESPN AP poll, BPI, SOR) go right after Overall, in this order,
 // whichever arrives first; the saved drag order then applies.
-const SOURCE_ROW_ORDER = ["Overall", "AP Top 25", "BPI"];
+const SOURCE_ROW_ORDER = ["Overall", "AP Top 25", "BPI", "SOR"];
 function _insertSourceRow(block, aggTbody, tr) {
     const mine = SOURCE_ROW_ORDER.indexOf(tr.dataset.group);
     const rows = Array.from(aggTbody.querySelectorAll(":scope > .voter-row:not(.row-pinned-agg)"));
@@ -3170,43 +3168,64 @@ function bpiSnapshotForTab(snaps, tabs, i) {
     return fit[fit.length - 1] || null;
 }
 
-async function injectBpiRow(block, weekId) {
+// BPI and SOR rows share the snapshots: `teams` = [key, rank, bpi] by BPI rank, `sor` =
+// [key, sorrank, wins, losses] by SOR rank (2025+ only; older snapshots have none, so no row).
+const SNAPSHOT_ROWS = {
+    BPI: {
+        cls: "row-bpi", tokenKey: "_bpiToken", list: s => s.teams,
+        title: "ESPN Basketball Power Index",
+        label: t => t[2].toFixed(1), tip: t => `BPI rating (rank #${t[1]})`,
+    },
+    SOR: {
+        cls: "row-sor", tokenKey: "_sorToken", list: s => s.sor,
+        title: "ESPN Strength of Record (chance a typical Top 25 team has this record or better against this schedule)",
+        label: t => `${t[2]}-${t[3]}`, tip: t => `SOR rank #${t[1]}; record ${t[2]}-${t[3]}`,
+    },
+};
+
+function injectBpiRow(block, weekId) { return _injectSnapshotRow(block, weekId, "BPI"); }
+function injectSorRow(block, weekId) { return _injectSnapshotRow(block, weekId, "SOR"); }
+
+async function _injectSnapshotRow(block, weekId, kind) {
     if (ON_AP_PAGE || !block || weekId.startsWith("week-ap-")) return;
-    const token = block._bpiToken = {};
+    const cfg = SNAPSHOT_ROWS[kind];
+    const token = block[cfg.tokenKey] = {};
     const tabs0 = getSortedTabs();
     const season = tabs0.find(t => t.dataset.week === weekId)?.dataset.year;
     let snaps;
     try { snaps = season ? await fetchBpiHistory(season) : []; } catch { snaps = []; }
-    if (block._bpiToken !== token) return;
+    if (block[cfg.tokenKey] !== token) return;
     const aggTbody = block.querySelectorAll(".ballot-section")[2]?.querySelector("tbody");
     if (!aggTbody) return;
-    const old = aggTbody.querySelector(".row-bpi");
+    const old = aggTbody.querySelector("." + cfg.cls);
     const expanded = old?.classList.contains("row-delta");
     old?.remove();
 
     const tabs = getSortedTabs().filter(t => t.dataset.year === season);
     const i = tabs.findIndex(t => t.dataset.week === weekId);
     const snap = bpiSnapshotForTab(snaps, tabs, i);
-    if (!snap) return;
-    const prev = bpiSnapshotForTab(snaps, tabs, i + 1);
-    const top = snap.teams.slice(0, 25);
+    const list = snap && cfg.list(snap);
+    if (!list?.length) return;
+    const prevSnap = bpiSnapshotForTab(snaps, tabs, i + 1);
+    const prevList = prevSnap && cfg.list(prevSnap);
+    const top = list.slice(0, 25);
     const ranked = top.map(t => t[0]);
     const pts = {}, prevRankOf = {};
-    top.forEach(([k, , bpi]) => { pts[k] = bpi.toFixed(1); });
-    (prev?.teams || []).forEach(([k, rank]) => { prevRankOf[k] = rank; });
-    const tr = _buildPointsRankingRow("BPI", ranked, pts, prevRankOf, !!prev);
-    tr.classList.add("row-bpi");
+    top.forEach(t => { pts[t[0]] = cfg.label(t); });
+    (prevList || []).forEach(t => { prevRankOf[t[0]] = t[1]; });
+    const tr = _buildPointsRankingRow(kind, ranked, pts, prevRankOf, !!prevList?.length);
+    tr.classList.add(cfg.cls);
     if (expanded) tr.classList.add("row-delta");
     const when = new Date(snap.at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-    tr.querySelector(".voter-name").title = `ESPN Basketball Power Index${snap.final ? ", final" : ""}, as of ${when}`;
+    tr.querySelector(".voter-name").title = `${cfg.title}${snap.final ? ", final" : ""}, as of ${when}`;
     tr.querySelectorAll("img.team-logo").forEach((img, j) => {
-        const [k, rank] = top[j];
+        const t = top[j];
         const label = img.parentElement.querySelector(".avg-label");
-        if (label) label.title = `BPI rating (rank #${rank})`;
-        if (k.startsWith("espn:")) {
+        if (label) label.title = cfg.tip(t);
+        if (t[0].startsWith("espn:")) {
             img.classList.remove("team-logo");
             delete img.dataset.team;
-            img.src = espnLogoUrl(k.slice(5));
+            img.src = espnLogoUrl(t[0].slice(5));
         }
     });
     _insertSourceRow(block, aggTbody, tr);
@@ -6115,69 +6134,6 @@ function showHeatmapModal(mode = 'grid') {
     modal.classList.add("open");
 }
 
-function showPrecisionModal() {
-    const activeTab = document.querySelector(".week-tab.active");
-    if (!activeTab) return;
-    const currentYear = activeTab.dataset.year;
-    const yearTabs = getSortedTabs().filter(t => t.dataset.year === currentYear).reverse();
-    if (yearTabs.length === 0) return;
-
-    const lbData = buildLeaderboardData();
-    const voterAvg = computeVoterAvg(yearTabs, lbData);
-    if (!voterAvg) return;
-
-    const sorted = Object.entries(voterAvg)
-        .filter(([, v]) => v.combined !== Infinity)
-        .sort((a, b) => a[1].combined - b[1].combined);
-    const disqualified = Object.entries(voterAvg)
-        .filter(([, v]) => v.combined === Infinity)
-        .sort((a, b) => a[0].localeCompare(b[0]));
-
-    const modal = document.getElementById("precision-modal");
-    const title = document.getElementById("precision-title");
-    const table = document.getElementById("precision-table");
-
-    title.textContent = `${currentYear} Précision Leaderboard`;
-
-    let html = `<colgroup>
-        <col style="width:28px">
-        <col>
-        <col style="width:60px">
-        <col style="width:60px">
-        <col style="width:52px">
-    </colgroup><thead><tr>
-        <th>#</th>
-        <th class="name-col">Voter</th>
-        <th title="Combined Précision score (lower is better)">Score</th>
-        <th title="Boldness adjustment (higher is better)">Bold ↑</th>
-        <th title="Missed weeks">Missed</th>
-    </tr></thead><tbody>`;
-
-    sorted.forEach(([username, scores], i) => {
-        const adj = scores.boldAdj || 0;
-        // Derive missed from combined = avg - boldAdj + missed * 1
-        const missedWeeks = Math.round(scores.combined - scores.avg + adj);
-        html += `<tr>
-            <td>${i + 1}</td>
-            <td class="name-col">${username}</td>
-            <td>${scores.combined.toFixed(2)}</td>
-            <td style="color:var(--color-win)">${adj > 0.05 ? '+' + adj.toFixed(2) : '—'}</td>
-            <td>${missedWeeks > 0 ? missedWeeks : '—'}</td>
-        </tr>`;
-    });
-
-    if (disqualified.length > 0) {
-        html += `<tr><td colspan="5" style="padding:6px 8px; color:#aaa; font-size:11px; text-align:left; border-top:1px solid #ddd;">Disqualified (≥5 misses or ≥3 consecutive)</td></tr>`;
-        disqualified.forEach(([username]) => {
-            html += `<tr><td>—</td><td class="name-col" style="color:#bbb">${username}</td><td colspan="3" style="color:#bbb">DQ</td></tr>`;
-        });
-    }
-
-    html += `</tbody>`;
-    table.innerHTML = html;
-    modal.classList.add("open");
-}
-
 function showTenureModal() {
     const isApToggle = _apCurrentYear !== null;
     const isAp = ON_AP_PAGE || isApToggle;
@@ -6608,150 +6564,13 @@ document.getElementById("conference-years").addEventListener("click", e => {
     if (btn) showConferenceModal(Number(btn.dataset.year));
 });
 
-["precision-modal", "tenure-modal", "conference-modal"].forEach(id => {
+["tenure-modal", "conference-modal"].forEach(id => {
     document.getElementById(id).addEventListener("click", e => {
         if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
     });
 });
 
 // Keyboard shortcuts
-
-function computeVoterAvg(yearTabs, lbData) {
-    // Per-week consensus ranking (Official Overall computed from that week's official ballots)
-    const weekConsensus = {};
-    yearTabs.forEach(tab => {
-        const overall = lbData[tab.dataset.week]?.["Official Overall"]?.teams;
-        weekConsensus[tab.dataset.week] = overall && overall.length > 0 ? overall : null;
-    });
-
-    // Build finalRanking as weighted 5-week average of the last 5 consensus rankings
-    // Mirrors the avg-label logic in applyDeltaToRow (weight 5=most recent, 1=oldest)
-    let finalRanking = null;
-    {
-        const last5 = [];
-        for (let i = yearTabs.length - 1; i >= 0 && last5.length < 5; i--) {
-            const c = weekConsensus[yearTabs[i].dataset.week];
-            if (c) last5.push(c);
-        }
-        if (last5.length === 0) return null;
-        const points = {};
-        last5.forEach((ranking, wi) => {
-            const weight = last5.length - wi; // most recent = 5 (or last5.length), oldest = 1
-            ranking.forEach((team, i) => {
-                points[team] = (points[team] || 0) + (25 - i) * weight;
-            });
-        });
-        finalRanking = Object.entries(points)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 25)
-            .map(([team]) => team);
-    }
-    if (!finalRanking) return null;
-
-    function posWeight(rank) {
-        // Weight scales from 1.0 at #1 to 0.5 at #25
-        return 1.0 - (rank - 1) * (0.5 / 24);
-    }
-
-    function ballotDistance(teams, reference) {
-        let dist = 0;
-        for (let i = 0; i < 25; i++) {
-            const team = reference[i];
-            const rank = i + 1;
-            const vr = teams.indexOf(team);
-            dist += Math.abs(rank - (vr === -1 ? 26 : vr + 1)) * posWeight(rank);
-        }
-        teams.forEach((team, vi) => {
-            if (!reference.includes(team)) dist += Math.abs((vi + 1) - 26) * posWeight(vi + 1);
-        });
-        return dist;
-    }
-
-    const weekFieldAvg = {};
-    yearTabs.forEach(tab => {
-        const weekId = tab.dataset.week;
-        const weekData = lbData[weekId];
-        if (!weekData) { weekFieldAvg[weekId] = 0; return; }
-        const dists = [];
-        Object.entries(weekData).forEach(([u, entry]) => {
-            if (u === "Official Overall" || !entry.isOfficial || !entry.teams?.length) return;
-            dists.push(ballotDistance(entry.teams, finalRanking));
-        });
-        weekFieldAvg[weekId] = dists.length
-            ? dists.reduce((a, b) => a + b, 0) / dists.length : 0;
-    });
-
-    const MISS_PENALTY = 1, MAX_MISSES = 5, MAX_CONSEC_MISSES = 3;
-    const voterAvg = {};
-    const allUsernames = new Set();
-    yearTabs.forEach(tab => {
-        const weekData = lbData[tab.dataset.week];
-        if (!weekData) return;
-        Object.keys(weekData).forEach(u => { if (u !== "Official Overall") allUsernames.add(u); });
-    });
-    const totalWeeks = yearTabs.length;
-
-    allUsernames.forEach(username => {
-        let lastBallot = null, total = 0, totalWW = 0, missed = 0, boldAdj = 0, consecMisses = 0, maxConsecMisses = 0;
-        yearTabs.forEach((tab, weekIdx) => {
-            const weekId = tab.dataset.week;
-            // Week weight: 0.5 for first week, 1.0 for last week, linear taper
-            const ww = totalWeeks > 1 ? 0.5 + (weekIdx / (totalWeeks - 1)) * 0.5 : 1.0;
-            const entry = lbData[weekId]?.[username];
-            const teams = entry?.teams;
-            const consensus = weekConsensus[weekId];
-            if (teams && teams.length > 0) {
-                total += ballotDistance(teams, finalRanking) * ww;
-                totalWW += ww;
-                lastBallot = teams;
-                consecMisses = 0;
-                // Boldness adjustment: compare voter vs consensus against final overall
-                if (consensus) {
-                    let weekBoldAdj = 0, totalWeight = 0;
-                    for (let i = 0; i < 25; i++) {
-                        const team = finalRanking[i];
-                        const finalRank = i + 1;
-                        const vi = teams.indexOf(team), ci = consensus.indexOf(team);
-                        const voterRank = vi === -1 ? 26 : vi + 1;
-                        const consensusRank = ci === -1 ? 26 : ci + 1;
-                        const deviation = Math.abs(voterRank - consensusRank);
-                        if (deviation > 0) {
-                            const scalar = 0.05; // flat boldness multiplier
-                            const weight = deviation;
-                            const consensusDist = Math.abs(consensusRank - finalRank);
-                            const voterDist = Math.abs(voterRank - finalRank);
-                            const gain = consensusDist - voterDist;
-                            if (gain > 0) {
-                                weekBoldAdj += gain * weight * scalar * posWeight(finalRank);
-                                totalWeight += weight;
-                            }
-                        }
-                    }
-                    if (totalWeight > 0) {
-                        boldAdj += (weekBoldAdj / totalWeight) * ww;
-                    }
-                }
-            } else {
-                const missDist = (lastBallot ? ballotDistance(lastBallot, finalRanking) : weekFieldAvg[weekId]);
-                total += missDist * ww;
-                totalWW += ww;
-                missed++;
-                consecMisses++;
-                maxConsecMisses = Math.max(maxConsecMisses, consecMisses);
-            }
-        });
-        // Longest streak anywhere in the season, not just a trailing one
-        if (missed >= MAX_MISSES || maxConsecMisses >= MAX_CONSEC_MISSES) {
-            voterAvg[username] = { avg: Infinity, combined: Infinity };
-            return;
-        }
-        const avg = totalWW > 0 ? total / totalWW : 0;
-        // Miss penalty applied post-hoc: +1 per missed week on final combined score
-        const combined = avg - boldAdj + missed * MISS_PENALTY;
-        voterAvg[username] = { avg, boldAdj, combined };
-    });
-    return voterAvg;
-}
 
 ["keybind-legend-modal", "season-stats-modal", "heatmap-modal"].forEach(id => {
     document.getElementById(id).addEventListener("click", e => {
@@ -6842,7 +6661,7 @@ document.getElementById("week-arrow-next").addEventListener("click", () => navig
 // viewer's local calendar day (localStorage `keybindsUnlockedDate`), checked each time a
 // locked action runs, so a tab left open past midnight locks again. The PIN prompt opens
 // only from Settings › Other › Dev; locked actions do nothing (no prompt) until then.
-const LOCKED_KEYS = new Set(["D", "X", "R", "T", "Y", "G", "U", "W", "H", "K", "P", "S", "?"]);
+const LOCKED_KEYS = new Set(["D", "X", "T", "Y", "G", "U", "W", "H", "K", "P", "S", "?"]);
 // Only a salted PBKDF2-SHA256 hash of the PIN ships in the page, never the PIN itself.
 // To change the PIN: python3 -c "import hashlib;print(hashlib.pbkdf2_hmac('sha256',b'NEWPIN',bytes.fromhex('<salt>'),300000).hex())"
 const PIN_SALT = "3257a8d4b7c69c8ae5b2dd12961baa35";
@@ -6934,7 +6753,6 @@ document.addEventListener("keydown", e => {
         document.getElementById("voter-history-modal").classList.remove("open");
         document.getElementById("keybind-legend-modal").classList.remove("open");
         document.getElementById("season-stats-modal").classList.remove("open");
-        document.getElementById("precision-modal").classList.remove("open");
         document.getElementById("tenure-modal").classList.remove("open");
         document.getElementById("conference-modal").classList.remove("open");
         document.getElementById("heatmap-modal").classList.remove("open");
@@ -7004,12 +6822,6 @@ document.addEventListener("keydown", e => {
     if (e.key === "C" || e.key === "c") {
         e.preventDefault();
         applyTableSort("consensus");
-        return;
-    }
-
-    if (e.key === "R" || e.key === "r") {
-        e.preventDefault();
-        showPrecisionModal();
         return;
     }
 

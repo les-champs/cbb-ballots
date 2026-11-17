@@ -9,7 +9,12 @@ overnight, ~09:00 UTC; polls close Mondays 10 AM ET).
 
     {"season": 2027,
      "snapshots": [{"asOf": "2026-11-16T09:08Z", "final": false,
-                    "teams": [[key, rank, bpi], ...]}, ...]}   # top KEEP teams by BPI rank
+                    "teams": [[key, rank, bpi], ...],          # top KEEP teams by BPI rank
+                    "sor": [[key, sorrank, wins, losses], ...]}, ...]}   # top KEEP by SOR rank
+
+`sor` (the Data Ballots "SOR" row) is ESPN's Strength of Record rank from the same request
+(it has no rating, only a rank) plus the team's W-L at that time; recorded only for seasons
+>= SOR_FROM (older seasons are frozen), so snapshots before then have no `sor`.
 
 `asOf` is ESPN's lastUpdated. `key` is our canonical team name (conferences.ESPN_IDS), or
 "espn:ID" for a team missing there. `final` marks a snapshot taken after the season ended
@@ -29,6 +34,7 @@ import conferences
 URL = ("https://site.web.api.espn.com/apis/fitt/v3/sports/basketball/mens-college-basketball/"
        "powerindex?region=us&lang=en&limit=500&season={season}")
 KEEP = 100
+SOR_FROM = 2025
 ET = ZoneInfo("America/New_York")
 
 
@@ -54,20 +60,33 @@ def fetch(season):
         data = json.load(r)
     names = data["categories"][0]["names"]
     i_bpi, i_rank = names.index("bpi"), names.index("bpirank")
+    i_w, i_l = names.index("wins"), names.index("losses")
+    res_names = next(c["names"] for c in data["categories"] if c["name"] == "resume")
+    i_sor = res_names.index("sorrank")
     key_of = {str(v): k for k, v in conferences.ESPN_IDS.items()}
-    rows = []
+    rows, sor = [], []
     for t in data.get("teams", []):
         cat = next((c for c in t["categories"] if c["name"] == "bpi"), None)
         if not cat or cat["values"][i_rank] is None:
             continue
         tid = str(t["team"]["id"])
-        rows.append([key_of.get(tid, f"espn:{tid}"), int(cat["values"][i_rank]),
-                     round(cat["values"][i_bpi], 1)])
+        key = key_of.get(tid, f"espn:{tid}")
+        rows.append([key, int(cat["values"][i_rank]), round(cat["values"][i_bpi], 1)])
+        res = next((c for c in t["categories"] if c["name"] == "resume"), None)
+        if res and res["values"][i_sor] is not None:
+            sor.append([key, int(res["values"][i_sor]),
+                        int(cat["values"][i_w] or 0), int(cat["values"][i_l] or 0)])
     rows.sort(key=lambda r: (r[1], -r[2]))
+    sor.sort(key=lambda r: (r[1], r[3] - r[2]))
     if len(rows) < 300:
         raise ValueError(f"only {len(rows)} teams in ESPN's BPI for {season}")
     as_of = data.get("lastUpdated")
-    return {"asOf": as_of, "final": is_final(season, as_of), "teams": rows[:KEEP]}
+    snap = {"asOf": as_of, "final": is_final(season, as_of), "teams": rows[:KEEP]}
+    if season >= SOR_FROM:
+        if len(sor) < 300:
+            raise ValueError(f"only {len(sor)} teams with an SOR rank in ESPN's data for {season}")
+        snap["sor"] = sor[:KEEP]
+    return snap
 
 
 def merge(snapshots, snap):
@@ -98,6 +117,8 @@ def run(base_dir, season):
             f.write("\n")
     unmapped = [t[0] for t in snap["teams"] if t[0].startswith("espn:")]
     print(f"  ✓ BPI {season} as of {snap['asOf']}{' (final)' if snap['final'] else ''}: "
-          f"#1 {snap['teams'][0][0]}, {len(payload['snapshots'])} snapshot(s) → {os.path.basename(path)}"
+          f"#1 {snap['teams'][0][0]}"
+          + (f", SOR #1 {snap['sor'][0][0]}" if snap.get("sor") else "")
+          + f", {len(payload['snapshots'])} snapshot(s) → {os.path.basename(path)}"
           + (f"; not in ESPN_IDS: {', '.join(unmapped)}" if unmapped else ""))
     return True
