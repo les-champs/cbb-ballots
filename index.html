@@ -565,7 +565,6 @@ thead th {
     z-index: 2;
 }
 #season-stats-table thead th,
-#precision-table thead th,
 #tenure-table thead th,
 #voter-history-table thead th,
 .heatmap-table thead th {
@@ -1023,7 +1022,7 @@ kbd {
 #season-stats-table.season-teampicker .ws-opp-site { opacity: 0.55; min-width: 13px; text-align: right; }
 #season-stats-table.season-teampicker img.records-opp-logo[data-team] { cursor: pointer; }
 
-#precision-modal, #tenure-modal {
+#tenure-modal {
     display: none;
     position: fixed;
     inset: 0;
@@ -1032,10 +1031,10 @@ kbd {
     justify-content: center;
     align-items: center;
 }
-#precision-modal.open, #tenure-modal.open {
+#tenure-modal.open {
     display: flex;
 }
-#precision-box, #tenure-box {
+#tenure-box {
     background: var(--color-bg-modal);
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.25);
@@ -1045,34 +1044,34 @@ kbd {
     overflow: auto;
     padding: 20px 24px 16px;
 }
-#precision-box h2, #tenure-box h2 {
+#tenure-box h2 {
     margin: 0 0 12px;
     font-size: 1.1rem;
     color: var(--color-modal-h2);
 }
-#precision-table, #tenure-table {
+#tenure-table {
     border-collapse: collapse;
     width: 100%;
     font-size: 13px;
     table-layout: auto;
 }
-#precision-table th, #tenure-table th {
+#tenure-table th {
     font-size: 11px;
     font-weight: normal;
     padding: 4px 8px;
     text-align: center;
     white-space: nowrap;
 }
-#precision-table th.name-col, #tenure-table th.name-col { text-align: left; }
-#precision-table td, #tenure-table td {
+#tenure-table th.name-col { text-align: left; }
+#tenure-table td {
     padding: 3px 6px;
     text-align: center;
     border-bottom: 1px solid var(--color-border-subtle);
     white-space: nowrap;
     vertical-align: middle;
 }
-#precision-table td.name-col, #tenure-table td.name-col { text-align: left; }
-#precision-table td:first-child, #tenure-table td:first-child { font-size: 11px; }
+#tenure-table td.name-col { text-align: left; }
+#tenure-table td:first-child { font-size: 11px; }
 
 body.year-loading::after {
     content: "Loading…";
@@ -1411,6 +1410,69 @@ body.dark .pin-btn.pinned {
 .header {
     z-index: 6;
 }
+
+/* Report: MM + P12 (Year window, table.season-records.season-mmp12) */
+#season-stats-table.season-records.season-mmp12 > thead > tr > th:nth-child(n),
+#season-stats-table.season-records.season-mmp12 > tbody > tr > td:nth-child(n) { border-right: none; }
+#season-stats-table.season-records.season-mmp12 > thead > tr > th.mm-sep:nth-child(n),
+#season-stats-table.season-records.season-mmp12 > tbody > tr > td.mm-sep:nth-child(n) { border-right: 1px solid var(--color-border-nth); }
+#season-stats-table.season-mmp12 th.mm-sortable { cursor: pointer; user-select: none; }
+#season-stats-table.season-mmp12 th.mm-sortable:hover { color: var(--color-heading); text-decoration: underline dotted; text-underline-offset: 2px; }
+#season-stats-table.season-mmp12 th.mm-sorted { font-weight: bold; }
+/* Cells: one size and weight throughout, like the Records metric columns (W-L bold, as in Records). */
+#season-stats-table.season-mmp12 > tbody > tr > td:not(:first-child):not(.team-col) { font-size: 12px; font-weight: normal; }
+#season-stats-table.season-mmp12 > tbody > tr > td.mm-wl b { font-weight: bold; }
+#season-stats-table.season-mmp12 td.mm-confName { text-align: left; }
+/* Tighter than Records' 6–8px side padding: this table has many more columns. */
+#season-stats-table.season-mmp12 > thead > tr > th { padding: 4px 4px; }
+#season-stats-table.season-mmp12 > tbody > tr > td { padding: 3px 4px; }
+#season-stats-table.season-mmp12 > tbody > tr > td.mm-sep,
+#season-stats-table.season-mmp12 > thead > tr > th.mm-sep { padding-right: 6px; }
+#season-stats-table.season-mmp12 > tbody > tr > td.mm-sep + td,
+#season-stats-table.season-mmp12 > thead > tr > th.mm-sep + th { padding-left: 6px; }
+/* "x/total" in Voters / P. Voters: the total smaller and faded (10px under 12px cells). */
+#season-stats-table.season-mmp12 .mm-of { font-size: 10px; opacity: 0.55; }
+/* P. Rk: same gray as the totals, at the cell size. */
+#season-stats-table.season-mmp12 .mm-dim { opacity: 0.55; }
+
+/* Reports menu (Shift+R) */
+#reports-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+#reports-modal.open { display: flex; }
+#reports-box {
+    background: var(--color-bg-modal);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    width: calc(100vw - 32px);
+    max-width: 280px;
+    max-height: 80vh;
+    overflow: auto;
+    padding: 14px 14px 12px;
+}
+#reports-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
+#reports-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.report-item {
+    display: block;
+    width: 100%;
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    padding: 6px 9px;
+    border: 1px solid var(--color-border-tab);
+    border-radius: 4px;
+    background: var(--color-bg-tab);
+    color: var(--color-heading);
+    cursor: pointer;
+}
+.report-item:hover, .report-item:focus-visible { background: var(--color-bg-tab-hover); outline: none; }
+.report-item.placeholder { opacity: 0.45; cursor: default; }
 
 /* Conference table (Shift+K) */
 #conference-modal {
@@ -1913,6 +1975,7 @@ body.dark {
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>E</kbd></span><span>Toggle Deltas</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>J</kbd></span><span>Toggle Delta Sub-label (Consensus Diff / Recency)</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>1</kbd> – <kbd>9</kbd></span><span>Adjust Delta Lookback Window</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>R</kbd></span><span>Reports Menu</span></div>
     </div>
     <div class="keybind-section">
       <div class="keybind-section-title">Sorting</div>
@@ -1923,7 +1986,6 @@ body.dark {
       <div class="keybind-section-title">Locked</div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>D</kbd></span><span>Jump to Data Ballots</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>X</kbd></span><span>Toggle AP Ballots</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>R</kbd></span><span>Précision leaderboard</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>T</kbd></span><span>Tenure leaderboard</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>Y</kbd></span><span>Week stats table</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>G</kbd></span><span>Week stats with chart</span></div>
@@ -1961,13 +2023,6 @@ body.dark {
   </div>
 </div>
 
-<div id="precision-modal">
-  <div id="precision-box">
-    <h2 id="precision-title"></h2>
-    <table id="precision-table"></table>
-  </div>
-</div>
-
 <div id="conference-modal">
   <div id="conference-box">
     <div id="conference-header">
@@ -1975,6 +2030,24 @@ body.dark {
       <div id="conference-years"></div>
     </div>
     <div id="conference-body"></div>
+  </div>
+</div>
+
+<div id="reports-modal">
+  <div id="reports-box">
+    <h2 id="reports-title">Reports</h2>
+    <ul id="reports-list">
+      <li><button class="report-item" data-report="mm-p12" title="Mid-Major + Pac-12">MM + P12</button></li>
+      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
+      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
+      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
+      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
+      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
+      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
+      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
+      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
+      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
+    </ul>
   </div>
 </div>
 
@@ -3088,9 +3161,6 @@ const isAp=_apCurrentYear!==null||ON_AP_PAGE;
 showVoterHistory(isAp?"AP Overall":"Official Overall");
 break;
 }
-case "precisionLeaderboard":
-showPrecisionModal();
-break;
 case "toggleOverall":
 toggleOverallRow();
 break;
@@ -4740,6 +4810,7 @@ _injectTenureRows(activeBlock,activeTab.dataset.week,yearTabs,deltaData);
 applyDataBallotOrder(activeBlock);
 injectEspnApRow(activeBlock,activeTab.dataset.week);
 injectBpiRow(activeBlock,activeTab.dataset.week);
+injectSorRow(activeBlock,activeTab.dataset.week);
 }
 function conferenceTable(year){
 if(typeof CONFERENCE_DATA==="undefined")return null;
@@ -4901,7 +4972,7 @@ img.src=espnLogoUrl(e.id);
 });
 _insertSourceRow(block,aggTbody,tr);
 }
-const SOURCE_ROW_ORDER=["Overall","AP Top 25","BPI"];
+const SOURCE_ROW_ORDER=["Overall","AP Top 25","BPI","SOR"];
 function _insertSourceRow(block,aggTbody,tr){
 const mine=SOURCE_ROW_ORDER.indexOf(tr.dataset.group);
 const rows=Array.from(aggTbody.querySelectorAll(":scope > .voter-row:not(.row-pinned-agg)"));
@@ -4933,42 +5004,59 @@ if(!deadline)return i===0?snaps.find(s=>s.final)||null:null;
 const fit=snaps.filter(s=>s.at>=deadline - BPI_MATCH_BEFORE_MS&&s.at<=deadline + BPI_MATCH_AFTER_MS);
 return fit[fit.length - 1]||null;
 }
-async function injectBpiRow(block,weekId){
+const SNAPSHOT_ROWS={
+BPI:{
+cls:"row-bpi",tokenKey:"_bpiToken",list:s=>s.teams,
+title:"ESPN Basketball Power Index",
+label:t=>t[2].toFixed(1),tip:t=>`BPI rating (rank #${t[1]})`,
+},
+SOR:{
+cls:"row-sor",tokenKey:"_sorToken",list:s=>s.sor,
+title:"ESPN Strength of Record (chance a typical Top 25 team has this record or better against this schedule)",
+label:t=>`${t[2]}-${t[3]}`,tip:t=>`SOR rank #${t[1]}; record ${t[2]}-${t[3]}`,
+},
+};
+function injectBpiRow(block,weekId){return _injectSnapshotRow(block,weekId,"BPI");}
+function injectSorRow(block,weekId){return _injectSnapshotRow(block,weekId,"SOR");}
+async function _injectSnapshotRow(block,weekId,kind){
 if(ON_AP_PAGE||!block||weekId.startsWith("week-ap-"))return;
-const token=block._bpiToken={};
+const cfg=SNAPSHOT_ROWS[kind];
+const token=block[cfg.tokenKey]={};
 const tabs0=getSortedTabs();
 const season=tabs0.find(t=>t.dataset.week===weekId)?.dataset.year;
 let snaps;
 try{snaps=season?await fetchBpiHistory(season):[];}catch{snaps=[];}
-if(block._bpiToken!==token)return;
+if(block[cfg.tokenKey]!==token)return;
 const aggTbody=block.querySelectorAll(".ballot-section")[2]?.querySelector("tbody");
 if(!aggTbody)return;
-const old=aggTbody.querySelector(".row-bpi");
+const old=aggTbody.querySelector("." + cfg.cls);
 const expanded=old?.classList.contains("row-delta");
 old?.remove();
 const tabs=getSortedTabs().filter(t=>t.dataset.year===season);
 const i=tabs.findIndex(t=>t.dataset.week===weekId);
 const snap=bpiSnapshotForTab(snaps,tabs,i);
-if(!snap)return;
-const prev=bpiSnapshotForTab(snaps,tabs,i + 1);
-const top=snap.teams.slice(0,25);
+const list=snap&&cfg.list(snap);
+if(!list?.length)return;
+const prevSnap=bpiSnapshotForTab(snaps,tabs,i + 1);
+const prevList=prevSnap&&cfg.list(prevSnap);
+const top=list.slice(0,25);
 const ranked=top.map(t=>t[0]);
 const pts={},prevRankOf={};
-top.forEach(([k,,bpi])=>{pts[k]=bpi.toFixed(1);});
-(prev?.teams||[]).forEach(([k,rank])=>{prevRankOf[k]=rank;});
-const tr=_buildPointsRankingRow("BPI",ranked,pts,prevRankOf,!!prev);
-tr.classList.add("row-bpi");
+top.forEach(t=>{pts[t[0]]=cfg.label(t);});
+(prevList||[]).forEach(t=>{prevRankOf[t[0]]=t[1];});
+const tr=_buildPointsRankingRow(kind,ranked,pts,prevRankOf,!!prevList?.length);
+tr.classList.add(cfg.cls);
 if(expanded)tr.classList.add("row-delta");
 const when=new Date(snap.at).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});
-tr.querySelector(".voter-name").title=`ESPN Basketball Power Index${snap.final?", final":""}, as of ${when}`;
+tr.querySelector(".voter-name").title=`${cfg.title}${snap.final?", final":""}, as of ${when}`;
 tr.querySelectorAll("img.team-logo").forEach((img,j)=>{
-const[k,rank]=top[j];
+const t=top[j];
 const label=img.parentElement.querySelector(".avg-label");
-if(label)label.title=`BPI rating (rank #${rank})`;
-if(k.startsWith("espn:")){
+if(label)label.title=cfg.tip(t);
+if(t[0].startsWith("espn:")){
 img.classList.remove("team-logo");
 delete img.dataset.team;
-img.src=espnLogoUrl(k.slice(5));
+img.src=espnLogoUrl(t[0].slice(5));
 }
 });
 _insertSourceRow(block,aggTbody,tr);
@@ -6232,6 +6320,7 @@ const table=document.getElementById("season-stats-table");
 title.innerHTML=seasonModalTitleHtml(currentYear,isApMode,mode);
 table.classList.toggle("season-voters",mode==="voters");
 table.classList.remove("season-records");
+table.classList.remove("season-mmp12");
 if(mode==="voters"){
 table.innerHTML=buildSeasonVotersTableHtml(weekBallots,voterWeeksVoted,minWeeksVoted,totalWeeks,esc);
 modal.classList.add("open");
@@ -6636,7 +6725,7 @@ if(el.classList.contains("active"))return;
 _recordsView=el.dataset.view;
 showSeasonRecords(currentYear,isApMode,activeTab);
 }));
-table.classList.remove("season-voters");
+table.classList.remove("season-voters","season-mmp12");
 table.classList.add("season-records");
 const weekId=isApMode&&_apCurrentWeekNum!==null
 ?`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`
@@ -7388,59 +7477,6 @@ document.getElementById("heatmap-container").innerHTML=html;
 modal.dataset.mode=mode;
 modal.classList.add("open");
 }
-function showPrecisionModal(){
-const activeTab=document.querySelector(".week-tab.active");
-if(!activeTab)return;
-const currentYear=activeTab.dataset.year;
-const yearTabs=getSortedTabs().filter(t=>t.dataset.year===currentYear).reverse();
-if(yearTabs.length===0)return;
-const lbData=buildLeaderboardData();
-const voterAvg=computeVoterAvg(yearTabs,lbData);
-if(!voterAvg)return;
-const sorted=Object.entries(voterAvg)
-.filter(([,v])=>v.combined!==Infinity)
-.sort((a,b)=>a[1].combined - b[1].combined);
-const disqualified=Object.entries(voterAvg)
-.filter(([,v])=>v.combined===Infinity)
-.sort((a,b)=>a[0].localeCompare(b[0]));
-const modal=document.getElementById("precision-modal");
-const title=document.getElementById("precision-title");
-const table=document.getElementById("precision-table");
-title.textContent=`${currentYear} Précision Leaderboard`;
-let html=`<colgroup>
-        <col style="width:28px">
-        <col>
-        <col style="width:60px">
-        <col style="width:60px">
-        <col style="width:52px">
-    </colgroup><thead><tr>
-        <th>#</th>
-        <th class="name-col">Voter</th>
-        <th title="Combined Précision score (lower is better)">Score</th>
-        <th title="Boldness adjustment (higher is better)">Bold ↑</th>
-        <th title="Missed weeks">Missed</th>
-    </tr></thead><tbody>`;
-sorted.forEach(([username,scores],i)=>{
-const adj=scores.boldAdj||0;
-const missedWeeks=Math.round(scores.combined - scores.avg + adj);
-html +=`<tr>
-            <td>${i + 1}</td>
-            <td class="name-col">${username}</td>
-            <td>${scores.combined.toFixed(2)}</td>
-            <td style="color:var(--color-win)">${adj>0.05?'+' + adj.toFixed(2):'—'}</td>
-            <td>${missedWeeks>0?missedWeeks:'—'}</td>
-        </tr>`;
-});
-if(disqualified.length>0){
-html +=`<tr><td colspan="5" style="padding:6px 8px; color:#aaa; font-size:11px; text-align:left; border-top:1px solid #ddd;">Disqualified (≥5 misses or ≥3 consecutive)</td></tr>`;
-disqualified.forEach(([username])=>{
-html +=`<tr><td>—</td><td class="name-col" style="color:#bbb">${username}</td><td colspan="3" style="color:#bbb">DQ</td></tr>`;
-});
-}
-html +=`</tbody>`;
-table.innerHTML=html;
-modal.classList.add("open");
-}
 function showTenureModal(){
 const isApToggle=_apCurrentYear!==null;
 const isAp=ON_AP_PAGE||isApToggle;
@@ -7802,133 +7838,281 @@ document.getElementById("conference-years").addEventListener("click",e=>{
 const btn=e.target.closest(".conference-year");
 if(btn)showConferenceModal(Number(btn.dataset.year));
 });
-["precision-modal","tenure-modal","conference-modal"].forEach(id=>{
+let _mmSort=null;
+let _mmToken=0;
+const _mmApRanks={};
+const MM_CONF_SHORT={
+"America East":"AE","American":"AAC","Atlantic 10":"A-10","Conference USA":"CUSA",
+"Missouri Valley":"MVC","Mountain West":"MWC",
+};
+function mmBig5(){return(CONFERENCE_DATA.power||[]).filter(c=>c!=="Pac-12");}
+function _mmRec(s){
+const m=/^(\d+)-(\d+)/.exec(s||"");
+return m?{w:+m[1],l:+m[2]}:null;
+}
+function showMmP12Report(){
+const modal=document.getElementById("season-stats-modal");
+const title=document.getElementById("season-stats-title");
+const table=document.getElementById("season-stats-table");
+const activeTab=document.querySelector(".week-tab.active");
+if(!activeTab)return;
+const isApMode=_apCurrentYear!==null;
+const season=isApMode?String(_apCurrentYear):activeTab.dataset.year;
+const weekId=isApMode&&_apCurrentWeekNum!==null?`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`:activeTab.dataset.week;
+const tabs=isApMode?getSortedApTabs():getSortedTabs();
+const weekTab=tabs.find(t=>t.dataset.week===weekId)||activeTab;
+const weekLabel=weekTextLabel(weekTab)||`Week ${displayWeekNum(weekTab)}`;
+const idx=tabs.indexOf(weekTab);
+const prevTab=idx>=0&&tabs[idx + 1]?.dataset.year===weekTab.dataset.year?tabs[idx + 1]:null;
+const showAp=!ON_AP_PAGE&&!isApMode;
+_recordsRenderToken++;
+const token=++_mmToken;
+table.className="season-records season-mmp12";
+let last=[null,null];
+const render=(data,error)=>{
+if(token!==_mmToken||!table.classList.contains("season-mmp12"))return;
+last=[data,error];
+title.innerHTML=`<span class="records-title-main">${season}${isApMode?" AP":""} ${weekLabel} — Mid-Major + Pac-12</span>`
++ `<span class="records-note records-title-note">${recordsNoteHtml(season,data)}</span>`;
+table.innerHTML=buildMmP12TableHtml(season,weekId,prevTab?.dataset.week||null,showAp,data,error);
+table.querySelector(".records-retry")?.addEventListener("click",()=>showMmP12Report());
+table.querySelectorAll("th[data-sort]").forEach(th=>th.addEventListener("click",()=>{
+const key=th.dataset.sort;
+const dir=+th.dataset.dir;
+_mmSort=_mmSort?.key===key?(_mmSort.dir===dir?{key,dir:-dir}:null):{key,dir};
+render(...last);
+}));
+initRecordsLogos(table);
+if(!data)return;
+const tbody=table.querySelector("tbody");
+tbody.addEventListener("click",e=>{
+const opp=e.target.closest("img.records-opp-logo[data-team]");
+if(opp){toggleTeamHighlight(opp.dataset.team);return;}
+const tr=e.target.closest("tr.records-team-row");
+if(tr&&tbody.contains(tr))toggleTeamGames(tr,season,data);
+});
+tbody.querySelectorAll("tr.records-team-row").forEach(tr=>{
+if(_recordsExpanded.has(`${season}:${tr.dataset.espn}`))toggleTeamGames(tr,season,data,true);
+});
+};
+if(!conferenceTable(season)){
+title.textContent=`${season} — Mid-Major + Pac-12`;
+table.innerHTML=`<tbody><tr><td class="records-msg">Conference data starts in 2025.</td></tr></tbody>`;
+modal.classList.add("open");
+return;
+}
+const cached=espnCachedData(`records:${season}`);
+render(cached,null);
+modal.classList.add("open");
+const again=()=>render(...last);
+if(quadsAvailable(season)&&(!_quadsData[season]||_quadsData[season].error))fetchQuads(season).then(again,again);
+if(showAp&&!(weekId in _mmApRanks)){
+espnApPollForWeek(weekId).then(p=>{
+const m={};
+(p?.ranks||[]).forEach(e=>{if(e.rank<=25)m[e.id]=e.rank;});
+_mmApRanks[weekId]=p?m:null;
+},()=>{}).then(again);
+}
+if(!cached||Date.now()- cached.at>=ESPN_TTL_MS){
+fetchSeasonRecords(season).then(d=>render(d,null),err=>render(null,err.message));
+}
+}
+function buildMmP12TableHtml(season,weekId,prevWeekId,showAp,data,error){
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const alias=k=>(CONFERENCE_DATA.aliases||{})[k]||k;
+const confs=conferenceTable(season);
+const big5=new Set(mmBig5());
+const confOf={};
+Object.entries(confs).forEach(([c,teams])=>teams.forEach(t=>{confOf[t]=c;}));
+const quadSrc=quadsAvailable(season);
+const qd=_quadsData[season];
+const hasQuadsFile=!!QUAD_FILES?.[season]?.quads;
+const showNet=quadSrc==="net";
+const showResume=hasQuadsFile&&Number(season)>=RESUME_FROM_SEASON;
+const apRanks=showAp?_mmApRanks[weekId]:undefined;
+const blank=qd||!quadSrc?"—":"…";
+const ballotsOf=id=>Object.entries(buildDeltaData(true)[id]||{})
+.filter(([u])=>u!=="Official Overall"&&u!=="AP Overall").map(([,ts])=>ts.slice(0,25));
+const ballots=ballotsOf(weekId);
+const pts={},spots={};
+ballots.forEach(b=>b.forEach((t,i)=>{
+if(!t)return;
+pts[t]=(pts[t]||0)+(25 - i);
+(spots[t]||(spots[t]=[])).push(i + 1);
+}));
+const rankOf=p=>{
+const r={};
+Object.entries(p).sort((a,b)=>b[1]- a[1]).forEach(([t,v],i,arr)=>{
+r[t]=i&&arr[i - 1][1]===v?r[arr[i - 1][0]]:i + 1;
+});
+return r;
+};
+const pollRank=rankOf(pts);
+const prevPts={};
+const prevBallots=prevWeekId?ballotsOf(prevWeekId):[];
+const prevVoters={};
+prevBallots.forEach(b=>b.forEach((t,i)=>{
+if(!t)return;
+prevPts[t]=(prevPts[t]||0)+(25 - i);
+prevVoters[t]=(prevVoters[t]||0)+ 1;
+}));
+const share=(p,n)=>n?p /(25*n)*100:null;
+const prevRank=rankOf(prevPts);
+const bpiRank={};
+if(qd?.teams){
+const s=Object.entries(qd.teams).filter(([,t])=>t.bpi!=null).sort((a,b)=>b[1].bpi - a[1].bpi);
+s.forEach(([k,t],i)=>{bpiRank[k]=i&&s[i - 1][1].bpi===t.bpi?bpiRank[s[i - 1][0]]:i + 1;});
+}
+const rows=[];
+Object.entries(confs).forEach(([conf,teams])=>{
+if(big5.has(conf))return;
+teams.forEach(team=>{
+if(!pts[team]&&!prevPts[team])return;
+const id=espnIdFor(team);
+const r=id&&data?data.byId[id]:null;
+const qk=alias(team);
+const t=qd?.teams?.[qk];
+const played=qd?.played?.[qk];
+let vsBig5=null;
+if(played){
+vsBig5={w:0,l:0};
+played.forEach(g=>{
+if(!g.opp.key||!big5.has(confOf[g.opp.key]))return;
+if(g.result==="W")vsBig5.w++;else if(g.result==="L")vsBig5.l++;
+});
+}
+const sp=spots[team]||[];
+const gp=r?r.wins + r.losses:0;
+rows.push({
+team,id,r,t,conf,
+pollRank:pollRank[team]??null,
+prevRank:prevRank[team]??null,
+dRank:pollRank[team]&&prevRank[team]?prevRank[team]- pollRank[team]:null,
+prevPts:prevWeekId?prevPts[team]||0:null,
+ptsPct:pts[team]?share(pts[team],ballots.length):null,
+prevPtsPct:prevPts[team]?share(prevPts[team],prevBallots.length):null,
+dPct:prevWeekId?(share(pts[team]||0,ballots.length)??0)-(share(prevPts[team]||0,prevBallots.length)??0):null,
+pts:pts[team]||0,
+votes:sp.length,
+firsts:sp.filter(n=>n===1).length,
+prevVotes:prevWeekId?prevVoters[team]||0:null,
+dVotes:prevWeekId?sp.length -(prevVoters[team]||0):null,
+hi:sp.length?Math.min(...sp):null,
+lo:sp.length?(sp.length<ballots.length?26:Math.max(...sp)):null,
+avg:sp.length?sp.reduce((a,b)=>a + b,0)/ sp.length:null,
+ap:apRanks?apRanks[id]??null:null,
+pct:gp?r.wins / gp:null,
+confPct:(()=>{const c=_mmRec(r?.confRecord);return c&&c.w + c.l?c.w /(c.w + c.l):null;})(),
+vsBig5,
+net:showNet?t?.rank??null:null,
+bpiRank:bpiRank[qk]??null,
+bpi:t?.bpi??null,sor:t?.sor??null,sos:t?.sos??null,
+});
+});
+});
+const nullLast=(a,b,f)=>(a==null)-(b==null)||(a==null?0:f(a,b));
+rows.sort((a,b)=>(b.pts - a.pts)
+||((prevPts[b.team]||0)-(prevPts[a.team]||0))
+||nullLast(a.bpiRank,b.bpiRank,(x,y)=>x - y)
+||nullLast(a.pct,b.pct,(x,y)=>y - x)
+||conferenceDisplayName(a.team).localeCompare(conferenceDisplayName(b.team)));
+const shown=rows;
+const wlVal=x=>x?x.w - x.l*0.001:null;
+const sortVal={
+pollRank:x=>x.pollRank,prevRank:x=>x.prevRank,dRank:x=>x.dRank,
+pts:x=>x.pts,ptsPct:x=>x.ptsPct,dPct:x=>x.dPct,votes:x=>x.votes,firsts:x=>x.firsts,prevVotes:x=>x.prevVotes,dVotes:x=>x.dVotes,lo:x=>x.lo,
+hi:x=>x.hi,avg:x=>x.avg,ap:x=>x.ap,wl:x=>x.pct,conf:x=>x.confPct,
+vsBig5:x=>wlVal(x.vsBig5),
+net:x=>x.net,bpiRank:x=>x.bpiRank,bpi:x=>x.bpi,sor:x=>x.sor,sos:x=>x.sos,
+team:x=>conferenceDisplayName(x.team),confName:x=>x.conf,
+};
+if(_mmSort&&sortVal[_mmSort.key]){
+const f=sortVal[_mmSort.key],dir=_mmSort.dir;
+shown.sort((a,b)=>nullLast(f(a),f(b),(x,y)=>(typeof x==="string"?x.localeCompare(y):x - y)*dir));
+}
+const wl=x=>x?`${x.w}-${x.l}`:blank;
+const num1=v=>v==null?blank:(v>0?"+":v<0?"−":"")+ Math.abs(v).toFixed(1);
+const espnBlank=x=>x.r?null:"—";
+const cols=[
+["confName","Conf","Conference",1,true,true,x=>MM_CONF_SHORT[x.conf]?`<span class="mm-conf" title="${esc(x.conf)}">${MM_CONF_SHORT[x.conf]}</span>`:`<span class="mm-conf">${esc(x.conf)}</span>`],
+["pollRank","Rk","Poll rank",1,false,true,x=>x.pollRank??"—"],
+["prevRank","P. Rk","Previous poll rank",1,false,!!prevWeekId,x=>`<span class="mm-dim">${x.prevRank??"—"}</span>`],
+["dRank","ΔRk","Rank change",-1,false,!!prevWeekId,
+x=>x.dRank?`<span class="${x.dRank>0?"delta-up":"delta-down"}">${x.dRank>0?"+":"−"}${Math.abs(x.dRank)}</span>`:x.dRank===0?"0":"—"],
+["hi","Hi","Highest ballot rank",1,false,true,x=>x.hi??"—"],
+["lo","Lo","Lowest ballot rank (NR = left off a ballot)",1,false,true,x=>x.lo===26?"NR":x.lo??"—"],
+["avg","Avg","Average ballot rank",1,false,true,x=>x.avg==null?"—":x.avg.toFixed(1)],
+["ap","AP","AP rank",1,false,showAp,x=>apRanks===undefined?"…":x.ap??"—"],
+["firsts","#1","First-place votes",-1,true,true,x=>x.firsts||"—"],
+["ptsPct","Pts %",`% of max points (${25*ballots.length})`,-1,false,true,
+x=>x.ptsPct==null?"—":`<span title="${x.pts} pts">${x.ptsPct.toFixed(1)}%</span>`],
+["dPct","Pts Δ%","Pts % change",-1,false,!!prevWeekId,
+x=>x.dPct==null?"—":Math.abs(x.dPct)<0.05?"0.0%"
+:`<span class="${x.dPct>0?"delta-up":"delta-down"}">${x.dPct>0?"+":"−"}${Math.abs(x.dPct).toFixed(1)}%</span>`],
+["votes","Voters","Voters who ranked the team",-1,!prevWeekId,true,x=>`${x.votes}<span class="mm-of">/${ballots.length}</span>`],
+["prevVotes","P. Voters","Previous poll voters",-1,false,!!prevWeekId,x=>`${x.prevVotes}<span class="mm-of">/${prevBallots.length}</span>`],
+["dVotes","ΔVoters","Voter change",-1,true,!!prevWeekId,
+x=>x.dVotes?`${x.dVotes>0?"+":"−"}${Math.abs(x.dVotes)}`:"0"],
+["wl","W-L","Record",-1,false,true,x=>espnBlank(x)??`<b>${x.r.wins}-${x.r.losses}</b>`],
+["conf","Conf","Conference record",-1,!hasQuadsFile,true,x=>espnBlank(x)??esc(x.r.confRecord||"—")],
+["vsBig5","vs P5","Record vs ACC, Big Ten, Big 12, SEC, Big East",-1,true,hasQuadsFile,
+x=>x.vsBig5?(x.vsBig5.w + x.vsBig5.l?wl(x.vsBig5):"0-0"):blank],
+["net","NET","NCAA NET rank",1,false,showNet,x=>x.net??blank],
+["bpiRank","BPI Rk","BPI rank",1,false,hasQuadsFile,x=>x.bpiRank??blank],
+["bpi","BPI","BPI rating",-1,false,hasQuadsFile,x=>num1(x.bpi)],
+["sor","SOR","Strength of Record rank",1,false,showResume,x=>x.sor??blank],
+["sos","SOS","Strength of Schedule rank",1,false,showResume,x=>x.sos??blank],
+].filter(c=>c[5]);
+const COLS=3 + cols.length;
+const arrow=key=>_mmSort?.key===key?(_mmSort.dir===1?" ▲":" ▼"):"";
+const th=(key,label,tip,dir,end,cls="")=>
+`<th data-sort="${key}" data-dir="${dir}" class="mm-sortable${end?" mm-sep":""}${_mmSort?.key===key?" mm-sorted":""}${cls?` ${cls}`:""}" title="${esc(tip)}">${label}${arrow(key)}</th>`;
+const head=`<thead><tr><th>#</th><th></th>${th("team","Team","Team",1,false,"team-col")}`
++ cols.map(([k,l,tip,dir,end])=>th(k,l,tip,dir,end)).join("")
++ `</tr></thead>`;
+if(!data){
+const msg=error?`Couldn't load records from ESPN (${esc(error)}). <span class="records-retry">Retry</span>`:"Loading";
+return `${head}<tbody><tr><td colspan="${COLS}" class="records-msg">${msg}</td></tr></tbody>`;
+}
+const body=shown.map((x,i)=>{
+const name=conferenceDisplayName(x.team);
+const logo=`<img class="logo-sm records-logo" data-team="${esc(x.team)}"${x.id?` data-espn="${x.id}"`:""} alt="">`;
+const cells=cols.map(([k,,,,end,,cell])=>`<td class="mm-${k}${end?" mm-sep":""}">${cell(x)}</td>`).join("");
+const ranked=x.pts&&!(shown[i + 1]?.pts)&&!_mmSort&&i<shown.length - 1;
+const cls=[x.r?"records-team-row":"",ranked?"records-t25-end":""].filter(Boolean).join(" ");
+return `<tr${cls?` class="${cls}"`:""}${x.r?` data-espn="${x.id}"`:""}><td>${i + 1}</td><td>${logo}</td>`
++ `<td class="team-col">${esc(name)}</td>${cells}</tr>`;
+}).join("");
+return `${head}<tbody>${body||`<tr><td colspan="${COLS}" class="records-msg">No Mid-Major or Pac-12 team received votes this week or the previous poll.</td></tr>`}</tbody>`;
+}
+const REPORT_ACTIONS={
+"mm-p12":showMmP12Report,
+};
+function showReportsModal(){
+const modal=document.getElementById("reports-modal");
+modal.classList.add("open");
+modal.querySelector(".report-item")?.focus();
+}
+document.getElementById("reports-list").addEventListener("click",e=>{
+const btn=e.target.closest(".report-item");
+const action=btn&&REPORT_ACTIONS[btn.dataset.report];
+if(!action)return;
+document.getElementById("reports-modal").classList.remove("open");
+action();
+});
+document.getElementById("reports-list").addEventListener("keydown",e=>{
+if(e.shiftKey||(e.key!=="ArrowDown"&&e.key!=="ArrowUp"))return;
+const items=[...document.querySelectorAll("#reports-list .report-item")];
+const i=items.indexOf(document.activeElement);
+if(i<0)return;
+e.preventDefault();
+items[(i +(e.key==="ArrowDown"?1:items.length - 1))%items.length].focus();
+});
+["tenure-modal","conference-modal","reports-modal"].forEach(id=>{
 document.getElementById(id).addEventListener("click",e=>{
 if(e.target===e.currentTarget)e.currentTarget.classList.remove("open");
 });
 });
-function computeVoterAvg(yearTabs,lbData){
-const weekConsensus={};
-yearTabs.forEach(tab=>{
-const overall=lbData[tab.dataset.week]?.["Official Overall"]?.teams;
-weekConsensus[tab.dataset.week]=overall&&overall.length>0?overall:null;
-});
-let finalRanking=null;
-{
-const last5=[];
-for(let i=yearTabs.length - 1;i>=0&&last5.length<5;i--){
-const c=weekConsensus[yearTabs[i].dataset.week];
-if(c)last5.push(c);
-}
-if(last5.length===0)return null;
-const points={};
-last5.forEach((ranking,wi)=>{
-const weight=last5.length - wi;
-ranking.forEach((team,i)=>{
-points[team]=(points[team]||0)+(25 - i)*weight;
-});
-});
-finalRanking=Object.entries(points)
-.sort((a,b)=>b[1]- a[1])
-.slice(0,25)
-.map(([team])=>team);
-}
-if(!finalRanking)return null;
-function posWeight(rank){
-return 1.0 -(rank - 1)*(0.5 / 24);
-}
-function ballotDistance(teams,reference){
-let dist=0;
-for(let i=0;i<25;i++){
-const team=reference[i];
-const rank=i + 1;
-const vr=teams.indexOf(team);
-dist +=Math.abs(rank -(vr===-1?26:vr + 1))*posWeight(rank);
-}
-teams.forEach((team,vi)=>{
-if(!reference.includes(team))dist +=Math.abs((vi + 1)- 26)*posWeight(vi + 1);
-});
-return dist;
-}
-const weekFieldAvg={};
-yearTabs.forEach(tab=>{
-const weekId=tab.dataset.week;
-const weekData=lbData[weekId];
-if(!weekData){weekFieldAvg[weekId]=0;return;}
-const dists=[];
-Object.entries(weekData).forEach(([u,entry])=>{
-if(u==="Official Overall"||!entry.isOfficial||!entry.teams?.length)return;
-dists.push(ballotDistance(entry.teams,finalRanking));
-});
-weekFieldAvg[weekId]=dists.length
-?dists.reduce((a,b)=>a + b,0)/ dists.length:0;
-});
-const MISS_PENALTY=1,MAX_MISSES=5,MAX_CONSEC_MISSES=3;
-const voterAvg={};
-const allUsernames=new Set();
-yearTabs.forEach(tab=>{
-const weekData=lbData[tab.dataset.week];
-if(!weekData)return;
-Object.keys(weekData).forEach(u=>{if(u!=="Official Overall")allUsernames.add(u);});
-});
-const totalWeeks=yearTabs.length;
-allUsernames.forEach(username=>{
-let lastBallot=null,total=0,totalWW=0,missed=0,boldAdj=0,consecMisses=0,maxConsecMisses=0;
-yearTabs.forEach((tab,weekIdx)=>{
-const weekId=tab.dataset.week;
-const ww=totalWeeks>1?0.5 +(weekIdx /(totalWeeks - 1))*0.5:1.0;
-const entry=lbData[weekId]?.[username];
-const teams=entry?.teams;
-const consensus=weekConsensus[weekId];
-if(teams&&teams.length>0){
-total +=ballotDistance(teams,finalRanking)*ww;
-totalWW +=ww;
-lastBallot=teams;
-consecMisses=0;
-if(consensus){
-let weekBoldAdj=0,totalWeight=0;
-for(let i=0;i<25;i++){
-const team=finalRanking[i];
-const finalRank=i + 1;
-const vi=teams.indexOf(team),ci=consensus.indexOf(team);
-const voterRank=vi===-1?26:vi + 1;
-const consensusRank=ci===-1?26:ci + 1;
-const deviation=Math.abs(voterRank - consensusRank);
-if(deviation>0){
-const scalar=0.05;
-const weight=deviation;
-const consensusDist=Math.abs(consensusRank - finalRank);
-const voterDist=Math.abs(voterRank - finalRank);
-const gain=consensusDist - voterDist;
-if(gain>0){
-weekBoldAdj +=gain*weight*scalar*posWeight(finalRank);
-totalWeight +=weight;
-}
-}
-}
-if(totalWeight>0){
-boldAdj +=(weekBoldAdj / totalWeight)*ww;
-}
-}
-}else{
-const missDist=(lastBallot?ballotDistance(lastBallot,finalRanking):weekFieldAvg[weekId]);
-total +=missDist*ww;
-totalWW +=ww;
-missed++;
-consecMisses++;
-maxConsecMisses=Math.max(maxConsecMisses,consecMisses);
-}
-});
-if(missed>=MAX_MISSES||maxConsecMisses>=MAX_CONSEC_MISSES){
-voterAvg[username]={avg:Infinity,combined:Infinity};
-return;
-}
-const avg=totalWW>0?total / totalWW:0;
-const combined=avg - boldAdj + missed*MISS_PENALTY;
-voterAvg[username]={avg,boldAdj,combined};
-});
-return voterAvg;
-}
 ["keybind-legend-modal","season-stats-modal","heatmap-modal"].forEach(id=>{
 document.getElementById(id).addEventListener("click",e=>{
 if(e.target===e.currentTarget)e.currentTarget.classList.remove("open");
@@ -7996,7 +8180,7 @@ try{localStorage.setItem("showWeekArrows",on?"1":"0");}catch(e){}
 setWeekArrowsVisible(_showWeekArrows);
 document.getElementById("week-arrow-prev").addEventListener("click",()=>navigateWeek(-1));
 document.getElementById("week-arrow-next").addEventListener("click",()=>navigateWeek(1));
-const LOCKED_KEYS=new Set(["D","X","R","T","Y","G","U","W","H","K","P","S","?"]);
+const LOCKED_KEYS=new Set(["D","X","T","Y","G","U","W","H","K","P","S","?"]);
 const PIN_SALT="3257a8d4b7c69c8ae5b2dd12961baa35";
 const PIN_HASH="20588ee36e7cdd384e92ceef66b5382d45fb006d4fea1d93059a20d679aa9a22";
 const PIN_LENGTH=9;
@@ -8077,10 +8261,10 @@ if(e.key==="Escape"){
 document.getElementById("voter-history-modal").classList.remove("open");
 document.getElementById("keybind-legend-modal").classList.remove("open");
 document.getElementById("season-stats-modal").classList.remove("open");
-document.getElementById("precision-modal").classList.remove("open");
 document.getElementById("tenure-modal").classList.remove("open");
 document.getElementById("conference-modal").classList.remove("open");
 document.getElementById("heatmap-modal").classList.remove("open");
+document.getElementById("reports-modal").classList.remove("open");
 }
 if(e.shiftKey&&(e.key==="V"||e.key==="v")){
 e.preventDefault();
@@ -8140,11 +8324,6 @@ e.preventDefault();
 applyTableSort("consensus");
 return;
 }
-if(e.key==="R"||e.key==="r"){
-e.preventDefault();
-showPrecisionModal();
-return;
-}
 if(e.key==="T"||e.key==="t"){
 e.preventDefault();
 showTenureModal();
@@ -8153,6 +8332,13 @@ return;
 if(e.key==="K"||e.key==="k"){
 e.preventDefault();
 showConferenceModal();
+return;
+}
+if(e.key==="R"||e.key==="r"){
+e.preventDefault();
+const reports=document.getElementById("reports-modal");
+if(reports.classList.contains("open"))reports.classList.remove("open");
+else showReportsModal();
 return;
 }
 if(e.key==="Y"||e.key==="y"){

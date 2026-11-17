@@ -1391,6 +1391,69 @@ body.dark .pin-btn.pinned {
     z-index: 6;
 }
 
+/* Report: MM + P12 (Year window, table.season-records.season-mmp12) */
+#season-stats-table.season-records.season-mmp12 > thead > tr > th:nth-child(n),
+#season-stats-table.season-records.season-mmp12 > tbody > tr > td:nth-child(n) { border-right: none; }
+#season-stats-table.season-records.season-mmp12 > thead > tr > th.mm-sep:nth-child(n),
+#season-stats-table.season-records.season-mmp12 > tbody > tr > td.mm-sep:nth-child(n) { border-right: 1px solid var(--color-border-nth); }
+#season-stats-table.season-mmp12 th.mm-sortable { cursor: pointer; user-select: none; }
+#season-stats-table.season-mmp12 th.mm-sortable:hover { color: var(--color-heading); text-decoration: underline dotted; text-underline-offset: 2px; }
+#season-stats-table.season-mmp12 th.mm-sorted { font-weight: bold; }
+/* Cells: one size and weight throughout, like the Records metric columns (W-L bold, as in Records). */
+#season-stats-table.season-mmp12 > tbody > tr > td:not(:first-child):not(.team-col) { font-size: 12px; font-weight: normal; }
+#season-stats-table.season-mmp12 > tbody > tr > td.mm-wl b { font-weight: bold; }
+#season-stats-table.season-mmp12 td.mm-confName { text-align: left; }
+/* Tighter than Records' 6–8px side padding: this table has many more columns. */
+#season-stats-table.season-mmp12 > thead > tr > th { padding: 4px 4px; }
+#season-stats-table.season-mmp12 > tbody > tr > td { padding: 3px 4px; }
+#season-stats-table.season-mmp12 > tbody > tr > td.mm-sep,
+#season-stats-table.season-mmp12 > thead > tr > th.mm-sep { padding-right: 6px; }
+#season-stats-table.season-mmp12 > tbody > tr > td.mm-sep + td,
+#season-stats-table.season-mmp12 > thead > tr > th.mm-sep + th { padding-left: 6px; }
+/* "x/total" in Voters / P. Voters: the total smaller and faded (10px under 12px cells). */
+#season-stats-table.season-mmp12 .mm-of { font-size: 10px; opacity: 0.55; }
+/* P. Rk: same gray as the totals, at the cell size. */
+#season-stats-table.season-mmp12 .mm-dim { opacity: 0.55; }
+
+/* Reports menu (Shift+R) */
+#reports-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+#reports-modal.open { display: flex; }
+#reports-box {
+    background: var(--color-bg-modal);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    width: calc(100vw - 32px);
+    max-width: 280px;
+    max-height: 80vh;
+    overflow: auto;
+    padding: 14px 14px 12px;
+}
+#reports-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
+#reports-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.report-item {
+    display: block;
+    width: 100%;
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    padding: 6px 9px;
+    border: 1px solid var(--color-border-tab);
+    border-radius: 4px;
+    background: var(--color-bg-tab);
+    color: var(--color-heading);
+    cursor: pointer;
+}
+.report-item:hover, .report-item:focus-visible { background: var(--color-bg-tab-hover); outline: none; }
+.report-item.placeholder { opacity: 0.45; cursor: default; }
+
 /* Conference table (Shift+K) */
 #conference-modal {
     display: none;

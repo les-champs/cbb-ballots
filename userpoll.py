@@ -1763,6 +1763,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>E</kbd></span><span>Toggle Deltas</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>J</kbd></span><span>Toggle Delta Sub-label (Consensus Diff / Recency)</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>1</kbd> – <kbd>9</kbd></span><span>Adjust Delta Lookback Window</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>R</kbd></span><span>Reports Menu</span></div>
     </div>
     <div class="keybind-section">
       <div class="keybind-section-title">Sorting</div>
@@ -1817,6 +1818,24 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
       <div id="conference-years"></div>
     </div>
     <div id="conference-body"></div>
+  </div>
+</div>
+
+<div id="reports-modal">
+  <div id="reports-box">
+    <h2 id="reports-title">Reports</h2>
+    <ul id="reports-list">
+      <li><button class="report-item" data-report="mm-p12" title="Mid-Major + Pac-12">MM + P12</button></li>
+      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
+      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
+      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
+      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
+      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
+      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
+      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
+      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
+      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
+    </ul>
   </div>
 </div>
 

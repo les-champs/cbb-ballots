@@ -4739,6 +4739,7 @@ function showSeasonStatsModal(mode = "records") {
     title.innerHTML = seasonModalTitleHtml(currentYear, isApMode, mode);
     table.classList.toggle("season-voters", mode === "voters");
     table.classList.remove("season-records");
+    table.classList.remove("season-mmp12");
 
     if (mode === "voters") {
         table.innerHTML = buildSeasonVotersTableHtml(weekBallots, voterWeeksVoted, minWeeksVoted, totalWeeks, esc);
@@ -5261,7 +5262,7 @@ function showSeasonRecords(currentYear, isApMode, activeTab) {
         _recordsView = el.dataset.view;
         showSeasonRecords(currentYear, isApMode, activeTab);
     }));
-    table.classList.remove("season-voters");
+    table.classList.remove("season-voters", "season-mmp12");
     table.classList.add("season-records");
 
     const weekId = isApMode && _apCurrentWeekNum !== null
@@ -6564,7 +6565,323 @@ document.getElementById("conference-years").addEventListener("click", e => {
     if (btn) showConferenceModal(Number(btn.dataset.year));
 });
 
-["tenure-modal", "conference-modal"].forEach(id => {
+// ── Report: MM + P12 (Mid-Major + Pac-12) ──────────────────────────────────
+// Every team outside the five "big" conferences (CONFERENCE_DATA.power minus Pac-12), for the
+// active week, in the Year window (#season-stats-modal, table class season-mmp12 on top of
+// season-records so it shares the Records look, logos and click-to-expand game lists).
+// 2025+ only (needs conferences.py). Columns, by group:
+//   Poll    — Rk (points rank among every vote-getter), Pts, Δ (vs the previous week), Votes
+//             (official ballots listing the team), Hi (best spot on a ballot), Avg (mean spot
+//             on ballots that list it), AP (ESPN AP rank; Userpoll weeks only)
+//   Résumé  — W-L, Conf (ESPN standings), vs P5 (record vs ACC/Big Ten/Big 12/SEC/Big East
+//             teams, from quads-YEAR.json's played games)
+//   Metrics — NET (once out), BPI rank (among all D1, by BPI score), BPI, SOR, SOS
+// Rows: teams with votes this week or the previous poll. Default order: poll points, then
+// previous poll's points, then BPI rank. Headers sort; click again to reverse.
+let _mmSort = null;             // null = default order, else {key, dir: 1 | -1}
+let _mmToken = 0;
+const _mmApRanks = {};          // weekId → {espnId: AP rank} | null (no matching ESPN poll)
+
+// Short labels for the long conference names, to keep the Conf column narrow (full name on hover).
+const MM_CONF_SHORT = {
+    "America East": "AE", "American": "AAC", "Atlantic 10": "A-10", "Conference USA": "CUSA",
+    "Missouri Valley": "MVC", "Mountain West": "MWC",
+};
+
+function mmBig5() { return (CONFERENCE_DATA.power || []).filter(c => c !== "Pac-12"); }
+
+function _mmRec(s) {
+    const m = /^(\d+)-(\d+)/.exec(s || "");
+    return m ? { w: +m[1], l: +m[2] } : null;
+}
+
+function showMmP12Report() {
+    const modal = document.getElementById("season-stats-modal");
+    const title = document.getElementById("season-stats-title");
+    const table = document.getElementById("season-stats-table");
+    const activeTab = document.querySelector(".week-tab.active");
+    if (!activeTab) return;
+    const isApMode = _apCurrentYear !== null;
+    const season = isApMode ? String(_apCurrentYear) : activeTab.dataset.year;
+    const weekId = isApMode && _apCurrentWeekNum !== null ? `week-ap-${_apCurrentYear}-${_apCurrentWeekNum}` : activeTab.dataset.week;
+    const tabs = isApMode ? getSortedApTabs() : getSortedTabs();
+    const weekTab = tabs.find(t => t.dataset.week === weekId) || activeTab;
+    const weekLabel = weekTextLabel(weekTab) || `Week ${displayWeekNum(weekTab)}`;
+    // Previous poll in the same season (tabs are sorted newest first).
+    const idx = tabs.indexOf(weekTab);
+    const prevTab = idx >= 0 && tabs[idx + 1]?.dataset.year === weekTab.dataset.year ? tabs[idx + 1] : null;
+    const showAp = !ON_AP_PAGE && !isApMode;
+
+    _recordsRenderToken++;          // drop any Records render still in flight
+    const token = ++_mmToken;
+    table.className = "season-records season-mmp12";
+    let last = [null, null];
+    const render = (data, error) => {
+        if (token !== _mmToken || !table.classList.contains("season-mmp12")) return;
+        last = [data, error];
+        title.innerHTML = `<span class="records-title-main">${season}${isApMode ? " AP" : ""} ${weekLabel} — Mid-Major + Pac-12</span>`
+            + `<span class="records-note records-title-note">${recordsNoteHtml(season, data)}</span>`;
+        table.innerHTML = buildMmP12TableHtml(season, weekId, prevTab?.dataset.week || null, showAp, data, error);
+        table.querySelector(".records-retry")?.addEventListener("click", () => showMmP12Report());
+        table.querySelectorAll("th[data-sort]").forEach(th => th.addEventListener("click", () => {
+            const key = th.dataset.sort;
+            const dir = +th.dataset.dir;
+            _mmSort = _mmSort?.key === key ? (_mmSort.dir === dir ? { key, dir: -dir } : null) : { key, dir };
+            render(...last);
+        }));
+        initRecordsLogos(table);
+        if (!data) return;
+        const tbody = table.querySelector("tbody");
+        tbody.addEventListener("click", e => {
+            const opp = e.target.closest("img.records-opp-logo[data-team]");
+            if (opp) { toggleTeamHighlight(opp.dataset.team); return; }
+            const tr = e.target.closest("tr.records-team-row");
+            if (tr && tbody.contains(tr)) toggleTeamGames(tr, season, data);
+        });
+        tbody.querySelectorAll("tr.records-team-row").forEach(tr => {
+            if (_recordsExpanded.has(`${season}:${tr.dataset.espn}`)) toggleTeamGames(tr, season, data, true);
+        });
+    };
+
+    if (!conferenceTable(season)) {
+        title.textContent = `${season} — Mid-Major + Pac-12`;
+        table.innerHTML = `<tbody><tr><td class="records-msg">Conference data starts in 2025.</td></tr></tbody>`;
+        modal.classList.add("open");
+        return;
+    }
+    const cached = espnCachedData(`records:${season}`);
+    render(cached, null);
+    modal.classList.add("open");
+    const again = () => render(...last);
+    if (quadsAvailable(season) && (!_quadsData[season] || _quadsData[season].error)) fetchQuads(season).then(again, again);
+    if (showAp && !(weekId in _mmApRanks)) {
+        espnApPollForWeek(weekId).then(p => {
+            const m = {};
+            (p?.ranks || []).forEach(e => { if (e.rank <= 25) m[e.id] = e.rank; });
+            _mmApRanks[weekId] = p ? m : null;
+        }, () => {}).then(again);
+    }
+    if (!cached || Date.now() - cached.at >= ESPN_TTL_MS) {
+        fetchSeasonRecords(season).then(d => render(d, null), err => render(null, err.message));
+    }
+}
+
+function buildMmP12TableHtml(season, weekId, prevWeekId, showAp, data, error) {
+    const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const alias = k => (CONFERENCE_DATA.aliases || {})[k] || k;
+    const confs = conferenceTable(season);
+    const big5 = new Set(mmBig5());
+    const confOf = {};
+    Object.entries(confs).forEach(([c, teams]) => teams.forEach(t => { confOf[t] = c; }));
+
+    const quadSrc = quadsAvailable(season);
+    const qd = _quadsData[season];
+    const hasQuadsFile = !!QUAD_FILES?.[season]?.quads;
+    const showNet = quadSrc === "net";
+    const showResume = hasQuadsFile && Number(season) >= RESUME_FROM_SEASON;
+    const apRanks = showAp ? _mmApRanks[weekId] : undefined;
+    const blank = qd || !quadSrc ? "—" : "…";
+
+    // Poll numbers from official ballots (same points as Official Overall).
+    const ballotsOf = id => Object.entries(buildDeltaData(true)[id] || {})
+        .filter(([u]) => u !== "Official Overall" && u !== "AP Overall").map(([, ts]) => ts.slice(0, 25));
+    const ballots = ballotsOf(weekId);
+    const pts = {}, spots = {};
+    ballots.forEach(b => b.forEach((t, i) => {
+        if (!t) return;
+        pts[t] = (pts[t] || 0) + (25 - i);
+        (spots[t] || (spots[t] = [])).push(i + 1);
+    }));
+    // Competition ranking (1, 2, 2, 4) by points among every vote-getter.
+    const rankOf = p => {
+        const r = {};
+        Object.entries(p).sort((a, b) => b[1] - a[1]).forEach(([t, v], i, arr) => {
+            r[t] = i && arr[i - 1][1] === v ? r[arr[i - 1][0]] : i + 1;
+        });
+        return r;
+    };
+    const pollRank = rankOf(pts);
+    const prevPts = {};
+    const prevBallots = prevWeekId ? ballotsOf(prevWeekId) : [];
+    const prevVoters = {};
+    prevBallots.forEach(b => b.forEach((t, i) => {
+        if (!t) return;
+        prevPts[t] = (prevPts[t] || 0) + (25 - i);
+        prevVoters[t] = (prevVoters[t] || 0) + 1;
+    }));
+    // Share of the most points a team could get that week (25 from every official ballot).
+    const share = (p, n) => n ? p / (25 * n) * 100 : null;
+    const prevRank = rankOf(prevPts);
+
+    // BPI rank among every D1 team in the quads file (competition ranking by score).
+    const bpiRank = {};
+    if (qd?.teams) {
+        const s = Object.entries(qd.teams).filter(([, t]) => t.bpi != null).sort((a, b) => b[1].bpi - a[1].bpi);
+        s.forEach(([k, t], i) => { bpiRank[k] = i && s[i - 1][1].bpi === t.bpi ? bpiRank[s[i - 1][0]] : i + 1; });
+    }
+
+    const rows = [];
+    Object.entries(confs).forEach(([conf, teams]) => {
+        if (big5.has(conf)) return;
+        teams.forEach(team => {
+            if (!pts[team] && !prevPts[team]) return;   // votes this week or last only
+            const id = espnIdFor(team);
+            const r = id && data ? data.byId[id] : null;
+            const qk = alias(team);
+            const t = qd?.teams?.[qk];
+            const played = qd?.played?.[qk];
+            let vsBig5 = null;
+            if (played) {
+                vsBig5 = { w: 0, l: 0 };
+                played.forEach(g => {
+                    if (!g.opp.key || !big5.has(confOf[g.opp.key])) return;
+                    if (g.result === "W") vsBig5.w++; else if (g.result === "L") vsBig5.l++;
+                });
+            }
+            const sp = spots[team] || [];
+            const gp = r ? r.wins + r.losses : 0;
+            rows.push({
+                team, id, r, t, conf,
+                pollRank: pollRank[team] ?? null,
+                prevRank: prevRank[team] ?? null,
+                // Rank change, positive = moved up; null unless ranked (received votes) in both polls.
+                dRank: pollRank[team] && prevRank[team] ? prevRank[team] - pollRank[team] : null,
+                prevPts: prevWeekId ? prevPts[team] || 0 : null,
+                ptsPct: pts[team] ? share(pts[team], ballots.length) : null,
+                prevPtsPct: prevPts[team] ? share(prevPts[team], prevBallots.length) : null,
+                // Change in Pts % since the previous poll (percentage points; no votes counts as 0%).
+                dPct: prevWeekId ? (share(pts[team] || 0, ballots.length) ?? 0) - (share(prevPts[team] || 0, prevBallots.length) ?? 0) : null,
+                pts: pts[team] || 0,
+                votes: sp.length,
+                firsts: sp.filter(n => n === 1).length,
+                prevVotes: prevWeekId ? prevVoters[team] || 0 : null,
+                dVotes: prevWeekId ? sp.length - (prevVoters[team] || 0) : null,
+                hi: sp.length ? Math.min(...sp) : null,
+                // Worst spot; 26 (shown "NR") when any official voter left the team off.
+                lo: sp.length ? (sp.length < ballots.length ? 26 : Math.max(...sp)) : null,
+                avg: sp.length ? sp.reduce((a, b) => a + b, 0) / sp.length : null,
+                ap: apRanks ? apRanks[id] ?? null : null,
+                pct: gp ? r.wins / gp : null,
+                confPct: (() => { const c = _mmRec(r?.confRecord); return c && c.w + c.l ? c.w / (c.w + c.l) : null; })(),
+                vsBig5,
+                net: showNet ? t?.rank ?? null : null,
+                bpiRank: bpiRank[qk] ?? null,
+                bpi: t?.bpi ?? null, sor: t?.sor ?? null, sos: t?.sos ?? null,
+            });
+        });
+    });
+
+    // Default order, then any header sort.
+    const nullLast = (a, b, f) => (a == null) - (b == null) || (a == null ? 0 : f(a, b));
+    rows.sort((a, b) => (b.pts - a.pts)
+        || ((prevPts[b.team] || 0) - (prevPts[a.team] || 0))
+        || nullLast(a.bpiRank, b.bpiRank, (x, y) => x - y)
+        || nullLast(a.pct, b.pct, (x, y) => y - x)
+        || conferenceDisplayName(a.team).localeCompare(conferenceDisplayName(b.team)));
+    const shown = rows;
+    const wlVal = x => x ? x.w - x.l * 0.001 : null;     // more wins first, then fewer losses
+    const sortVal = {
+        pollRank: x => x.pollRank, prevRank: x => x.prevRank, dRank: x => x.dRank,
+        pts: x => x.pts, ptsPct: x => x.ptsPct, dPct: x => x.dPct, votes: x => x.votes, firsts: x => x.firsts, prevVotes: x => x.prevVotes, dVotes: x => x.dVotes, lo: x => x.lo,
+        hi: x => x.hi, avg: x => x.avg, ap: x => x.ap, wl: x => x.pct, conf: x => x.confPct,
+        vsBig5: x => wlVal(x.vsBig5),
+        net: x => x.net, bpiRank: x => x.bpiRank, bpi: x => x.bpi, sor: x => x.sor, sos: x => x.sos,
+        team: x => conferenceDisplayName(x.team), confName: x => x.conf,
+    };
+    if (_mmSort && sortVal[_mmSort.key]) {
+        const f = sortVal[_mmSort.key], dir = _mmSort.dir;
+        shown.sort((a, b) => nullLast(f(a), f(b), (x, y) => (typeof x === "string" ? x.localeCompare(y) : x - y) * dir));
+    }
+
+    // Columns: [key, label, tooltip, default sort dir (1 = ascending), group end?, show?, cell]
+    const wl = x => x ? `${x.w}-${x.l}` : blank;
+    const num1 = v => v == null ? blank : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(1);
+    const espnBlank = x => x.r ? null : "—";
+    const cols = [
+        ["confName", "Conf", "Conference", 1, true, true, x => MM_CONF_SHORT[x.conf] ? `<span class="mm-conf" title="${esc(x.conf)}">${MM_CONF_SHORT[x.conf]}</span>` : `<span class="mm-conf">${esc(x.conf)}</span>`],
+        ["pollRank", "Rk", "Poll rank", 1, false, true, x => x.pollRank ?? "—"],
+        ["prevRank", "P. Rk", "Previous poll rank", 1, false, !!prevWeekId, x => `<span class="mm-dim">${x.prevRank ?? "—"}</span>`],
+        ["dRank", "ΔRk", "Rank change", -1, false, !!prevWeekId,
+            x => x.dRank ? `<span class="${x.dRank > 0 ? "delta-up" : "delta-down"}">${x.dRank > 0 ? "+" : "−"}${Math.abs(x.dRank)}</span>` : x.dRank === 0 ? "0" : "—"],
+        ["hi", "Hi", "Highest ballot rank", 1, false, true, x => x.hi ?? "—"],
+        ["lo", "Lo", "Lowest ballot rank (NR = left off a ballot)", 1, false, true, x => x.lo === 26 ? "NR" : x.lo ?? "—"],
+        ["avg", "Avg", "Average ballot rank", 1, false, true, x => x.avg == null ? "—" : x.avg.toFixed(1)],
+        ["ap", "AP", "AP rank", 1, false, showAp, x => apRanks === undefined ? "…" : x.ap ?? "—"],
+        ["firsts", "#1", "First-place votes", -1, true, true, x => x.firsts || "—"],
+        ["ptsPct", "Pts %", `% of max points (${25 * ballots.length})`, -1, false, true,
+            x => x.ptsPct == null ? "—" : `<span title="${x.pts} pts">${x.ptsPct.toFixed(1)}%</span>`],
+        ["dPct", "Pts Δ%", "Pts % change", -1, false, !!prevWeekId,
+            x => x.dPct == null ? "—" : Math.abs(x.dPct) < 0.05 ? "0.0%"
+                : `<span class="${x.dPct > 0 ? "delta-up" : "delta-down"}">${x.dPct > 0 ? "+" : "−"}${Math.abs(x.dPct).toFixed(1)}%</span>`],
+        ["votes", "Voters", "Voters who ranked the team", -1, !prevWeekId, true, x => `${x.votes}<span class="mm-of">/${ballots.length}</span>`],
+        ["prevVotes", "P. Voters", "Previous poll voters", -1, false, !!prevWeekId, x => `${x.prevVotes}<span class="mm-of">/${prevBallots.length}</span>`],
+        ["dVotes", "ΔVoters", "Voter change", -1, true, !!prevWeekId,
+            x => x.dVotes ? `${x.dVotes > 0 ? "+" : "−"}${Math.abs(x.dVotes)}` : "0"],
+        ["wl", "W-L", "Record", -1, false, true, x => espnBlank(x) ?? `<b>${x.r.wins}-${x.r.losses}</b>`],
+        ["conf", "Conf", "Conference record", -1, !hasQuadsFile, true, x => espnBlank(x) ?? esc(x.r.confRecord || "—")],
+        ["vsBig5", "vs P5", "Record vs ACC, Big Ten, Big 12, SEC, Big East", -1, true, hasQuadsFile,
+            x => x.vsBig5 ? (x.vsBig5.w + x.vsBig5.l ? wl(x.vsBig5) : "0-0") : blank],
+        ["net", "NET", "NCAA NET rank", 1, false, showNet, x => x.net ?? blank],
+        ["bpiRank", "BPI Rk", "BPI rank", 1, false, hasQuadsFile, x => x.bpiRank ?? blank],
+        ["bpi", "BPI", "BPI rating", -1, false, hasQuadsFile, x => num1(x.bpi)],
+        ["sor", "SOR", "Strength of Record rank", 1, false, showResume, x => x.sor ?? blank],
+        ["sos", "SOS", "Strength of Schedule rank", 1, false, showResume, x => x.sos ?? blank],
+    ].filter(c => c[5]);
+    const COLS = 3 + cols.length;
+    const arrow = key => _mmSort?.key === key ? (_mmSort.dir === 1 ? " ▲" : " ▼") : "";
+    const th = (key, label, tip, dir, end, cls = "") =>
+        `<th data-sort="${key}" data-dir="${dir}" class="mm-sortable${end ? " mm-sep" : ""}${_mmSort?.key === key ? " mm-sorted" : ""}${cls ? ` ${cls}` : ""}" title="${esc(tip)}">${label}${arrow(key)}</th>`;
+    const head = `<thead><tr><th>#</th><th></th>${th("team", "Team", "Team", 1, false, "team-col")}`
+        + cols.map(([k, l, tip, dir, end]) => th(k, l, tip, dir, end)).join("")
+        + `</tr></thead>`;
+
+    if (!data) {
+        const msg = error ? `Couldn't load records from ESPN (${esc(error)}). <span class="records-retry">Retry</span>` : "Loading";
+        return `${head}<tbody><tr><td colspan="${COLS}" class="records-msg">${msg}</td></tr></tbody>`;
+    }
+    const body = shown.map((x, i) => {
+        const name = conferenceDisplayName(x.team);
+        const logo = `<img class="logo-sm records-logo" data-team="${esc(x.team)}"${x.id ? ` data-espn="${x.id}"` : ""} alt="">`;
+        const cells = cols.map(([k, , , , end, , cell]) => `<td class="mm-${k}${end ? " mm-sep" : ""}">${cell(x)}</td>`).join("");
+        const ranked = x.pts && !(shown[i + 1]?.pts) && !_mmSort && i < shown.length - 1;
+        const cls = [x.r ? "records-team-row" : "", ranked ? "records-t25-end" : ""].filter(Boolean).join(" ");
+        return `<tr${cls ? ` class="${cls}"` : ""}${x.r ? ` data-espn="${x.id}"` : ""}><td>${i + 1}</td><td>${logo}</td>`
+            + `<td class="team-col">${esc(name)}</td>${cells}</tr>`;
+    }).join("");
+    return `${head}<tbody>${body || `<tr><td colspan="${COLS}" class="records-msg">No Mid-Major or Pac-12 team received votes this week or the previous poll.</td></tr>`}</tbody>`;
+}
+
+// Reports menu (Shift+R): a list of report launchers. Add a handler to
+// REPORT_ACTIONS keyed by the item's data-report (markup in build_full_html()).
+const REPORT_ACTIONS = {
+    "mm-p12": showMmP12Report,
+};
+
+function showReportsModal() {
+    const modal = document.getElementById("reports-modal");
+    modal.classList.add("open");
+    modal.querySelector(".report-item")?.focus();
+}
+
+document.getElementById("reports-list").addEventListener("click", e => {
+    const btn = e.target.closest(".report-item");
+    const action = btn && REPORT_ACTIONS[btn.dataset.report];
+    if (!action) return;
+    document.getElementById("reports-modal").classList.remove("open");
+    action();
+});
+
+// Plain ↑/↓ move between items while the menu is open (Enter/Space click the focused one).
+document.getElementById("reports-list").addEventListener("keydown", e => {
+    if (e.shiftKey || (e.key !== "ArrowDown" && e.key !== "ArrowUp")) return;
+    const items = [...document.querySelectorAll("#reports-list .report-item")];
+    const i = items.indexOf(document.activeElement);
+    if (i < 0) return;
+    e.preventDefault();
+    items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus();
+});
+
+["tenure-modal", "conference-modal", "reports-modal"].forEach(id => {
     document.getElementById(id).addEventListener("click", e => {
         if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
     });
@@ -6756,6 +7073,7 @@ document.addEventListener("keydown", e => {
         document.getElementById("tenure-modal").classList.remove("open");
         document.getElementById("conference-modal").classList.remove("open");
         document.getElementById("heatmap-modal").classList.remove("open");
+        document.getElementById("reports-modal").classList.remove("open");
     }
     // Chord: Shift+V then X → toggle veteran tags
     if (e.shiftKey && (e.key === "V" || e.key === "v")) {
@@ -6834,6 +7152,14 @@ document.addEventListener("keydown", e => {
     if (e.key === "K" || e.key === "k") {
         e.preventDefault();
         showConferenceModal();
+        return;
+    }
+
+    if (e.key === "R" || e.key === "r") {
+        e.preventDefault();
+        const reports = document.getElementById("reports-modal");
+        if (reports.classList.contains("open")) reports.classList.remove("open");
+        else showReportsModal();
         return;
     }
 
