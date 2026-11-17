@@ -1,5 +1,5 @@
-# Refreshes NET (net-YEAR.json) and quadrant / BPI / SOR / SOS data
-# (quads-YEAR.json) once a day, commits any real change, and redeploys.
+# Refreshes NET (net-YEAR.json), quadrant / BPI / SOR / SOS data
+# (quads-YEAR.json) and the weekly BPI snapshots (bpi-YEAR.json) once a day, commits any real change, and redeploys.
 # A push made with GITHUB_TOKEN doesn't trigger other workflows, so the
 # deploy is started explicitly with `gh workflow run`.
 name: Refresh quads
@@ -40,6 +40,13 @@ jobs:
       - name: Compute quads
         run: python3 userpoll.py --quads
 
+      # ESPN keeps no BPI history: record today's snapshot (bpi-YEAR.json keeps
+      # the latest one per poll week, for the Data Ballots BPI row). A failure
+      # shouldn't block the rest of the refresh.
+      - name: Record BPI snapshot
+        continue-on-error: true
+        run: python3 userpoll.py --bpi
+
       # Every run rewrites the "fetched" timestamp; drop files whose only
       # change is that, so the repo doesn't grow ~1.4 MB a day for nothing.
       - name: Discard timestamp-only changes
@@ -69,7 +76,7 @@ jobs:
       - name: Commit and push
         id: commit
         run: |
-          git add -A -- 'net-*.json' 'quads-*.json' '*.html'
+          git add -A -- 'net-*.json' 'quads-*.json' 'bpi-*.json' '*.html'
           if git diff --cached --quiet; then
             echo "No data changes."
             echo "changed=false" >> "$GITHUB_OUTPUT"

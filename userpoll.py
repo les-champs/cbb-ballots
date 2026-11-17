@@ -15,6 +15,7 @@ import conferences
 import nond1_logos
 import net_rankings
 import quads
+import bpi_history
 
 # Output directory for logos
 BASE_HTML_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1658,6 +1659,16 @@ def compute_ap_tenure_counts():
                     counts[username] = counts.get(username, 0) + 1
     return counts
 
+def get_bpi_files():
+    """Seasons with a bpi-YEAR.json on disk (bpi_history.py; the Data Ballots BPI row)."""
+    years = []
+    for name in sorted(os.listdir(BASE_HTML_DIR)):
+        m = re.fullmatch(r"bpi-(\d{4})\.json", name)
+        if m and m.group(1) not in EXCLUDED_YEARS:
+            years.append(int(m.group(1)))
+    return years
+
+
 def get_quad_files():
     """{season: {"net": bool, "quads": bool}} for the net-YEAR.json / quads-YEAR.json files on disk.
 
@@ -1684,6 +1695,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
     ncaa_dark_logo_ids_js = "new Set(" + json.dumps(ncaa_dark) + ")"
     conference_data_js = conferences.js_payload()
     quad_files_js = json.dumps(get_quad_files())
+    bpi_files_js = json.dumps(get_bpi_files())
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -1838,6 +1850,7 @@ const NCAA_LOGO_IDS = {ncaa_logo_ids_js};
 const NCAA_DARK_LOGO_IDS = {ncaa_dark_logo_ids_js};
 const CONFERENCE_DATA = {conference_data_js};
 const QUAD_FILES = {quad_files_js};
+const BPI_FILES = {bpi_files_js};
 {JS}
 </script>
 
@@ -2137,6 +2150,7 @@ def main():
     parser.add_argument("--ncaa-logos", action="store_true", help="Download NCAA.com logos for non-D1 opponents ESPN has none for (nond1_logos.NCAA_SLUGS), list unmapped ones, and exit. --year 0 = every shown season (default: current)")
     parser.add_argument("--net", action="store_true", help="Fetch NCAA NET rankings + quadrant records from NCAA.com into net-YEAR.json and exit")
     parser.add_argument("--quads", action="store_true", help="Compute Q1–Q4 records from ESPN schedules + BPI (or NET) ranks into quads-YEAR.json and exit (--year, default current)")
+    parser.add_argument("--bpi", action="store_true", help="Record today's ESPN BPI snapshot into bpi-YEAR.json (one kept per poll week) and exit (--year, default current; past season = its final BPI; 0 = every shown season)")
     parser.add_argument("--rank-source", choices=["auto", "bpi", "net"], default="auto", dest="rank_source", help="With --quads: opponent ranking (auto = NET if net-YEAR.json exists, else BPI)")
     parser.add_argument("--check", action="store_true", help="With --quads: compare computed quads with official ones in net-YEAR.json")
     parser.add_argument("--force", action="store_true", help="With --ncaa-logos: re-download files that already exist")
@@ -2158,6 +2172,17 @@ def main():
         return
     if args.net:
         if not net_rankings.run(BASE_HTML_DIR):
+            sys.exit(1)
+        return
+    if args.bpi:
+        today = datetime.date.today()
+        current = today.year + (1 if today.month >= 7 else 0)
+        if args.year == 0:
+            seasons = [y for y in range(2016, current + 1) if str(y) not in EXCLUDED_YEARS]
+        else:
+            seasons = [args.year or current]
+        ok = [bpi_history.run(BASE_HTML_DIR, y) for y in seasons]
+        if not all(ok):
             sys.exit(1)
         return
     if args.quads:

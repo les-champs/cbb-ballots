@@ -2919,6 +2919,8 @@ function injectWeightedRankingRow(activeTab, activeBlock) {
     const deltaData = buildDeltaData(true);
     _injectTenureRows(activeBlock, activeTab.dataset.week, yearTabs, deltaData);
     applyDataBallotOrder(activeBlock);
+    injectEspnApRow(activeBlock, activeTab.dataset.week);
+    injectBpiRow(activeBlock, activeTab.dataset.week);
 }
 
 // {conf: [teams]} for a season (later seasons reuse the last defined one), or null before 2025.
@@ -2942,10 +2944,11 @@ function weekBallotPoints(weekBallots) {
 
 // One ranking row (name cell + 25 logo cells with delta and points labels).
 // pts = {team: points}; prevRankOf = {team: last week's rank in the same ranking}.
-function _buildPointsRankingRow(label, ranked, pts, prevRankOf, hasPrev) {
+// key = the row's id for the saved drag order (defaults to the label).
+function _buildPointsRankingRow(label, ranked, pts, prevRankOf, hasPrev, key = label) {
     const tr = document.createElement("tr");
     tr.className = "voter-row row-weighted-ranking";
-    tr.dataset.group = label;
+    tr.dataset.group = key;
     const nameTd = document.createElement("td");
     nameTd.innerHTML = `<div class="voter-cell"><span class="voter-name"></span></div>`;
     nameTd.querySelector(".voter-name").textContent = label;
@@ -2984,15 +2987,17 @@ function _buildPointsRankingRow(label, ranked, pts, prevRankOf, hasPrev) {
 // Overall points from only the official ballots of voters in a tenure band
 // (TENURE_COUNTS = career ballots, the same numbers as the Tenure leaderboard).
 const TENURE_GROUPS = [
-    // Non-overlapping bands; a season is roughly 18–20 ballots.
-    { label: "Rookies",     test: n => n < 20 },
-    { label: "2–5 Seasons", test: n => n >= 20 && n < 100 },
-    { label: "Veterans",    test: n => n >= 100 },
+    // Non-overlapping bands; a season is roughly 18–20 ballots. `key` is the old label,
+    // kept as the drag-order id so saved orders (localStorage dataBallotOrder) still apply.
+    { key: "Rookies",     label: "20- Ballots",   test: n => n <= 20 },
+    { key: "2–5 Seasons", label: "21-99 Ballots", test: n => n > 20 && n < 100 },
+    { key: "Veterans",    label: "100+ Ballots",  test: n => n >= 100 },
 ];
 
 function tenureBallots(weekBallots, test) {
     const out = {};
     Object.entries(weekBallots || {}).forEach(([user, teams]) => {
+        if (user === "Official Overall" || user === "AP Overall") return;
         if (test(TENURE_COUNTS[user] ?? 0)) out[user] = teams;
     });
     return out;
@@ -3014,8 +3019,10 @@ function _injectTenureRows(block, weekId, yearTabs, deltaData) {
     const rankRows = aggTbody.querySelectorAll(".row-weighted-ranking");
     let anchor = rankRows[rankRows.length - 1] || aggTbody.querySelector(".voter-row:not(.row-pinned-agg)");
     TENURE_GROUPS.forEach(group => {
-        const pts = weekBallotPoints(tenureBallots(deltaData[weekId], group.test));
+        const ballots = tenureBallots(deltaData[weekId], group.test);
+        const pts = weekBallotPoints(ballots);
         if (!Object.keys(pts).length) return;
+        const voters = Object.values(ballots).filter(t => t && t.length).length;
         const ranked = Object.keys(pts).sort((a, b) => pts[b] - pts[a]).slice(0, 25);
         const prevPts = prevWeekId ? weekBallotPoints(tenureBallots(deltaData[prevWeekId], group.test)) : {};
         const hasPrev = Object.keys(prevPts).length > 0;
@@ -3023,13 +3030,185 @@ function _injectTenureRows(block, weekId, yearTabs, deltaData) {
         Object.keys(prevPts).sort((a, b) => prevPts[b] - prevPts[a]).slice(0, 25)
             .forEach((t, i) => { prevRankOf[t] = i + 1; });
 
-        const tr = _buildPointsRankingRow(group.label, ranked, pts, prevRankOf, hasPrev);
+        const tr = _buildPointsRankingRow(`${group.label} (${voters})`, ranked, pts, prevRankOf, hasPrev, group.key);
         tr.classList.add("row-tenure-ranking");
-        if (expanded.has(group.label)) tr.classList.add("row-delta");
+        if (expanded.has(group.key)) tr.classList.add("row-delta");
         if (anchor) anchor.after(tr); else aggTbody.appendChild(tr);
         anchor = tr;
     });
     bindTeamLogos();
+}
+
+// ── AP Top 25 row (Data Ballots, Userpoll only) ─────────────────────────────
+// The official AP poll for the same week, live from ESPN's core API (CORS open, history back
+// to at least 2017). ESPN AP week N = userpoll week N (pre-season = ESPN week 1); checked by
+// ranking similarity for 2017/2020/2022 and by date for 2026. ESPN's numbering has holes and
+// misfiled weeks (2026: week 9 missing, week 2 holds the final poll dated Apr 7), so weeks with
+// a poll deadline must also match by date (ESPN dates AP polls Monday 07:00/08:00 UTC, our
+// deadline is the same Monday 10 AM ET); if type-2 week N misses, the postseason (type 3) polls
+// are tried. Legacy weeks (no deadline) trust the number and never use postseason polls.
+const ESPN_CORE_BASE = "https://sports.core.api.espn.com/v2/sports/basketball/leagues/mens-college-basketball";
+const ESPN_AP_MATCH_MS = 3 * 86400000;
+const ESPN_AP_LABEL = "AP Top 25";
+
+// {date, ranks: [{id, rank, prev, pts, fpv}]}, or {missing: true} when ESPN has no such poll.
+function fetchEspnApPoll(season, type, week) {
+    return _espnCached(`ap:${season}:${type}:${week}`, async () => {
+        let json;
+        try { json = await _espnJson(`${ESPN_CORE_BASE}/seasons/${season}/types/${type}/weeks/${week}/rankings/1`); }
+        catch (e) { if (/HTTP 404\b/.test(e.message)) return { missing: true }; throw e; }
+        const ranks = (json.ranks || []).map(e => ({
+            id: (/teams\/(\d+)/.exec(e.team?.$ref || "") || [])[1] || null,
+            rank: e.current, prev: e.previous || 0,
+            pts: Math.round(e.points || 0), fpv: e.firstPlaceVotes || 0,
+        })).filter(e => e.id && e.rank).sort((a, b) => a.rank - b.rank);
+        return { date: json.date, ranks };
+    });
+}
+
+async function espnApPollForWeek(weekId) {
+    const tab = getSortedTabs().find(t => t.dataset.week === weekId);
+    if (!tab) return null;
+    const season = tab.dataset.year;
+    const pre = isPreseasonTab(tab);
+    // Pre-season ballots can be saved long after the poll (2025's were re-saved in Feb): no date check.
+    const deadline = pre ? null : pollDeadline(weekId);
+    const ok = p => p && !p.missing && p.ranks.length &&
+        (!deadline || Math.abs(Date.parse(p.date) - deadline) <= ESPN_AP_MATCH_MS);
+    const first = await fetchEspnApPoll(season, 2, pre ? 1 : Number(tab.dataset.weeknum));
+    if (ok(first)) return first;
+    if (!deadline) return null;
+    for (const w of [1, 2, 3]) {
+        const p = await fetchEspnApPoll(season, 3, w);
+        if (ok(p)) return p;   // no early exit on 404: 2026 has only type-3 week 3
+    }
+    return null;
+}
+
+async function injectEspnApRow(block, weekId) {
+    if (ON_AP_PAGE || !block || weekId.startsWith("week-ap-")) return;
+    const token = block._espnApToken = {};
+    let poll;
+    try { poll = await espnApPollForWeek(weekId); } catch { poll = null; }
+    if (block._espnApToken !== token) return;
+    const aggTbody = block.querySelectorAll(".ballot-section")[2]?.querySelector("tbody");
+    if (!aggTbody) return;
+    const old = aggTbody.querySelector(".row-espn-ap");
+    const expanded = old?.classList.contains("row-delta");
+    old?.remove();
+    if (!poll) return;
+
+    // Teams missing from ESPN_IDS get a placeholder key, then ESPN's logo below.
+    const keyOf = e => espnTeamKey(e.id) || `espn:${e.id}`;
+    const ranked = poll.ranks.slice(0, 25).map(keyOf);
+    const pts = {}, prevRankOf = {};
+    poll.ranks.forEach(e => { pts[keyOf(e)] = e.pts; if (e.prev) prevRankOf[keyOf(e)] = e.prev; });
+    const hasPrev = poll.ranks.some(e => e.prev);
+    const tr = _buildPointsRankingRow(ESPN_AP_LABEL, ranked, pts, prevRankOf, hasPrev);
+    tr.classList.add("row-espn-ap");
+    if (expanded) tr.classList.add("row-delta");
+    const nameCell = tr.querySelector(".voter-name");
+    nameCell.title = `AP poll via ESPN, ${new Date(poll.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`;
+    tr.querySelectorAll("img.team-logo").forEach((img, i) => {
+        const e = poll.ranks[i];
+        const ptsLabel = img.parentElement.querySelector(".avg-label");
+        if (ptsLabel) ptsLabel.title = e.fpv ? `AP points (${e.fpv} first-place)` : "AP points";
+        if (img.dataset.team.startsWith("espn:")) {
+            img.classList.remove("team-logo");
+            delete img.dataset.team;
+            img.src = espnLogoUrl(e.id);
+        }
+    });
+
+    _insertSourceRow(block, aggTbody, tr);
+}
+
+// Rows from outside sources (ESPN AP poll, BPI) go right after Overall, in this order,
+// whichever arrives first; the saved drag order then applies.
+const SOURCE_ROW_ORDER = ["Overall", "AP Top 25", "BPI"];
+function _insertSourceRow(block, aggTbody, tr) {
+    const mine = SOURCE_ROW_ORDER.indexOf(tr.dataset.group);
+    const rows = Array.from(aggTbody.querySelectorAll(":scope > .voter-row:not(.row-pinned-agg)"));
+    const before = rows.filter(r => { const i = SOURCE_ROW_ORDER.indexOf(dataBallotRowKey(r)); return i !== -1 && i < mine; });
+    const anchor = before[before.length - 1];
+    if (anchor) anchor.after(tr); else aggTbody.prepend(tr);
+    applyDataBallotOrder(block);
+    bindVoterCells(block);
+    bindTeamLogos(block);
+}
+
+// ── BPI row (Data Ballots, Userpoll only) ───────────────────────────────────
+// ESPN's BPI top 25 as of the poll, from bpi-YEAR.json (bpi_history.py, --bpi; same origin,
+// BPI_FILES lists the seasons). ESPN keeps no BPI history, so the daily refresh workflow
+// records one snapshot per poll week (Monday morning, after ESPN's overnight update).
+// A week with a deadline uses the latest snapshot within BPI_MATCH_BEFORE_MS before to
+// BPI_MATCH_AFTER_MS after it; a week without one (legacy 2016–2022) only gets the season's
+// final snapshot, and only if it is the season's last week (those are post-tournament polls).
+const BPI_MATCH_BEFORE_MS = 4 * 86400000;
+const BPI_MATCH_AFTER_MS = 12 * 3600000;
+const _bpiHistory = {};   // season → Promise<snapshots[]>
+
+function fetchBpiHistory(season) {
+    if (typeof BPI_FILES === "undefined" || !BPI_FILES.includes(Number(season))) return Promise.resolve([]);
+    if (!_bpiHistory[season]) {
+        _bpiHistory[season] = fetch(`bpi-${season}.json`)
+            .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+            .then(d => (d.snapshots || []).map(s => ({ ...s, at: Date.parse(s.asOf) })))
+            .catch(e => { delete _bpiHistory[season]; throw e; });
+    }
+    return _bpiHistory[season];
+}
+
+// tabs = the season's tabs, newest first (getSortedTabs order).
+function bpiSnapshotForTab(snaps, tabs, i) {
+    const tab = tabs[i];
+    if (!tab) return null;
+    const deadline = isPreseasonTab(tab) ? null : pollDeadline(tab.dataset.week);
+    if (!deadline) return i === 0 ? snaps.find(s => s.final) || null : null;
+    const fit = snaps.filter(s => s.at >= deadline - BPI_MATCH_BEFORE_MS && s.at <= deadline + BPI_MATCH_AFTER_MS);
+    return fit[fit.length - 1] || null;
+}
+
+async function injectBpiRow(block, weekId) {
+    if (ON_AP_PAGE || !block || weekId.startsWith("week-ap-")) return;
+    const token = block._bpiToken = {};
+    const tabs0 = getSortedTabs();
+    const season = tabs0.find(t => t.dataset.week === weekId)?.dataset.year;
+    let snaps;
+    try { snaps = season ? await fetchBpiHistory(season) : []; } catch { snaps = []; }
+    if (block._bpiToken !== token) return;
+    const aggTbody = block.querySelectorAll(".ballot-section")[2]?.querySelector("tbody");
+    if (!aggTbody) return;
+    const old = aggTbody.querySelector(".row-bpi");
+    const expanded = old?.classList.contains("row-delta");
+    old?.remove();
+
+    const tabs = getSortedTabs().filter(t => t.dataset.year === season);
+    const i = tabs.findIndex(t => t.dataset.week === weekId);
+    const snap = bpiSnapshotForTab(snaps, tabs, i);
+    if (!snap) return;
+    const prev = bpiSnapshotForTab(snaps, tabs, i + 1);
+    const top = snap.teams.slice(0, 25);
+    const ranked = top.map(t => t[0]);
+    const pts = {}, prevRankOf = {};
+    top.forEach(([k, , bpi]) => { pts[k] = bpi.toFixed(1); });
+    (prev?.teams || []).forEach(([k, rank]) => { prevRankOf[k] = rank; });
+    const tr = _buildPointsRankingRow("BPI", ranked, pts, prevRankOf, !!prev);
+    tr.classList.add("row-bpi");
+    if (expanded) tr.classList.add("row-delta");
+    const when = new Date(snap.at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    tr.querySelector(".voter-name").title = `ESPN Basketball Power Index${snap.final ? ", final" : ""}, as of ${when}`;
+    tr.querySelectorAll("img.team-logo").forEach((img, j) => {
+        const [k, rank] = top[j];
+        const label = img.parentElement.querySelector(".avg-label");
+        if (label) label.title = `BPI rating (rank #${rank})`;
+        if (k.startsWith("espn:")) {
+            img.classList.remove("team-logo");
+            delete img.dataset.team;
+            img.src = espnLogoUrl(k.slice(5));
+        }
+    });
+    _insertSourceRow(block, aggTbody, tr);
 }
 
 // ── Data Ballots row order (drag to reorder) ────────────────────────────────

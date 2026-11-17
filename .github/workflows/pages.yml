@@ -36,7 +36,7 @@ jobs:
         run: |
           mkdir _site
           cp *.html thumbnail.png CNAME _site/
-          for f in net-*.json quads-*.json; do if [ -e "$f" ]; then cp "$f" _site/; fi; done
+          for f in net-*.json quads-*.json bpi-*.json; do if [ -e "$f" ]; then cp "$f" _site/; fi; done
           cp -r cbb-logos _site/
           du -sh _site
           ls _site | wc -l
