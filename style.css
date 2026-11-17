@@ -1453,6 +1453,7 @@ body.dark .pin-btn.pinned {
 }
 .report-item:hover, .report-item:focus-visible { background: var(--color-bg-tab-hover); outline: none; }
 .report-item.placeholder { opacity: 0.45; cursor: default; }
+.report-lock { display: block; }
 
 /* Conference table (Shift+K) */
 #conference-modal {

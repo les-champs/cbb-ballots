@@ -6919,6 +6919,23 @@ function modalWeekArrowsHtml() {
 
 // Step one week forward (dir = 1) or back (dir = -1). Shared by Shift+←/→
 // and the optional header arrows (#week-arrows).
+// Re-render any open week-specific window for the week just navigated to (Shift+←/→ and the
+// header week arrows). Add new week-specific windows here. Season-wide windows (team charts,
+// heatmap, tenure, conferences, Year window Voters) aren't refreshed.
+function refreshWeekWindows(weekId) {
+    const vhm = document.getElementById("voter-history-modal");
+    if (vhm.classList.contains("open")) {
+        if (vhm.dataset.chartType === "highlow") showWeekHighLowChart(weekId, vhm.dataset.chartMode || "highlow");
+        else if (vhm.dataset.chartType === "ballottimes" && !weekId.startsWith("week-ap-")) showBallotTimesChart();
+    }
+    const ssm = document.getElementById("season-stats-modal");
+    if (ssm.classList.contains("open")) {
+        const table = document.getElementById("season-stats-table");
+        if (table.classList.contains("season-mmp12")) showMmP12Report();
+        else if (table.classList.contains("season-records")) showSeasonStatsModal("records");
+    }
+}
+
 function navigateWeek(dir) {
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab) return;
@@ -6933,10 +6950,7 @@ function navigateWeek(dir) {
             loadApYear(target.dataset.year).then(async () => {
                 await showApWeek(target.dataset.year, target.dataset.weeknum);
                 if (weekPickerPinned) rebuildWeekPicker();
-                const apWeekId = `week-ap-${target.dataset.year}-${target.dataset.weeknum}`;
-                const vhm = document.getElementById("voter-history-modal");
-                if (vhm.classList.contains("open") && vhm.dataset.chartType === "highlow")
-                    showWeekHighLowChart(apWeekId, vhm.dataset.chartMode || "highlow");
+                refreshWeekWindows(`week-ap-${target.dataset.year}-${target.dataset.weeknum}`);
             }).catch(() => {});
         }
     } else {
@@ -6947,11 +6961,7 @@ function navigateWeek(dir) {
             loadYear(target.dataset.year).then(async () => {
                 await showWeek(target.dataset.week);
                 if (weekPickerPinned) rebuildWeekPicker();
-                const vhm = document.getElementById("voter-history-modal");
-                if (vhm.classList.contains("open") && vhm.dataset.chartType === "highlow")
-                    showWeekHighLowChart(target.dataset.week, vhm.dataset.chartMode || "highlow");
-                if (vhm.classList.contains("open") && vhm.dataset.chartType === "ballottimes")
-                    showBallotTimesChart();
+                refreshWeekWindows(target.dataset.week);
                 backgroundLoad();
             }).catch(() => {});
         }

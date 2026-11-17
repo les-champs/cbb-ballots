@@ -1473,6 +1473,7 @@ body.dark .pin-btn.pinned {
 }
 .report-item:hover, .report-item:focus-visible { background: var(--color-bg-tab-hover); outline: none; }
 .report-item.placeholder { opacity: 0.45; cursor: default; }
+.report-lock { display: block; }
 
 /* Conference table (Shift+K) */
 #conference-modal {
@@ -1835,15 +1836,15 @@ body.dark {
     <h2 id="reports-title">Reports</h2>
     <ul id="reports-list">
       <li><button class="report-item" data-report="mm-p12" title="Mid-Major + Pac-12">MM + P12</button></li>
-      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
-      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
-      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
-      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
-      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
-      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
-      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
-      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
-      <li><button class="report-item placeholder" data-report="">XXXXXXXXX</button></li>
+      <li><button class="report-item placeholder" data-report="" aria-label="Locked report" title="Locked"><svg class="report-lock" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button></li>
+      <li><button class="report-item placeholder" data-report="" aria-label="Locked report" title="Locked"><svg class="report-lock" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button></li>
+      <li><button class="report-item placeholder" data-report="" aria-label="Locked report" title="Locked"><svg class="report-lock" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button></li>
+      <li><button class="report-item placeholder" data-report="" aria-label="Locked report" title="Locked"><svg class="report-lock" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button></li>
+      <li><button class="report-item placeholder" data-report="" aria-label="Locked report" title="Locked"><svg class="report-lock" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button></li>
+      <li><button class="report-item placeholder" data-report="" aria-label="Locked report" title="Locked"><svg class="report-lock" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button></li>
+      <li><button class="report-item placeholder" data-report="" aria-label="Locked report" title="Locked"><svg class="report-lock" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button></li>
+      <li><button class="report-item placeholder" data-report="" aria-label="Locked report" title="Locked"><svg class="report-lock" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button></li>
+      <li><button class="report-item placeholder" data-report="" aria-label="Locked report" title="Locked"><svg class="report-lock" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button></li>
     </ul>
   </div>
 </div>
@@ -7782,6 +7783,19 @@ return `<span class="modal-week-arrows">`
 + `<button type="button" class="week-arrow" aria-label="Next week" title="Next week" onclick="navigateWeek(1)">${chev("M9 5l7 7-7 7")}</button>`
 + `</span>`;
 }
+function refreshWeekWindows(weekId){
+const vhm=document.getElementById("voter-history-modal");
+if(vhm.classList.contains("open")){
+if(vhm.dataset.chartType==="highlow")showWeekHighLowChart(weekId,vhm.dataset.chartMode||"highlow");
+else if(vhm.dataset.chartType==="ballottimes"&&!weekId.startsWith("week-ap-"))showBallotTimesChart();
+}
+const ssm=document.getElementById("season-stats-modal");
+if(ssm.classList.contains("open")){
+const table=document.getElementById("season-stats-table");
+if(table.classList.contains("season-mmp12"))showMmP12Report();
+else if(table.classList.contains("season-records"))showSeasonStatsModal("records");
+}
+}
 function navigateWeek(dir){
 const activeTab=document.querySelector(".week-tab.active");
 if(!activeTab)return;
@@ -7795,10 +7809,7 @@ if(target){
 loadApYear(target.dataset.year).then(async()=>{
 await showApWeek(target.dataset.year,target.dataset.weeknum);
 if(weekPickerPinned)rebuildWeekPicker();
-const apWeekId=`week-ap-${target.dataset.year}-${target.dataset.weeknum}`;
-const vhm=document.getElementById("voter-history-modal");
-if(vhm.classList.contains("open")&&vhm.dataset.chartType==="highlow")
-showWeekHighLowChart(apWeekId,vhm.dataset.chartMode||"highlow");
+refreshWeekWindows(`week-ap-${target.dataset.year}-${target.dataset.weeknum}`);
 }).catch(()=>{});
 }
 }else{
@@ -7809,11 +7820,7 @@ if(target){
 loadYear(target.dataset.year).then(async()=>{
 await showWeek(target.dataset.week);
 if(weekPickerPinned)rebuildWeekPicker();
-const vhm=document.getElementById("voter-history-modal");
-if(vhm.classList.contains("open")&&vhm.dataset.chartType==="highlow")
-showWeekHighLowChart(target.dataset.week,vhm.dataset.chartMode||"highlow");
-if(vhm.classList.contains("open")&&vhm.dataset.chartType==="ballottimes")
-showBallotTimesChart();
+refreshWeekWindows(target.dataset.week);
 backgroundLoad();
 }).catch(()=>{});
 }
