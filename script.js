@@ -15,9 +15,11 @@ let _chordTimer = null;
 
 const _loadedYears = new Set();
 const _loadingYears = {};
-// Userpoll seasons kept in the data but hidden from navigation and analysis (2024 is incomplete).
-// Keep in sync with EXCLUDED_YEARS in userpoll.py.
-const HIDDEN_YEARS = new Set(["2023", "2024"]);
+// Seasons before FIRST_SHOWN_YEAR stay in the data (fragments still load for tenure etc.) but are
+// hidden from navigation: year picker, ←/→ and ↑/↓, for Userpoll and AP on both pages.
+// Analysis exclusions are separate: EXCLUDED_YEARS in userpoll.py.
+const FIRST_SHOWN_YEAR = 2025;
+function isHiddenYear(y) { return parseInt(y) < FIRST_SHOWN_YEAR; }
 // True on ap-ballots.html (IS_AP_PAGE is injected there only).
 const ON_AP_PAGE = typeof IS_AP_PAGE !== "undefined" && IS_AP_PAGE;
 
@@ -2469,8 +2471,7 @@ function rebuildYearPicker() {
         if (!byYear[y]) byYear[y] = [];
         byYear[y].push(t);
     });
-    const showHidden = isAp || ON_AP_PAGE;
-    const years = Object.keys(byYear).filter(y => showHidden || !HIDDEN_YEARS.has(y)).sort();
+    const years = Object.keys(byYear).filter(y => !isHiddenYear(y)).sort();
 
     const yearPicker = document.getElementById("year-picker");
     yearPicker.innerHTML = "";
@@ -6789,7 +6790,7 @@ function navigateWeek(dir) {
     const currentYear = activeTab.dataset.year;
     if (_apCurrentYear !== null) {
         // AP mode: navigate AP weeks
-        const sortedApAll = getSortedApTabs().slice().reverse(); // ascending
+        const sortedApAll = getSortedApTabs().filter(t => !isHiddenYear(t.dataset.year)).slice().reverse(); // ascending
         const idx = sortedApAll.findIndex(t => t.dataset.year === _apCurrentYear && t.dataset.weeknum === _apCurrentWeekNum);
         const target = dir > 0 ? sortedApAll[idx + 1] : sortedApAll[idx - 1];
         if (target) {
@@ -6803,8 +6804,7 @@ function navigateWeek(dir) {
             }).catch(() => {});
         }
     } else {
-        const sortedAll = getSortedTabs().filter(t =>
-            (ON_AP_PAGE || !HIDDEN_YEARS.has(t.dataset.year))).slice().reverse();
+        const sortedAll = getSortedTabs().filter(t => !isHiddenYear(t.dataset.year)).slice().reverse();
         const idx = sortedAll.findIndex(t => t.dataset.week === activeTab.dataset.week);
         const target = dir > 0 ? sortedAll[idx + 1] : sortedAll[idx - 1];
         if (target) {
@@ -7140,7 +7140,7 @@ document.addEventListener("keydown", e => {
         if (_apCurrentYear !== null) {
             // AP mode: navigate AP years
             const apTabs = getSortedApTabs();
-            const years = [...new Set(apTabs.map(t => t.dataset.year))].sort();
+            const years = [...new Set(apTabs.map(t => t.dataset.year))].filter(y => !isHiddenYear(y)).sort();
             const yearIdx = years.indexOf(_apCurrentYear);
             const targetYear = e.key === "ArrowUp" ? years[yearIdx + 1] : years[yearIdx - 1];
             if (!targetYear) return;
@@ -7159,7 +7159,7 @@ document.addEventListener("keydown", e => {
             }).catch(() => {});
         } else {
             const tabs = getSortedTabs();
-            const years = [...new Set(tabs.map(t => t.dataset.year))].filter(y => ON_AP_PAGE || !HIDDEN_YEARS.has(y)).sort();
+            const years = [...new Set(tabs.map(t => t.dataset.year))].filter(y => !isHiddenYear(y)).sort();
             const yearIdx = years.indexOf(currentYear);
             const targetYear = e.key === "ArrowUp" ? years[yearIdx + 1] : years[yearIdx - 1];
             if (!targetYear) return;

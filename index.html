@@ -2326,7 +2326,8 @@ let _chordPending=null;
 let _chordTimer=null;
 const _loadedYears=new Set();
 const _loadingYears={};
-const HIDDEN_YEARS=new Set(["2023","2024"]);
+const FIRST_SHOWN_YEAR=2025;
+function isHiddenYear(y){return parseInt(y)<FIRST_SHOWN_YEAR;}
 const ON_AP_PAGE=typeof IS_AP_PAGE!=="undefined"&&IS_AP_PAGE;
 const OUTLIER_OMISSION_TOP_N=15;
 const OUTLIER_HIGH_MAX_RANK=20;
@@ -4356,8 +4357,7 @@ const y=t.dataset.year;
 if(!byYear[y])byYear[y]=[];
 byYear[y].push(t);
 });
-const showHidden=isAp||ON_AP_PAGE;
-const years=Object.keys(byYear).filter(y=>showHidden||!HIDDEN_YEARS.has(y)).sort();
+const years=Object.keys(byYear).filter(y=>!isHiddenYear(y)).sort();
 const yearPicker=document.getElementById("year-picker");
 yearPicker.innerHTML="";
 const activeYear=isAp?_apCurrentYear:(document.querySelector(".week-tab.active")?.dataset.year??null);
@@ -7954,7 +7954,7 @@ if(!activeTab)return;
 const currentWeekNum=parseInt(activeTab.dataset.weeknum);
 const currentYear=activeTab.dataset.year;
 if(_apCurrentYear!==null){
-const sortedApAll=getSortedApTabs().slice().reverse();
+const sortedApAll=getSortedApTabs().filter(t=>!isHiddenYear(t.dataset.year)).slice().reverse();
 const idx=sortedApAll.findIndex(t=>t.dataset.year===_apCurrentYear&&t.dataset.weeknum===_apCurrentWeekNum);
 const target=dir>0?sortedApAll[idx + 1]:sortedApAll[idx - 1];
 if(target){
@@ -7968,8 +7968,7 @@ showWeekHighLowChart(apWeekId,vhm.dataset.chartMode||"highlow");
 }).catch(()=>{});
 }
 }else{
-const sortedAll=getSortedTabs().filter(t=>
-(ON_AP_PAGE||!HIDDEN_YEARS.has(t.dataset.year))).slice().reverse();
+const sortedAll=getSortedTabs().filter(t=>!isHiddenYear(t.dataset.year)).slice().reverse();
 const idx=sortedAll.findIndex(t=>t.dataset.week===activeTab.dataset.week);
 const target=dir>0?sortedAll[idx + 1]:sortedAll[idx - 1];
 if(target){
@@ -8256,7 +8255,7 @@ if(e.key==="ArrowUp"||e.key==="ArrowDown"){
 e.preventDefault();
 if(_apCurrentYear!==null){
 const apTabs=getSortedApTabs();
-const years=[...new Set(apTabs.map(t=>t.dataset.year))].sort();
+const years=[...new Set(apTabs.map(t=>t.dataset.year))].filter(y=>!isHiddenYear(y)).sort();
 const yearIdx=years.indexOf(_apCurrentYear);
 const targetYear=e.key==="ArrowUp"?years[yearIdx + 1]:years[yearIdx - 1];
 if(!targetYear)return;
@@ -8275,7 +8274,7 @@ showWeekHighLowChart(apWeekId,vhm2.dataset.chartMode||"highlow");
 }).catch(()=>{});
 }else{
 const tabs=getSortedTabs();
-const years=[...new Set(tabs.map(t=>t.dataset.year))].filter(y=>ON_AP_PAGE||!HIDDEN_YEARS.has(y)).sort();
+const years=[...new Set(tabs.map(t=>t.dataset.year))].filter(y=>!isHiddenYear(y)).sort();
 const yearIdx=years.indexOf(currentYear);
 const targetYear=e.key==="ArrowUp"?years[yearIdx + 1]:years[yearIdx - 1];
 if(!targetYear)return;

@@ -1583,7 +1583,7 @@ def write_year_fragments(data_by_year, current_year, base_dir):
             f.write(year_html)
 
 # Userpoll seasons kept in the data but left out of all analysis (2024 is an incomplete Wayback recovery).
-# Keep in sync with HIDDEN_YEARS in script.js.
+# Separate from navigation hiding: FIRST_SHOWN_YEAR in script.js hides every season before 2025.
 EXCLUDED_YEARS = {"2023", "2024"}
 
 # Per-voter corrections so tenure matches hand-verified totals (supplied 2026-11-17).

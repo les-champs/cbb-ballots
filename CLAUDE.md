@@ -91,7 +91,7 @@ Local testing: `python3 -m http.server 8000` → http://localhost:8000. Opening 
 
 ## script.js layout (search by function name)
 
-- **Globals/caches (top of file):** `_sortedTabsCache`, `_leaderboardDataCache`, `_deltaDataCache` (+`_deltaDataCacheIsProvisional`, invalidated on Official/Provisional toggle), `_officialDeltaDataCache` (official ballots only), `_apDeltaDataCache`, `_apCurrentYear`/`_apCurrentWeekNum` (non-null ⇒ AP mode on index.html), `HIDDEN_YEARS` (2023 + 2024 hidden from userpoll navigation and analysis; mirrors `EXCLUDED_YEARS` in `userpoll.py`), outlier constants.
+- **Globals/caches (top of file):** `_sortedTabsCache`, `_leaderboardDataCache`, `_deltaDataCache` (+`_deltaDataCacheIsProvisional`, invalidated on Official/Provisional toggle), `_officialDeltaDataCache` (official ballots only), `_apDeltaDataCache`, `_apCurrentYear`/`_apCurrentWeekNum` (non-null ⇒ AP mode on index.html), `FIRST_SHOWN_YEAR` / `isHiddenYear()` (every season before 2025 is hidden from navigation, Userpoll and AP, on both pages; the data and fragments stay and still feed tenure etc. Analysis exclusions are separate: `EXCLUDED_YEARS` in `userpoll.py`), outlier constants.
 - **Loading:** `loadYear(year)` fetches `${FRAG_PATH_PREFIX}${year}.html`; `loadApYear(year)` fetches `data-ap-YEAR.html`. Both inject into `#year-data-container`; `_loadedYears` (AP keyed `ap-YEAR`) and `_loadingYears` dedupe. `backgroundLoad()` lazy-loads images (16 concurrent) for weeks already in the DOM only; prior-year fragments load on demand when navigated to (eager preloading of every fragment caused a ~30 s DOM stall). All year-navigation paths must `await loadYear()` before `showWeek()`.
 - **Week 1 / Pre-Season:** pre-season is stored as week 0 (`week-YEAR-0`; legacy 2017–2022 tabs have no label, newer ones `data-weeklabel="Pre-Season"`), but the UI shows it as **Week 1** everywhere (there is never a real week 1). `isPreseasonTab()` detects it, `displayWeekNum()` returns 1, and `weekTextLabel()` returns undefined so callers fall back to the number. Use these helpers for any user-facing week text — never `dataset.weeknum`/`dataset.weeklabel` directly. Week 1 is shown in the week picker and ←/→ navigation (no longer hidden). Keep storage as week 0: pre-season reclassification, Cmd+0 and AP data depend on it.
 - **Navigation:** `showWeek()` (async), `showApWeek()`, `switchToApBallots()`, `exitApBallots()`, `rebuildWeekPicker()`, `rebuildYearPicker()`, `fitPicker()`, `updateFavicon()` (favicon shows current week number).
@@ -144,7 +144,7 @@ Local testing: `python3 -m http.server 8000` → http://localhost:8000. Opening 
 ### ap-ballots.html differences
 
 - AP weeks are the primary `.week-tab`s (IDs `week-YEAR-N`, no `data-poll`), so standard JS paths work with `_apCurrentYear === null`.
-- Injected constants: `IS_AP_PAGE = true`, `FRAG_PATH_PREFIX = 'data-appage-'`; `FRAGMENT_YEARS` = AP page years; `AP_FRAGMENT_YEARS = []`. `HIDDEN_YEARS` is ignored on this page.
+- Injected constants: `IS_AP_PAGE = true`, `FRAG_PATH_PREFIX = 'data-appage-'`; `FRAGMENT_YEARS` = AP page years; `AP_FRAGMENT_YEARS = []`. `isHiddenYear()` applies here too.
 - Header shows "← Userpoll" link instead of "AP Ballots →".
 
 ## ESPN data (W-L records and game results)
