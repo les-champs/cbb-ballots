@@ -1478,7 +1478,9 @@ body.dark .pin-btn.pinned {
 }
 
 /* Conference ranking rows (Data Ballots, 2025+) */
-.voter-row.row-conference-first > td { border-top: 2px solid var(--color-border-tab); }
+.voter-row.row-data-draggable > td:first-child { cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; }
+body.data-ballot-dragging, body.data-ballot-dragging * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
+.voter-row.row-dragging > td { background: var(--color-bg-tab-hover); }
 
 /* Clickable elements: don't select text on rapid/double clicks (or flash on mobile taps).
    Covers every cursor:pointer rule above plus JS/SVG elements given an inline pointer

@@ -1585,6 +1585,23 @@ def write_year_fragments(data_by_year, current_year, base_dir):
 # Keep in sync with HIDDEN_YEARS in script.js.
 EXCLUDED_YEARS = {"2023", "2024"}
 
+# Per-voter corrections so tenure matches hand-verified totals (supplied 2026-11-17).
+# Stored as offsets, not fixed totals, so new ballots keep counting.
+TENURE_ADJUSTMENTS = {
+    "ALStark69": 2, "Axgwd1": -12, "bakonydraco": 1, "bkervick": 18,
+    "Boilers11": -5, "brendan0305": 3, "danielshap2": -3, "darrylweenus": 1,
+    "DCProf": 3, "DEP61": 21, "drcollegehoops": 2, "drowse": 1,
+    "Equivalent-Yard3824": 47, "ferrett3": 11, "frumpybuffalo": -2, "Gavigator": 15,
+    "Greyson04": 1, "Hackasizlak": -1, "Hambone721": 18, "INeedMoreCreativity": 2,
+    "IrishBall": -15, "Jaymoney00": -9, "Jaze1": 14, "Jomosensual": 1,
+    "JuliePepperwood": 1, "LagJetGameThe": 9, "Les-Champs": -1, "MainPeanut25": 36,
+    "Maison-Marthgiela": 13, "Monkey832": 1, "oddcharisma": 4, "OliviaPG1": 48,
+    "pete4999": -1, "Piglee_037": -1, "Pure-Shirt-5831": -1, "Senior_Chang": 9,
+    "Sharpe318": 3, "ShogunAshoka": -2, "SpeedLegend": -2, "Travbowman": 5,
+    "Tygorz": 1, "ukfan515": 24, "UncleSam_HS": -1, "Wazzup44": -23,
+    "zzer0tonin": -1,
+}
+
 def compute_tenure_counts(data_html):
     """Count total ballots per voter across all week/year data (all loaded HTML).
     Adds 36 to voters present in both 2022 and 2025 to account for missing 2023/2024 seasons."""
@@ -1615,6 +1632,9 @@ def compute_tenure_counts(data_html):
     for voter in bonus_voters:
         if voter in counts:
             counts[voter] += 36
+    for voter, delta in TENURE_ADJUSTMENTS.items():
+        if voter in counts:
+            counts[voter] += delta
     return counts
 
 def compute_ap_tenure_counts():
