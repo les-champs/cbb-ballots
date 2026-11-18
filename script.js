@@ -5645,8 +5645,8 @@ function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
 // losses); lower is better, ties by SOR then BPI. Current season only, from RESUME_FROM_SEASON
 // (needs SOR). The # column is positional: dragging moves the team, the numbers stay put.
 // A dragged order is saved per viewer in localStorage for the poll it's being picked for (next
-// Monday 10 AM ET deadline, pickerPollKey()), so a new week starts fresh; Reset in the title
-// note clears it. Teams that enter the top PICKER_COUNT later slot in at their eligibility spot.
+// Monday 10 AM ET deadline, pickerPollKey()); a new week starts from the last saved order until
+// a drag saves it under the new week. Reset in the title note clears it. Teams that enter the top PICKER_COUNT later slot in at their eligibility spot.
 // Last PICKER_GAMES games (wins and losses): quads-YEAR.json's completed games plus the ESPN scoreboard since that
 // snapshot (pickerFetchRecent()), as Week Stats Games chips. With more games than fit, trimPickerGames() drops
 // non-D1 wins, then Q4 wins, then Q3 wins (oldest first in each), then the oldest games left.
@@ -5681,16 +5681,26 @@ function pickerPollKey() {
     return new Date(Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day) + add)).toISOString().slice(0, 10);
 }
 function pickerStorageKey(season) { return `pickerOrder:${season}:${pickerPollKey()}`; }
+// This poll's saved order, else the newest one saved for an earlier poll of the same season
+// (so an order carries into the next week until a drag saves it under the new key).
 function pickerSavedOrder(season) {
     try {
-        const v = JSON.parse(localStorage.getItem(pickerStorageKey(season)) || "null");
+        const k = pickerStorageKey(season);
+        let raw = localStorage.getItem(k);
+        if (raw == null) {
+            const prefix = `pickerOrder:${season}:`;
+            const prev = Object.keys(localStorage).filter(x => x.startsWith(prefix) && x < k).sort().pop();
+            raw = prev ? localStorage.getItem(prev) : null;
+        }
+        const v = JSON.parse(raw || "null");
         return Array.isArray(v) && v.length ? v : null;
     } catch { return null; }
 }
 function pickerSaveOrder(season, keys) {
     try {
         const k = pickerStorageKey(season);
-        // Drop orders saved for earlier polls.
+        // Drop orders saved for earlier polls (a save replaces a carried-over order;
+        // Reset, keys = null, clears every saved order so nothing carries back in).
         Object.keys(localStorage).filter(x => x.startsWith("pickerOrder:") && x !== k).forEach(x => localStorage.removeItem(x));
         if (keys) localStorage.setItem(k, JSON.stringify(keys));
         else localStorage.removeItem(k);

@@ -6735,7 +6735,14 @@ return new Date(Date.UTC(Number(p.year),Number(p.month)- 1,Number(p.day)+ add)).
 function pickerStorageKey(season){return `pickerOrder:${season}:${pickerPollKey()}`;}
 function pickerSavedOrder(season){
 try{
-const v=JSON.parse(localStorage.getItem(pickerStorageKey(season))||"null");
+const k=pickerStorageKey(season);
+let raw=localStorage.getItem(k);
+if(raw==null){
+const prefix=`pickerOrder:${season}:`;
+const prev=Object.keys(localStorage).filter(x=>x.startsWith(prefix)&&x<k).sort().pop();
+raw=prev?localStorage.getItem(prev):null;
+}
+const v=JSON.parse(raw||"null");
 return Array.isArray(v)&&v.length?v:null;
 }catch{return null;}
 }
