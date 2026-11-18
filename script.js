@@ -5840,7 +5840,7 @@ function buildPickerTableHtml(season, data, error) {
         const name = fullName.length > RECORDS_NAME_MAX && c.r.name && c.r.name.length < fullName.length ? c.r.name : fullName;
         const tip = `Eligibility ${c.score.toFixed(1)} (#${cands.indexOf(c) + 1}): average of SOR #${c.sorRank}, BPI #${c.bpiRank}, W-L #${c.wlRank}`;
         const games = pickerGames(season, c.key, c.id);
-        return `<tr class="tp-row${i === 24 ? " records-t25-end" : ""}" data-team="${esc(c.key)}" data-espn="${c.id}">
+        return `<tr class="tp-row records-team-row${i === 24 ? " records-t25-end" : ""}" data-team="${esc(c.key)}" data-espn="${c.id}">
             <td class="tp-num tp-handle">${i + 1}</td>
             <td class="tp-handle"><img class="logo-sm records-logo" data-team="${esc(c.key)}" data-espn="${c.id}" alt=""></td>
             <td class="team-col tp-handle" title="${esc(`${fullName} · ${tip}`)}">${esc(name)}</td>
@@ -5858,6 +5858,7 @@ function buildPickerTableHtml(season, data, error) {
 // #, logo or name cells (touch-action: none there) so the rest of the row still scrolls.
 // Rows move live as the pointer passes other rows' midpoints; the # cells and the line after
 // #25 stay with the position, not the team. Near the window's top/bottom edge it autoscrolls.
+// A row's open game list (records-games-row, from a click; toggleTeamGames()) moves with it.
 function initPickerDrag(tbody, season, onDrop) {
     const box = tbody.closest("#season-stats-box") || document.scrollingElement;
     let drag = null;
@@ -5873,8 +5874,11 @@ function initPickerDrag(tbody, season, onDrop) {
             const b = r.getBoundingClientRect();
             if (y < b.top + b.height / 2) { before = r; break; }
         }
-        if (before ? drag.tr.nextElementSibling === before : tbody.lastElementChild === drag.tr) return;
+        const games = drag.tr.nextElementSibling?.classList.contains("records-games-row") ? drag.tr.nextElementSibling : null;
+        const tail = games || drag.tr;
+        if (before ? tail.nextElementSibling === before : tbody.lastElementChild === tail) return;
         tbody.insertBefore(drag.tr, before);
+        if (games) drag.tr.after(games);
         renumber();
     };
     const autoScroll = () => {
