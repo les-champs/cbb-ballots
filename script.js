@@ -5451,7 +5451,9 @@ function buildTeamGamesHtml(sched, teamId, records, season) {
             : oppLogoSrc(g.opp) ? `<img class="records-games-logo" src="${esc(oppLogoSrc(g.opp))}" data-filler="${esc(g.opp.name)}" alt="">`
             : logoFillerHtml("records-games-logo", g.opp.name);
         const name = g.opp.key ? conferenceDisplayName(g.opp.key) : g.opp.name;
-        const nonD1 = records.byId[g.opp.id] ? "" : `<span class="records-tag" title="Not a Division I team">non-D1</span>`;
+        const oppRec = records.byId[g.opp.id];
+        const nonD1 = oppRec ? "" : `<span class="records-tag" title="Not a Division I team">non-D1</span>`;
+        const recTag = oppRec ? `<span class="rg-opp-rec" title="${esc(name)}'s record">(${oppRec.wins}-${oppRec.losses})</span>` : "";
         let res;
         if (g.result) res = `<span class="${g.result === "W" ? "delta-up" : "delta-down"}">${g.result}</span> ${g.us}-${g.them}`;
         else if (g.state === "in") res = `<span class="records-live">Live</span> ${g.us ?? ""}-${g.them ?? ""}`;
@@ -5459,7 +5461,7 @@ function buildTeamGamesHtml(sched, teamId, records, season) {
         return `<tr class="${g.result ? "" : "records-game-pending"}">
             <td class="rg-date">${fmtDate(g.date)}</td>
             <td class="rg-site" title="${g.site === "N" ? "Neutral site" : g.site === "H" ? "Home" : "Away"}">${site}</td>
-            <td class="rg-opp" title="${esc(name)}">${logo}${g.oppRank ? `<span class="rg-rank" title="AP rank at game time">${g.oppRank}</span>` : ""}${g.oppSeed ? `<span class="rg-rank" title="Seed">(${g.oppSeed})</span>` : ""}${esc(name)}${nonD1}</td>${quadCell}
+            <td class="rg-opp" title="${esc(name)}">${logo}${g.oppRank ? `<span class="rg-rank" title="AP rank at game time">${g.oppRank}</span>` : ""}${g.oppSeed ? `<span class="rg-rank" title="Seed">(${g.oppSeed})</span>` : ""}${esc(name)}${recTag}${nonD1}</td>${quadCell}
             <td class="rg-res">${res}</td>
             <td class="rg-note">${esc(g.note)}${g.postseason && !g.note ? "Postseason" : ""}</td>
         </tr>`;

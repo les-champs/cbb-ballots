@@ -934,6 +934,7 @@ kbd {
 #season-stats-table .records-games-table tr.records-game-pending td.rg-res { font-weight: normal; font-size: 11px; }
 .records-games-logo { display: inline-block; height: 16px; width: 16px; object-fit: contain; vertical-align: middle; margin-right: 4px; }
 .rg-rank { font-size: 10px; opacity: 0.65; margin-right: 3px; }
+.rg-opp-rec { font-size: 10px; opacity: 0.55; margin-left: 3px; }
 .records-tag { font-size: 9px; text-transform: uppercase; letter-spacing: 0.03em; border: 1px solid currentColor; border-radius: 3px; padding: 0 3px; margin-left: 6px; opacity: 0.6; }
 .records-live { color: var(--color-modal-h2); }
 #season-stats-table.season-records td.records-wl { font-weight: bold; }
