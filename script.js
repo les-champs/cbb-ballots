@@ -5187,7 +5187,7 @@ function fetchQuads(season) {
             });
         }
         return (_quadsData[season] = { source, official: !!net, asOf: net ? net.through : q.ranksAsOf, teams, games, upcoming, played,
-            fetched: q ? Date.parse(q.fetched) : null });
+            fetched: q ? Date.parse(q.fetched) : null, cutoffs: q?.cutoffs || null });
     });
     p.catch(err => { _quadsData[season] = { error: err.message }; delete _quadsPromise[season]; });
     return (_quadsPromise[season] = p);
@@ -5248,16 +5248,21 @@ function showSeasonRecords(currentYear, isApMode, activeTab) {
     const modal = document.getElementById("season-stats-modal");
     const title = document.getElementById("season-stats-title");
     const table = document.getElementById("season-stats-table");
-    // Title: "YYYY Records — Voted All Picker (beta)", the switch styled like the Week window's tabs.
+    // Title: "YYYY Records — Userpoll Conferences Tool", the switch styled like the Week window's tabs.
     // Picker only where it has its data (pickerAvailable()).
     const hasPicker = pickerAvailable(currentYear);
     if (_recordsView === "picker" && !hasPicker) _recordsView = "week";
-    const views = [["week", "Voted"], ["all", "All"], ...(hasPicker ? [["picker", "Picker (beta)"]] : [])];
+    const views = [["week", "Userpoll"], ["all", "Conferences"], ...(hasPicker ? [["picker", "Tool"]] : [])];
     const switcher = `<span class="records-switch">${views.map(([k, l]) =>
         `<span class="records-view${_recordsView === k ? " active" : ""}" data-view="${k}">${l}</span>`).join("")}</span>`;
-    title.innerHTML = `<span class="records-title-main">${currentYear}${isApMode ? " AP" : ""} Records — ${switcher}</span>`
+    // Picker adds a small "Score BPI Record" switch (what the Last 7 Games chips show, pickerShowMode()).
+    const showSwitch = _recordsView === "picker"
+        ? `<span class="records-switch tp-show-switch">${PICKER_SHOW.map(([k, l]) =>
+            `<span class="records-view${pickerShowMode() === k ? " active" : ""}" data-show="${k}">${l}</span>`).join("")}</span>`
+        : "";
+    title.innerHTML = `<span class="records-title-main">${currentYear}${isApMode ? " AP" : ""} Records — ${switcher}${showSwitch}</span>`
         + `<span class="records-note records-title-note"></span>`;
-    title.querySelectorAll(".records-view").forEach(el => el.addEventListener("click", () => {
+    title.querySelectorAll(".records-view[data-view]").forEach(el => el.addEventListener("click", () => {
         if (el.classList.contains("active")) return;
         _recordsView = el.dataset.view;
         showSeasonRecords(currentYear, isApMode, activeTab);
@@ -5315,6 +5320,13 @@ function showSeasonRecords(currentYear, isApMode, activeTab) {
             if (_recordsExpanded.has(`${currentYear}:${tr.dataset.espn}`)) toggleTeamGames(tr, currentYear, data, true);
         });
     };
+
+    title.querySelectorAll(".records-view[data-show]").forEach(el => el.addEventListener("click", () => {
+        if (el.classList.contains("active")) return;
+        setPickerShowMode(el.dataset.show);
+        title.querySelectorAll(".records-view[data-show]").forEach(x => x.classList.toggle("active", x === el));
+        render(...last);
+    }));
 
     const cached = espnCachedData(`records:${currentYear}`);
     render(cached, null);   // cached data (or a loading row) right away
@@ -5636,10 +5648,20 @@ function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
 // Monday 10 AM ET deadline, pickerPollKey()), so a new week starts fresh; Reset in the title
 // note clears it. Teams that enter the top PICKER_COUNT later slot in at their eligibility spot.
 // Last PICKER_GAMES games (wins and losses): quads-YEAR.json's completed games plus the ESPN scoreboard since that
-// snapshot (pickerFetchRecent()), as Week Stats Games chips.
+// snapshot (pickerFetchRecent()), as Week Stats Games chips. With more games than fit, trimPickerGames() drops
+// non-D1 wins, then Q4 wins, then Q3 wins (oldest first in each), then the oldest games left.
 const PICKER_COUNT = 100;
 const PICKER_GAMES = 7;
 const _pickerRecent = {};   // season → {espnId: [game]} finished since the quads snapshot
+// What the Last 7 Games chips show after the opponent logo (small title switch "Score BPI Record"):
+// the game score, the opponent's current BPI rating, or the opponent's current W-L.
+// Saved per viewer in localStorage pickerShow.
+const PICKER_SHOW = [["score", "Score"], ["bpi", "BPI"], ["record", "Record"]];
+function pickerShowMode() {
+    try { const v = localStorage.getItem("pickerShow"); if (PICKER_SHOW.some(([k]) => k === v)) return v; } catch { }
+    return "score";
+}
+function setPickerShowMode(v) { try { localStorage.setItem("pickerShow", v); } catch { } }
 let _pickerSuppressClickUntil = 0;
 
 function pickerAvailable(season) {
@@ -5712,9 +5734,35 @@ function pickerGames(season, key, id) {
     const base = _quadsData[season]?.played?.[key] || [];
     const tag = g => `${g.date.slice(0, 10)}:${g.opp.id}`;
     const seen = new Set(base.map(tag));
-    const extra = (_pickerRecent[season]?.[id] || []).filter(g => !seen.has(tag(g)));
-    return base.concat(extra).filter(g => g.result === "W" || g.result === "L")
-        .sort((a, b) => a.date.localeCompare(b.date)).slice(-PICKER_GAMES);
+    const extra = (_pickerRecent[season]?.[id] || []).filter(g => !seen.has(tag(g)))
+        .map(g => ({ ...g, quad: pickerRecentQuad(season, key, g) }));
+    return trimPickerGames(base.concat(extra).filter(g => g.result === "W" || g.result === "L")
+        .sort((a, b) => a.date.localeCompare(b.date)));
+}
+// Quad of a game finished since the quads snapshot: the snapshot's own quad for it (it was listed
+// as upcoming, same opponent, start within a day), else from the opponent's current rank, the site
+// and the file's cutoffs. null for non-D1 or unranked opponents.
+function pickerRecentQuad(season, key, g) {
+    const qd = _quadsData[season];
+    if (!g.opp.key) return null;
+    const t = Date.parse(g.date);
+    const up = (qd?.upcoming?.[key] || []).find(u => u.opp.id === g.opp.id && Math.abs(Date.parse(u.date) - t) < 864e5);
+    if (up?.quad) return up.quad;
+    const rank = qd?.teams?.[g.opp.key]?.rank;
+    const bounds = qd?.cutoffs?.[g.site];
+    if (!rank || !bounds) return null;
+    const i = bounds.findIndex(b => rank <= b);
+    return i < 0 ? 4 : i + 1;
+}
+// Picker cell cap: with more than PICKER_GAMES games (date order), drop non-D1 wins, then Q4 wins,
+// then Q3 wins (oldest first within each), then the oldest games left. Keeps date order.
+function trimPickerGames(games) {
+    if (games.length <= PICKER_GAMES) return games;
+    const prio = g => g.result !== "W" ? 3 : !g.opp.key ? 0 : g.quad === 4 ? 1 : g.quad === 3 ? 2 : 3;
+    const drop = new Set(games.map((g, i) => ({ g, i, p: prio(g) }))
+        .sort((a, b) => a.p - b.p || a.i - b.i)
+        .slice(0, games.length - PICKER_GAMES).map(x => x.g));
+    return games.filter(g => !drop.has(g));
 }
 
 function buildPickerTableHtml(season, data, error) {
@@ -5733,7 +5781,7 @@ function buildPickerTableHtml(season, data, error) {
         <th title="ESPN Strength of Record rank (lower is better)">SOR</th>
         <th title="ESPN BPI: points better than an average D1 team per 70 possessions, neutral court">BPI</th>
         ${[1, 2, 3, 4].map(q => `<th class="records-quad-col${q === 1 ? " records-q1-col" : ""}${q === 4 ? " records-q4-col" : ""}" title="${quadTip}">Q${q}</th>`).join("")}
-        <th class="records-opps-col tp-wins-col" title="Each team's ${PICKER_GAMES} most recent games: wins in green, losses in red (hover for details)">Last ${PICKER_GAMES} Games</th>
+        <th class="records-opps-col tp-wins-col" title="Each team's ${PICKER_GAMES} most recent games: wins in green, losses in red (hover for details). Score / BPI / Record in the title picks what follows each logo: the score, or the opponent's current BPI or W-L. With more games, non-D1 wins, then Q4 wins, then Q3 wins drop out before older games">Last ${PICKER_GAMES} Games</th>
     </tr></thead>`;
     const msg = text => `${head}<tbody><tr><td colspan="${COLS}" class="records-msg">${text}</td></tr></tbody>`;
     if (!data) return msg(error ? `Couldn't load records from ESPN (${esc(error)}). <span class="records-retry">Retry</span>` : "Loading");
@@ -5753,6 +5801,14 @@ function buildPickerTableHtml(season, data, error) {
     }
 
     const rankLabel = qd.source === "net" ? "NET" : "BPI";
+    const num = v => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(1);
+    const show = pickerShowMode();
+    // Chip value after the logo: score, or the opponent's current BPI / W-L ("—" for non-D1 or missing).
+    const chipValue = g => {
+        if (show === "bpi") { const b = g.opp.key ? qd.teams[g.opp.key]?.bpi : null; return b == null ? "—" : num(b); }
+        if (show === "record") { const r = g.opp.key ? data.byId[g.opp.id] : null; return r ? `${r.wins}-${r.losses}` : "—"; }
+        return `${g.us}-${g.them}`;
+    };
     const chip = g => {
         const siteWord = g.site === "H" ? "vs" : g.site === "A" ? "@" : "neutral vs";
         const name = g.opp.key ? conferenceDisplayName(g.opp.key) : g.opp.name || "?";
@@ -5766,9 +5822,8 @@ function buildPickerTableHtml(season, data, error) {
             ? `<img class="records-opp-logo records-logo" data-team="${esc(g.opp.key)}" data-espn="${g.opp.id}" alt="">`
             : src ? `<img class="records-opp-logo" src="${esc(src)}" data-filler="${esc(name)}" alt="">`
             : logoFillerHtml("records-opp-logo", name, "");
-        return `<span class="ws-opp ${g.result === "W" ? "ws-win" : "ws-loss"}"${g.opp.key ? ` data-team="${esc(g.opp.key)}"` : ""} title="${tip}"><span class="ws-opp-site">${g.site === "H" ? "vs" : g.site === "A" ? "@" : "N"}</span>${logo}<span class="ws-opp-score">${g.us}-${g.them}</span></span>`;
+        return `<span class="ws-opp ${g.result === "W" ? "ws-win" : "ws-loss"}"${g.opp.key ? ` data-team="${esc(g.opp.key)}"` : ""} title="${tip}"><span class="ws-opp-site">${g.site === "H" ? "vs" : g.site === "A" ? "@" : "N"}</span>${logo}<span class="ws-opp-score">${chipValue(g)}</span></span>`;
     };
-    const num = v => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(1);
     const body = order.map((k, i) => {
         const c = byKey.get(k);
         const fullName = conferenceDisplayName(c.key);
