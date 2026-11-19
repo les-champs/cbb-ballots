@@ -5255,7 +5255,7 @@ function showSeasonRecords(currentYear, isApMode, activeTab) {
     const views = [["week", "Userpoll"], ["all", "Conferences"], ...(hasPicker ? [["picker", "Tool"]] : [])];
     const switcher = `<span class="records-switch">${views.map(([k, l]) =>
         `<span class="records-view${_recordsView === k ? " active" : ""}" data-view="${k}">${l}</span>`).join("")}</span>`;
-    // Picker adds a small "Score BPI Record" switch (what the Last 7 Games chips show, pickerShowMode()).
+    // Picker adds a small "Score BPI Record Quad" switch (what the Last 7 Games chips show, pickerShowMode()).
     const showSwitch = _recordsView === "picker"
         ? `<span class="records-switch tp-show-switch">${PICKER_SHOW.map(([k, l]) =>
             `<span class="records-view${pickerShowMode() === k ? " active" : ""}" data-show="${k}">${l}</span>`).join("")}</span>`
@@ -5655,10 +5655,10 @@ function buildRecordsTableHtml(currentYear, weekId, weekLabel, data, error) {
 const PICKER_COUNT = 100;
 const PICKER_GAMES = 7;
 const _pickerRecent = {};   // season → {espnId: [game]} finished since the quads snapshot
-// What the Last 7 Games chips show after the opponent logo (small title switch "Score BPI Record"):
-// the game score, the opponent's current BPI rating, or the opponent's current W-L.
+// What the Last 7 Games chips show after the opponent logo (small title switch "Score BPI Record Quad"):
+// the game score, the opponent's current BPI rating, the opponent's current W-L, or the game's quadrant.
 // Saved per viewer in localStorage pickerShow.
-const PICKER_SHOW = [["score", "Score"], ["bpi", "BPI"], ["record", "Record"]];
+const PICKER_SHOW = [["score", "Score"], ["bpi", "BPI"], ["record", "Record"], ["quad", "Quad"]];
 function pickerShowMode() {
     try { const v = localStorage.getItem("pickerShow"); if (PICKER_SHOW.some(([k]) => k === v)) return v; } catch { }
     return "score";
@@ -5793,7 +5793,7 @@ function buildPickerTableHtml(season, data, error) {
         <th title="ESPN Strength of Record rank (lower is better)">SOR</th>
         <th title="ESPN BPI: points better than an average D1 team per 70 possessions, neutral court">BPI</th>
         ${[1, 2, 3, 4].map(q => `<th class="records-quad-col${q === 1 ? " records-q1-col" : ""}${q === 4 ? " records-q4-col" : ""}" title="${quadTip}">Q${q}</th>`).join("")}
-        <th class="records-opps-col tp-wins-col" title="Each team's ${PICKER_GAMES} most recent games: wins in green, losses in red (hover for details). Score / BPI / Record in the title picks what follows each logo: the score, or the opponent's current BPI or W-L. With more games, non-D1 wins, then Q4 wins, then Q3 wins drop out before older games">Last ${PICKER_GAMES} Games</th>
+        <th class="records-opps-col tp-wins-col" title="Each team's ${PICKER_GAMES} most recent games: wins in green, losses in red (hover for details). Score / BPI / Record / Quad in the title picks what follows each logo: the score, the opponent's current BPI or W-L, or the game's quadrant. With more games, non-D1 wins, then Q4 wins, then Q3 wins drop out before older games">Last ${PICKER_GAMES} Games</th>
     </tr></thead>`;
     const msg = text => `${head}<tbody><tr><td colspan="${COLS}" class="records-msg">${text}</td></tr></tbody>`;
     if (!data) return msg(error ? `Couldn't load records from ESPN (${esc(error)}). <span class="records-retry">Retry</span>` : "Loading");
@@ -5815,10 +5815,11 @@ function buildPickerTableHtml(season, data, error) {
     const rankLabel = qd.source === "net" ? "NET" : "BPI";
     const num = v => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(1);
     const show = pickerShowMode();
-    // Chip value after the logo: score, or the opponent's current BPI / W-L ("—" for non-D1 or missing).
+    // Chip value after the logo: score, the opponent's current BPI / W-L, or the game's quad ("—" for non-D1 or missing).
     const chipValue = g => {
         if (show === "bpi") { const b = g.opp.key ? qd.teams[g.opp.key]?.bpi : null; return b == null ? "—" : num(b); }
         if (show === "record") { const r = g.opp.key ? data.byId[g.opp.id] : null; return r ? `${r.wins}-${r.losses}` : "—"; }
+        if (show === "quad") return g.quad ? `Q${g.quad}` : "—";
         return `${g.us}-${g.them}`;
     };
     const chip = g => {
