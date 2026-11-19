@@ -5092,7 +5092,7 @@ label:t=>t[2].toFixed(1),tip:t=>`BPI rating (rank #${t[1]})`,
 },
 SOR:{
 cls:"row-sor",tokenKey:"_sorToken",list:s=>s.sor,
-title:"ESPN Strength of Record (chance a typical Top 25 team has this record or better against this schedule)",
+title:"ESPN Strength of Record",
 label:t=>`${t[2]}-${t[3]}`,tip:t=>`SOR rank #${t[1]}; record ${t[2]}-${t[3]}`,
 },
 };
@@ -5394,17 +5394,17 @@ return `<tr data-team="${teamAttr}">
 let html=`<thead><tr>
         <th>#</th><th></th>
         <th class="team-col">Team</th>
-        <th title="Rank change from previous week">Δ</th>
+        <th title="Rank change">Δ</th>
         <th>Voters</th>
         <th>Pts</th>
         <th title="First-place votes">#1</th>
-        <th title="Change from previous week in points as a share of points available (25 × voters)">Δ Pts</th>
-        <th title="10th percentile rank across all voters">P<sub>90+</sub></th>
+        <th title="Points change, % of max (25 × voters)">Δ Pts</th>
+        <th title="10th percentile rank">P<sub>90+</sub></th>
         <th>Avg</th>
-        <th title="90th percentile rank across all voters">P<sub>10−</sub></th>
-        <th title="Standard deviation of ranks given by voters this week">Dev</th>
-        <th title="Outlook inner band: likely range (~50%) of this team's rank over the next few polls">50%</th>
-        <th title="Outlook outer band: wider range (~77.5%) of this team's rank over the next few polls, from voters' best/worst ranks over the last 5 polls">77%</th>
+        <th title="90th percentile rank">P<sub>10−</sub></th>
+        <th title="Rank standard deviation">Dev</th>
+        <th title="Likely rank range (~50%), next few polls">50%</th>
+        <th title="Outlook rank range (~77.5%), next few polls">77%</th>
         <th class="ws-res">Games</th>
     </tr></thead><tbody>`;
 top25.forEach((team,i)=>{html +=buildRow(team,i + 1);});
@@ -5455,7 +5455,7 @@ if(!win){statsTable.classList.add("ws-no-results");return;}
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=ms=>new Date(ms).toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
 const span=`${fmt(win.start)} – ${fmt(win.end)}`;
-statsTable.querySelector("th.ws-res").title=`Games since the previous poll (${span}): wins in green, losses in red; hover a game for details`;
+statsTable.querySelector("th.ws-res").title=`Games since last poll (${span})`;
 const cells=()=>statsTable.querySelectorAll("td.ws-res");
 cells().forEach(td=>{td.innerHTML=`<span class="ws-res-msg">…</span>`;});
 const oppHtml=g=>{
@@ -5584,11 +5584,11 @@ const tbl=document.createElement("table");
 tbl.className="conf-stats-table";
 tbl.innerHTML=`<colgroup><col style="width:130px"><col style="width:44px"><col style="width:64px"><col style="width:60px"><col style="width:48px"><col></colgroup><thead><tr>
         <th class="team-col">Conference</th>
-        <th title="Teams in the consensus Top 25">T25</th>
-        <th title="Total ballot points (rank 1 = 25 … rank 25 = 1)">Pts</th>
-        <th title="Share of all ballot points this week">Share</th>
-        <th title="Change in points share from last week (percentage points)">Δ</th>
-        <th class="conf-teams" title="Teams receiving votes, most points first (number = consensus rank)">Teams</th>
+        <th title="Teams in the Top 25">T25</th>
+        <th title="Ballot points (#1 = 25 … #25 = 1)">Pts</th>
+        <th title="Share of all points">Share</th>
+        <th title="Share change (pp)">Δ</th>
+        <th class="conf-teams" title="Teams with votes, by points (number = rank)">Teams</th>
     </tr></thead><tbody>
         ${stats.voted.map(row).join("")}
     </tbody>`;
@@ -6831,7 +6831,7 @@ table.innerHTML=isPicker
 const noteEl=title.querySelector(".records-title-note");
 if(noteEl){
 noteEl.innerHTML=(isPicker&&pickerSavedOrder(currentYear)
-?`<span class="records-retry tp-reset" title="Put the teams back in eligibility order">Reset order</span> · `:"")
+?`<span class="records-retry tp-reset" title="Restore eligibility order">Reset order</span> · `:"")
 + recordsNoteHtml(currentYear,data);
 noteEl.querySelector(".tp-reset")?.addEventListener("click",()=>{
 pickerSaveOrder(currentYear,null);
@@ -6959,7 +6959,7 @@ const fmtDate=iso=>new Date(iso).toLocaleDateString([],{month:"short",day:"numer
 const teamKey=espnTeamKey(teamId);
 const qd=_quadsData[season];
 const showQuads=!!(teamKey&&qd?.games?.[teamKey]);
-const quadTip=qd?`${qd.source==="net"?"NET":"BPI (unofficial)"} quadrant, by the opponent's current rank and the game site`:"";
+const quadTip=qd?(qd.source==="net"?"NET quadrant":"Unofficial BPI quadrant"):"";
 const lines=games.map(g=>{
 const site=g.site==="H"?"vs":g.site==="A"?"@":"N";
 const quad=showQuads?quadOfGame(season,teamKey,g):null;
@@ -7027,16 +7027,16 @@ const isCurrentSeason=Number(currentYear)>=Math.max(...getSortedTabs().map(t=>Nu
 const showNext=showBpi&&isCurrentSeason;
 const COLS=6 +(quadSrc?4:0)+(showNet?1:0)+(showBpi?3:0)+(showResume?2:0)+(showNext?1:0);
 const quadTip=quadSrc==="net"
-?"Official NCAA quadrant record (D1 games only)"
-:"Unofficial: NCAA quadrant cutoffs with ESPN BPI ranks in place of NET (D1 games only)";
+?"NCAA quadrant record (D1 only)"
+:"Unofficial quadrant record, BPI for NET (D1 only)";
 const bpiCols=[
-["bpi","BPI","ESPN BPI: points better than an average D1 team per 70 possessions, neutral court"],
-["off","Off","ESPN BPI offense component (points per 70 possessions above average)"],
-["def","Def","ESPN BPI defense component (points per 70 possessions above average)"],
+["bpi","BPI","ESPN BPI: points above an average D1 team per 70 possessions"],
+["off","Off","BPI offense (points per 70 poss. above avg)"],
+["def","Def","BPI defense (points per 70 poss. above avg)"],
 ];
 const resumeCols=[
-["sor","SOR","ESPN Strength of Record rank: how hard it would be for a typical Top 25 team to have this record or better against this schedule (lower is better)"],
-["sos","SOS","ESPN Strength of Schedule rank, games played so far (1 = hardest)"],
+["sor","SOR","ESPN Strength of Record rank (lower is better)"],
+["sos","SOS","ESPN Strength of Schedule rank (1 = hardest)"],
 ];
 const quadHead=quadSrc
 ?(showResume?resumeCols.map(([k,l,tip])=>
@@ -7053,7 +7053,7 @@ const head=`<colgroup>
         ${showNext?"<col>":""}
     </colgroup><thead><tr>
         <th>#</th><th></th><th class="team-col">Team</th>
-        <th>W-L</th><th>Pct</th><th>Conf</th>${quadHead}${showNext?`<th class="records-opps-col records-next-col" title="Next ${RECORDS_NEXT_COUNT} games (hover for opponent, time and quadrant)">Next</th>`:""}
+        <th>W-L</th><th>Pct</th><th>Conf</th>${quadHead}${showNext?`<th class="records-opps-col records-next-col" title="Next ${RECORDS_NEXT_COUNT} games">Next</th>`:""}
     </tr></thead>`;
 const quadCells=key=>{
 if(!quadSrc)return "";
@@ -7245,8 +7245,8 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const qd=_quadsData[season];
 const COLS=11;
 const quadTip=qd?.source==="net"
-?"Official NCAA quadrant record (D1 games only)"
-:"Unofficial: NCAA quadrant cutoffs with ESPN BPI ranks in place of NET (D1 games only)";
+?"NCAA quadrant record (D1 only)"
+:"Unofficial quadrant record, BPI for NET (D1 only)";
 const head=`<colgroup>
         <col style="width:28px"><col style="width:26px"><col>
         <col style="width:52px"><col style="width:40px"><col style="width:46px">
@@ -7254,9 +7254,9 @@ const head=`<colgroup>
     </colgroup><thead><tr>
         <th>#</th><th></th><th class="team-col">Team</th><th>W-L</th>
         <th title="ESPN Strength of Record rank (lower is better)">SOR</th>
-        <th title="ESPN BPI: points better than an average D1 team per 70 possessions, neutral court">BPI</th>
+        <th title="ESPN BPI: points above an average D1 team per 70 possessions">BPI</th>
         ${[1,2,3,4].map(q=>`<th class="records-quad-col${q===1?" records-q1-col":""}${q===4?" records-q4-col":""}" title="${quadTip}">Q${q}</th>`).join("")}
-        <th class="records-opps-col tp-wins-col" title="Each team's ${PICKER_GAMES} most recent games: wins in green, losses in red (hover for details). Score / BPI / Record / Quad in the title picks what follows each logo: the score, the opponent's current BPI or W-L, or the game's quadrant. With more games, non-D1 wins, then Q4 wins, then Q3 wins drop out before older games">Last ${PICKER_GAMES} Games</th>
+        <th class="records-opps-col tp-wins-col" title="Last ${PICKER_GAMES} games; non-D1, Q4, then Q3 wins drop out first">Last ${PICKER_GAMES} Games</th>
     </tr></thead>`;
 const msg=text=>`${head}<tbody><tr><td colspan="${COLS}" class="records-msg">${text}</td></tr></tbody>`;
 if(!data)return msg(error?`Couldn't load records from ESPN (${esc(error)}). <span class="records-retry">Retry</span>`:"Loading");
@@ -7301,7 +7301,7 @@ const body=order.map((k,i)=>{
 const c=byKey.get(k);
 const fullName=conferenceDisplayName(c.key);
 const name=fullName.length>RECORDS_NAME_MAX&&c.r.name&&c.r.name.length<fullName.length?c.r.name:fullName;
-const tip=`Eligibility ${c.score.toFixed(1)} (#${cands.indexOf(c)+ 1}): average of SOR #${c.sorRank}, BPI #${c.bpiRank}, W-L #${c.wlRank}`;
+const tip=`Eligibility ${c.score.toFixed(1)} (#${cands.indexOf(c)+ 1}): avg of SOR #${c.sorRank}, BPI #${c.bpiRank}, W-L #${c.wlRank}`;
 const games=pickerGames(season,c.key,c.id);
 return `<tr class="tp-row records-team-row${i===24?" records-t25-end":""}" data-team="${esc(c.key)}" data-espn="${c.id}">
             <td class="tp-num tp-handle">${i + 1}</td>
@@ -7450,7 +7450,7 @@ let html=`<colgroup>
         <th>#</th><th></th>
         <th class="team-col">Voter</th>
         <th>Weeks</th>
-        <th title="Average distance from the weekly consensus, same as the homepage Consensus sort: places this voter's teams moved up vs. consensus per ballot (lower = closer)">Cons Δ</th>
+        <th title="Avg places off weekly consensus per ballot (lower = closer)">Cons Δ</th>
         <th class="fan-col">#1 Pick</th>
         <th class="fan-col">Favorite</th>
         <th class="fan-col">Least Fav.</th>
@@ -7648,7 +7648,7 @@ let html=`<colgroup>
     </colgroup><thead><tr>
         <th>#</th>
         <th class="name-col">Voter</th>
-        <th title="Total ballots submitted all-time">Ballots</th>
+        <th title="All-time ballots">Ballots</th>
     </tr></thead><tbody>`;
 voters.forEach((username,i)=>{
 const count=ballotCount[username]??0;
@@ -7824,7 +7824,7 @@ return h>=24?`${Math.floor(h / 24)}d ${h%24}h`:(h?`${h}h ${m%60}m`:`${m}m`);
 const tbl=document.createElement("table");
 tbl.className="ballot-times-table bt-week-table";
 tbl.innerHTML=`<thead><tr><th>#</th><th class="name-col">Voter</th><th class="name-col">Type</th>`
-+ `<th title="When the ballot was first created (ET)">Submitted (ET)</th><th title="Time before the estimated deadline">Before deadline</th></tr></thead><tbody></tbody>`;
++ `<th title="Ballot creation time">Submitted (ET)</th><th title="Before est. deadline">Before deadline</th></tr></thead><tbody></tbody>`;
 const tbody=tbl.querySelector("tbody");
 ballots.forEach((b,i)=>{
 const tr=document.createElement("tr");
@@ -7901,7 +7901,7 @@ rows +=`<tr${active}><td class="name-col">${ballotTimesWeekName(w.tab)}</td><td>
 const tbl=document.createElement("table");
 tbl.className="ballot-times-table";
 tbl.innerHTML=`<thead><tr><th class="name-col">Week</th><th>Ballots</th><th>Official</th><th title="Last ballot rounded up to the hour (ET)">Deadline ≈</th>`
-+ `<th title="Median time before the deadline">Median</th><th title="Share submitted in the final 24 hours">≤24h</th><th>≤12h</th><th>≤3h</th><th>≤1h</th></tr></thead><tbody>${rows}</tbody>`;
++ `<th title="Median time before deadline">Median</th><th title="Share in final 24 h">≤24h</th><th>≤12h</th><th>≤3h</th><th>≤1h</th></tr></thead><tbody>${rows}</tbody>`;
 const wrap=document.createElement("div");
 wrap.appendChild(svg);
 wrap.appendChild(tbl);
@@ -8177,7 +8177,7 @@ const cols=[
 ["dRank","ΔRk","Rank change",-1,false,!!prevWeekId,
 x=>x.dRank?`<span class="${x.dRank>0?"delta-up":"delta-down"}">${x.dRank>0?"+":"−"}${Math.abs(x.dRank)}</span>`:x.dRank===0?"0":"—"],
 ["hi","Hi","Highest ballot rank",1,false,true,x=>x.hi??"—"],
-["lo","Lo","Lowest ballot rank (NR = left off a ballot)",1,false,true,x=>x.lo===26?"NR":x.lo??"—"],
+["lo","Lo","Lowest ballot rank (NR = unranked)",1,false,true,x=>x.lo===26?"NR":x.lo??"—"],
 ["avg","Avg","Average ballot rank",1,false,true,x=>x.avg==null?"—":x.avg.toFixed(1)],
 ["ap","AP","AP rank",1,false,showAp,x=>apRanks===undefined?"…":x.ap??"—"],
 ["firsts","#1","First-place votes",-1,true,true,x=>x.firsts||"—"],
