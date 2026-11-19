@@ -219,6 +219,8 @@ body.show-week-arrows .modal-week-arrows {
     position: relative;
 }
 
+/* Highlight average-rank lines: off unless turned on in Settings */
+body:not(.show-avg-lines) .avg-rank-line { display: none; }
 .avg-rank-line {
     position: absolute;
     top: 0;
@@ -1247,14 +1249,51 @@ body.year-loading::after {
 
 
 /* ─── Outlier highlighting ───────────────────────────────── */
-.logo-cell.outlier-high .team-logo {
-    border-radius: 50%;
-    box-shadow: 0 0 0 3px rgb(40, 167, 69);
+td.logo-cell.outlier-high,
+td.logo-cell.outlier-low {
+    position: relative;
 }
-.logo-cell.outlier-low .team-logo {
-    border-radius: 50%;
-    box-shadow: 0 0 0 3px rgb(220, 53, 69);
+/* Compact table (Settings): natural width, smaller rank headers */
+body.compact-table h1 { font-size: 27px; }
+body.compact-table .ballot-section th { font-size: 13px; padding: 0 0 4px; }
+body.compact-table .ballot-section .voters-toggle { font-size: 14px; }
+body.compact-table .ballot-section th:first-child, body.compact-table .ballot-section td:first-child { width: 150px; min-width: 150px; max-width: 150px; }
+body.compact-table .ballot-section td:first-child { padding: 2px 5px; }
+body.compact-table .ballot-section .voter-cell > .logo { width: 18px; }
+body.compact-table .ballot-section td.logo-cell .logo { display: block; margin: 0 auto; }
+
+/* Both highlight modes: solid +9 / −7 tag in the cell's top-right corner */
+.outlier-tag {
+    position: absolute;
+    top: -3px;
+    right: -2px;
+    z-index: 1;
+    font-size: 8.5px;
+    font-weight: 800;
+    line-height: 1;
+    padding: 1px 2px;
+    border-radius: 3px;
+    color: var(--color-bg-modal);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    pointer-events: none;
 }
+.outlier-high .outlier-tag { background: var(--color-win); }
+.outlier-low .outlier-tag { background: var(--color-loss); }
+/* Both highlight modes: full-width bar along the cell's bottom */
+td.logo-cell.outlier-high::after,
+td.logo-cell.outlier-low::after {
+    content: "";
+    position: absolute;
+    bottom: 1px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-radius: 2px;
+    pointer-events: none;
+}
+td.logo-cell.outlier-high::after { background: var(--color-win); }
+td.logo-cell.outlier-low::after { background: var(--color-loss); }
 .voter-omission-badge {
     display: inline-block;
     font-size: 10px;
@@ -1801,7 +1840,7 @@ body.dark {
   </div>
 </div>
 
-<template id="picker-template"><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Show</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Deltas</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='picker-category'>Stats</span><span class='sort-option' data-action='dotPlot'>Week</span><span class='sort-option' data-action='yearlyStats'>Records</span><span class='sort-option' data-action='results'>Results</span><span class='picker-category'>&bull;</span><span class='sort-option' data-action='settings'>Settings</span><span class='sort-option' data-action='credits'>Credits</span><span class='picker-category settings-only'>Settings</span><span class='sort-option settings-only' data-action='darkMode'>Dark Mode</span><span class='sort-option settings-only' data-action='weekArrows'>Nav Arrows ON</span><span class='picker-category settings-only'>Other</span><span class='sort-option settings-only' data-action='savePng'>Save as PNG</span><span class='sort-option settings-only' data-action='legend'>Keybinds</span><span class='sort-option settings-only' data-action='devPin'>Dev</span><span class='credits-only credits-text'>Site displays poll results from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span></span></template>
+<template id="picker-template"><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Show</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Deltas</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='picker-category'>Stats</span><span class='sort-option' data-action='dotPlot'>Week</span><span class='sort-option' data-action='yearlyStats'>Records</span><span class='sort-option' data-action='results'>Results</span><span class='picker-category'>&bull;</span><span class='sort-option' data-action='settings'>Settings</span><span class='sort-option' data-action='credits'>Credits</span><span class='picker-category settings-only'>Settings</span><span class='sort-option settings-only' data-action='darkMode'>Dark Mode</span><span class='sort-option settings-only' data-action='weekArrows'>Nav Arrows ON</span><span class='sort-option settings-only' data-action='highlightMode'>Dim Highlights</span><span class='sort-option settings-only' data-action='compactTable'>Compact Table</span><span class='sort-option settings-only' data-action='avgLines'>Avg Lines ON</span><span class='picker-category settings-only'>Other</span><span class='sort-option settings-only' data-action='savePng'>Save as PNG</span><span class='sort-option settings-only' data-action='legend'>Keybinds</span><span class='sort-option settings-only' data-action='devPin'>Dev</span><span class='credits-only credits-text'>Site displays poll results from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span></span></template>
 
 <div id="pin-modal">
   <div id="pin-box">
@@ -2076,9 +2115,21 @@ function refreshSettingsLabels(root=document){
 root.querySelectorAll('.sort-option[data-action="darkMode"]').forEach(o=>{
 o.textContent=isDarkMode()?'Light Mode':'Dark Mode';
 });
+const dimOn=document.body.classList.contains('highlight-dim');
+root.querySelectorAll('.sort-option[data-action="highlightMode"]').forEach(o=>{
+o.textContent=dimOn?'Glow Highlights':'Dim Highlights';
+});
+const compactOn=document.body.classList.contains('compact-table');
+root.querySelectorAll('.sort-option[data-action="compactTable"]').forEach(o=>{
+o.textContent=compactOn?'Standard Table':'Compact Table';
+});
 const arrowsOn=document.body.classList.contains('show-week-arrows');
 root.querySelectorAll('.sort-option[data-action="weekArrows"]').forEach(o=>{
 o.textContent=arrowsOn?'Nav Arrows OFF':'Nav Arrows ON';
+});
+const avgLinesOn=document.body.classList.contains('show-avg-lines');
+root.querySelectorAll('.sort-option[data-action="avgLines"]').forEach(o=>{
+o.textContent=avgLinesOn?'Avg Lines OFF':'Avg Lines ON';
 });
 let devUnlocked=false;
 try{
@@ -2228,8 +2279,8 @@ const highlightClasses=[
 ];
 const highlightColorSets={
 light:{
-"team-highlight-1":"#ffcc00",
-"team-highlight-2":"#0077cc",
+"team-highlight-1":"#0077cc",
+"team-highlight-2":"#ffcc00",
 "team-highlight-3":"#ff6666",
 "team-highlight-4":"#33cc33",
 "team-highlight-5":"#cc66ff"
@@ -2254,14 +2305,22 @@ el.id="team-highlight-styles";
 document.head.appendChild(el);
 }
 const rules=[];
+const lit=highlightClasses.map(c=>highlightedTeams[c]).filter(Boolean);
+if(lit.length){
+const nots=lit.map(t=>`:not([data-team="${t}"])`).join("");
+rules.push(`body.highlight-dim td.logo-cell > .team-logo${nots} { opacity: 0.2; filter: grayscale(1); }`);
+}
 highlightClasses.forEach(cls=>{
 const team=highlightedTeams[cls];
 if(!team)return;
 const color=getHighlightColors()[cls];
 rules.push(`.team-logo[data-team="${team}"] { border-radius: 4px; box-shadow: 0 0 0 2px ${color}, 0 0 20px 6px ${color}; }`);
-rules.push(`.row-delta .team-logo[data-team="${team}"] { box-shadow: 0 0 0 2px ${color}; }`);
-rules.push(`.logo-cell.outlier-high .team-logo[data-team="${team}"] { border-radius: 50% !important; box-shadow: 0 0 0 3px rgb(40, 167, 69), 0 0 20px 6px ${color} !important; }`);
-rules.push(`.logo-cell.outlier-low .team-logo[data-team="${team}"] { border-radius: 50% !important; box-shadow: 0 0 0 3px rgb(220, 53, 69), 0 0 20px 6px ${color} !important; }`);
+const cell=`td.logo-cell:has(> .team-logo[data-team="${team}"])`;
+rules.push(`td.logo-cell > .team-logo[data-team="${team}"] { box-shadow: none; }`);
+rules.push(`${cell} { position: relative; z-index: 1; }`);
+rules.push(`${cell}::before { content: ""; position: absolute; inset: 1px; border-radius: 3px; pointer-events: none; }`);
+rules.push(`body:not(.highlight-dim) ${cell}::before { box-shadow: inset 0 0 0 2px ${color}, 0 0 12px 2px ${color}; }`);
+rules.push(`body:not(.highlight-dim) .row-delta ${cell}::before, body.highlight-dim ${cell}::before { box-shadow: inset 0 0 0 2px ${color}; }`);
 rules.push(`.chart-logo-ring[data-team="${team}"] { display: inline; stroke: ${color}; fill: ${color}; filter: url(#chart-glow-${cls}); }`);
 rules.push(`.chart-stroke[data-team="${team}"] { stroke: ${color}; filter: url(#chart-glow-${cls}); }`);
 rules.push(`.chart-fill[data-team="${team}"] { fill: ${color}; filter: url(#chart-glow-${cls}); }`);
@@ -2621,11 +2680,18 @@ const voterRank=idx + 1;
 const cRank=consensusRankMap[team]??26;
 const deviation=cRank - voterRank;
 const stat=teamStats[team];
-cell.classList.remove("outlier-high","outlier-low");
-if(stat&&stat.sd>0&&Math.abs(voterRank - stat.avg)>=OUTLIER_SD_THRESHOLD*stat.sd&&Math.abs(deviation)>=3){
-if(deviation>0&&voterRank<=OUTLIER_HIGH_MAX_RANK)cell.classList.add("outlier-high");
-else if(deviation<0)cell.classList.add("outlier-low");
-}
+clearOutlierCell(cell);
+if(!stat||!(stat.sd>0)||Math.abs(deviation)<3)return;
+const z=Math.abs(voterRank - stat.avg)/ stat.sd;
+if(z<OUTLIER_SD_THRESHOLD)return;
+if(deviation>0&&voterRank>OUTLIER_HIGH_MAX_RANK)return;
+const high=deviation>0;
+cell.classList.add(high?"outlier-high":"outlier-low");
+const tag=document.createElement("span");
+tag.className="outlier-tag";
+tag.textContent=(high?"+":"−")+ Math.abs(deviation);
+cell.appendChild(tag);
+cell.title=`${team}: #${voterRank} on this ballot · consensus ${cRank===26?"unranked":"#" + cRank} · avg ${stat.avg.toFixed(1)} · ${z.toFixed(1)}σ`;
 });
 const omittedTeams=[];
 for(let i=0;i<Math.min(OUTLIER_OMISSION_TOP_N,consensus.length);i++){
@@ -2647,10 +2713,14 @@ badge.remove();
 }
 });
 }
+function clearOutlierCell(cell){
+if(!cell.classList.contains("outlier-high")&&!cell.classList.contains("outlier-low"))return;
+cell.classList.remove("outlier-high","outlier-low");
+cell.removeAttribute("title");
+cell.querySelector(".outlier-tag")?.remove();
+}
 function clearOutliers(weekBlock){
-weekBlock.querySelectorAll(".outlier-high, .outlier-low").forEach(el=>{
-el.classList.remove("outlier-high","outlier-low");
-});
+weekBlock.querySelectorAll(".outlier-high, .outlier-low").forEach(clearOutlierCell);
 weekBlock.querySelectorAll(".voter-omission-badge").forEach(el=>el.remove());
 }
 function toggleOutliers(){
@@ -2759,7 +2829,7 @@ const action=opt.dataset.action;
 const picker=opt.closest(".sort-picker");
 if(action==="devPin"&&_pinLockedOut())return;
 const showToggles=["toggleOverall","expandDeltas","toggleOutliers"];
-const inPlace=["settings","credits","darkMode","weekArrows",...showToggles].includes(action);
+const inPlace=["settings","credits","darkMode","weekArrows","highlightMode","compactTable","avgLines",...showToggles].includes(action);
 if(inPlace){
 const swallow=ev=>ev.stopPropagation();
 window.addEventListener("click",swallow,{capture:true,once:true});
@@ -2777,6 +2847,9 @@ return;
 }
 if(action==="darkMode"){toggleDarkMode();return;}
 if(action==="weekArrows"){setWeekArrowsVisible(!_showWeekArrows);return;}
+if(action==="highlightMode"){setHighlightDim(!_highlightDim);return;}
+if(action==="avgLines"){setAvgLinesVisible(!_showAvgLines);return;}
+if(action==="compactTable"){setCompactTable(!_compactTable);fitCreditsText(picker);return;}
 if(showToggles.includes(action)){
 handlePickerAction(action);
 syncDeltasMenu(picker);
@@ -7895,6 +7968,34 @@ refreshSettingsLabels();
 try{localStorage.setItem("showWeekArrows",on?"1":"0");}catch(e){}
 }
 setWeekArrowsVisible(_showWeekArrows);
+let _highlightDim=false;
+try{_highlightDim=localStorage.getItem("highlightMode")==="dim";}catch(e){}
+function setHighlightDim(on){
+_highlightDim=on;
+document.body.classList.toggle("highlight-dim",on);
+refreshSettingsLabels();
+try{localStorage.setItem("highlightMode",on?"dim":"glow");}catch(e){}
+}
+setHighlightDim(_highlightDim);
+let _showAvgLines=false;
+try{_showAvgLines=localStorage.getItem("showAvgLines")==="1";}catch(e){}
+function setAvgLinesVisible(on){
+_showAvgLines=on;
+document.body.classList.toggle("show-avg-lines",on);
+refreshSettingsLabels();
+try{localStorage.setItem("showAvgLines",on?"1":"0");}catch(e){}
+}
+setAvgLinesVisible(_showAvgLines);
+let _compactTable=false;
+try{_compactTable=localStorage.getItem("compactTable")==="1";}catch(e){}
+function setCompactTable(on){
+_compactTable=on;
+document.body.classList.toggle("compact-table",on);
+refreshSettingsLabels();
+try{localStorage.setItem("compactTable",on?"1":"0");}catch(e){}
+updateAvgRankLines();
+}
+setCompactTable(_compactTable);
 document.getElementById("week-arrow-prev").addEventListener("click",()=>navigateWeek(-1));
 document.getElementById("week-arrow-next").addEventListener("click",()=>navigateWeek(1));
 const LOCKED_KEYS=new Set(["D","X","T","Y","G","U","W","H","K","P","S","?"]);

@@ -48,9 +48,21 @@ function refreshSettingsLabels(root = document) {
     root.querySelectorAll('.sort-option[data-action="darkMode"]').forEach(o => {
         o.textContent = isDarkMode() ? 'Light Mode' : 'Dark Mode';
     });
+    const dimOn = document.body.classList.contains('highlight-dim');
+    root.querySelectorAll('.sort-option[data-action="highlightMode"]').forEach(o => {
+        o.textContent = dimOn ? 'Glow Highlights' : 'Dim Highlights';
+    });
+    const compactOn = document.body.classList.contains('compact-table');
+    root.querySelectorAll('.sort-option[data-action="compactTable"]').forEach(o => {
+        o.textContent = compactOn ? 'Standard Table' : 'Compact Table';
+    });
     const arrowsOn = document.body.classList.contains('show-week-arrows');
     root.querySelectorAll('.sort-option[data-action="weekArrows"]').forEach(o => {
         o.textContent = arrowsOn ? 'Nav Arrows OFF' : 'Nav Arrows ON';
+    });
+    const avgLinesOn = document.body.classList.contains('show-avg-lines');
+    root.querySelectorAll('.sort-option[data-action="avgLines"]').forEach(o => {
+        o.textContent = avgLinesOn ? 'Avg Lines OFF' : 'Avg Lines ON';
     });
     // Dev is dimmed unless the locked keybinds are unlocked today. Reads storage directly
     // because this can run before the PIN-lock section (and its `let`s) near the end of the file.
@@ -225,8 +237,8 @@ const highlightClasses = [
 ];
 const highlightColorSets = {
     light: {
-        "team-highlight-1": "#ffcc00",
-        "team-highlight-2": "#0077cc",
+        "team-highlight-1": "#0077cc",
+        "team-highlight-2": "#ffcc00",
         "team-highlight-3": "#ff6666",
         "team-highlight-4": "#33cc33",
         "team-highlight-5": "#cc66ff"
@@ -253,14 +265,28 @@ function applyHighlightStyles() {
         document.head.appendChild(el);
     }
     const rules = [];
+    const lit = highlightClasses.map(c => highlightedTeams[c]).filter(Boolean);
+    // Dim mode (body.highlight-dim, Settings): fade every ballot logo that isn't highlighted.
+    if (lit.length) {
+        const nots = lit.map(t => `:not([data-team="${t}"])`).join("");
+        rules.push(`body.highlight-dim td.logo-cell > .team-logo${nots} { opacity: 0.2; filter: grayscale(1); }`);
+    }
     highlightClasses.forEach(cls => {
         const team = highlightedTeams[cls];
         if (!team) return;
         const color = getHighlightColors()[cls];
+        // Logos outside the ballot tables (modals, stats tables) keep the square glow.
         rules.push(`.team-logo[data-team="${team}"] { border-radius: 4px; box-shadow: 0 0 0 2px ${color}, 0 0 20px 6px ${color}; }`);
-        rules.push(`.row-delta .team-logo[data-team="${team}"] { box-shadow: 0 0 0 2px ${color}; }`);
-        rules.push(`.logo-cell.outlier-high .team-logo[data-team="${team}"] { border-radius: 50% !important; box-shadow: 0 0 0 3px rgb(40, 167, 69), 0 0 20px 6px ${color} !important; }`);
-        rules.push(`.logo-cell.outlier-low .team-logo[data-team="${team}"] { border-radius: 50% !important; box-shadow: 0 0 0 3px rgb(220, 53, 69), 0 0 20px 6px ${color} !important; }`);
+        // Ballot tables frame the cell instead: glowing frame in Glow mode, plain frame in
+        // Dim mode and on delta rows. Outlier marks live on the cell too (tag / bar).
+        const cell = `td.logo-cell:has(> .team-logo[data-team="${team}"])`;
+        rules.push(`td.logo-cell > .team-logo[data-team="${team}"] { box-shadow: none; }`);
+        // The frame is a ::before layer: collapsed-border table cells ignore border-radius
+        // and don't reliably paint an outer box-shadow.
+        rules.push(`${cell} { position: relative; z-index: 1; }`);
+        rules.push(`${cell}::before { content: ""; position: absolute; inset: 1px; border-radius: 3px; pointer-events: none; }`);
+        rules.push(`body:not(.highlight-dim) ${cell}::before { box-shadow: inset 0 0 0 2px ${color}, 0 0 12px 2px ${color}; }`);
+        rules.push(`body:not(.highlight-dim) .row-delta ${cell}::before, body.highlight-dim ${cell}::before { box-shadow: inset 0 0 0 2px ${color}; }`);
         rules.push(`.chart-logo-ring[data-team="${team}"] { display: inline; stroke: ${color}; fill: ${color}; filter: url(#chart-glow-${cls}); }`);
         rules.push(`.chart-stroke[data-team="${team}"] { stroke: ${color}; filter: url(#chart-glow-${cls}); }`);
         rules.push(`.chart-fill[data-team="${team}"] { fill: ${color}; filter: url(#chart-glow-${cls}); }`);
@@ -707,12 +733,21 @@ function applyOutliers(weekBlock) {
             const cRank = consensusRankMap[team] ?? 26;
             const deviation = cRank - voterRank;
             const stat = teamStats[team];
-            cell.classList.remove("outlier-high", "outlier-low");
-            if (stat && stat.sd > 0 && Math.abs(voterRank - stat.avg) >= OUTLIER_SD_THRESHOLD * stat.sd && Math.abs(deviation) >= 3) {
-                // High outliers only count in the top 20; #21-25 is ordinary ballot filler.
-                if (deviation > 0 && voterRank <= OUTLIER_HIGH_MAX_RANK) cell.classList.add("outlier-high");
-                else if (deviation < 0) cell.classList.add("outlier-low");
-            }
+            clearOutlierCell(cell);
+            if (!stat || !(stat.sd > 0) || Math.abs(deviation) < 3) return;
+            const z = Math.abs(voterRank - stat.avg) / stat.sd;
+            if (z < OUTLIER_SD_THRESHOLD) return;
+            // High outliers only count in the top 20; #21-25 is ordinary ballot filler.
+            if (deviation > 0 && voterRank > OUTLIER_HIGH_MAX_RANK) return;
+            const high = deviation > 0;
+            cell.classList.add(high ? "outlier-high" : "outlier-low");
+            // Both modes show this tag plus a full-width bar (CSS).
+            const tag = document.createElement("span");
+            tag.className = "outlier-tag";
+            // Unranked-by-consensus teams count as #26, so the number is the gap to unranked.
+            tag.textContent = (high ? "+" : "−") + Math.abs(deviation);
+            cell.appendChild(tag);
+            cell.title = `${team}: #${voterRank} on this ballot · consensus ${cRank === 26 ? "unranked" : "#" + cRank} · avg ${stat.avg.toFixed(1)} · ${z.toFixed(1)}σ`;
         });
 
         const omittedTeams = [];
@@ -737,10 +772,15 @@ function applyOutliers(weekBlock) {
     });
 }
 
+function clearOutlierCell(cell) {
+    if (!cell.classList.contains("outlier-high") && !cell.classList.contains("outlier-low")) return;
+    cell.classList.remove("outlier-high", "outlier-low");
+    cell.removeAttribute("title");
+    cell.querySelector(".outlier-tag")?.remove();
+}
+
 function clearOutliers(weekBlock) {
-    weekBlock.querySelectorAll(".outlier-high, .outlier-low").forEach(el => {
-        el.classList.remove("outlier-high", "outlier-low");
-    });
+    weekBlock.querySelectorAll(".outlier-high, .outlier-low").forEach(clearOutlierCell);
     weekBlock.querySelectorAll(".voter-omission-badge").forEach(el => el.remove());
 }
 
@@ -869,7 +909,7 @@ document.addEventListener("mousedown", e => {
     // row can reflow under the cursor, so swallow the click that follows this
     // mousedown — otherwise it can land outside the picker and close it.
     const showToggles = ["toggleOverall", "expandDeltas", "toggleOutliers"];
-    const inPlace = ["settings", "credits", "darkMode", "weekArrows", ...showToggles].includes(action);
+    const inPlace = ["settings", "credits", "darkMode", "weekArrows", "highlightMode", "compactTable", "avgLines", ...showToggles].includes(action);
     if (inPlace) {
         const swallow = ev => ev.stopPropagation();
         window.addEventListener("click", swallow, { capture: true, once: true });
@@ -887,6 +927,9 @@ document.addEventListener("mousedown", e => {
     }
     if (action === "darkMode") { toggleDarkMode(); return; }
     if (action === "weekArrows") { setWeekArrowsVisible(!_showWeekArrows); return; }
+    if (action === "highlightMode") { setHighlightDim(!_highlightDim); return; }
+    if (action === "avgLines") { setAvgLinesVisible(!_showAvgLines); return; }
+    if (action === "compactTable") { setCompactTable(!_compactTable); fitCreditsText(picker); return; }
     if (showToggles.includes(action)) {
         handlePickerAction(action);
         syncDeltasMenu(picker);
@@ -7053,6 +7096,48 @@ function setWeekArrowsVisible(on) {
     try { localStorage.setItem("showWeekArrows", on ? "1" : "0"); } catch (e) {}
 }
 setWeekArrowsVisible(_showWeekArrows);
+
+// ── Highlight mode ──────────────────────────────────────────────────────────
+// Glow (default): highlighted ballot cells get a glowing frame.
+// Dim (body.highlight-dim): other ballot logos fade, highlighted cells get a plain
+// frame. Outliers look the same in both (tag + bar). Toggled in Settings, remembered in localStorage.
+let _highlightDim = false;
+try { _highlightDim = localStorage.getItem("highlightMode") === "dim"; } catch (e) {}
+function setHighlightDim(on) {
+    _highlightDim = on;
+    document.body.classList.toggle("highlight-dim", on);
+    refreshSettingsLabels();
+    try { localStorage.setItem("highlightMode", on ? "dim" : "glow"); } catch (e) {}
+}
+setHighlightDim(_highlightDim);
+
+// ── Highlight average-rank lines ────────────────────────────────────────────
+// The vertical line at a highlighted team's average ballot rank. Off by default;
+// toggled in Settings, remembered in localStorage. Hidden via CSS (body.show-avg-lines),
+// so updateAvgRankLines() still places them and still colors the consensus header.
+let _showAvgLines = false;
+try { _showAvgLines = localStorage.getItem("showAvgLines") === "1"; } catch (e) {}
+function setAvgLinesVisible(on) {
+    _showAvgLines = on;
+    document.body.classList.toggle("show-avg-lines", on);
+    refreshSettingsLabels();
+    try { localStorage.setItem("showAvgLines", on ? "1" : "0"); } catch (e) {}
+}
+setAvgLinesVisible(_showAvgLines);
+
+// ── Compact table ───────────────────────────────────────────────────────────
+// Ballot tables at their natural width (like the outlier mockups) instead of stretched
+// to the page. Toggled in Settings, remembered in localStorage.
+let _compactTable = false;
+try { _compactTable = localStorage.getItem("compactTable") === "1"; } catch (e) {}
+function setCompactTable(on) {
+    _compactTable = on;
+    document.body.classList.toggle("compact-table", on);
+    refreshSettingsLabels();
+    try { localStorage.setItem("compactTable", on ? "1" : "0"); } catch (e) {}
+    updateAvgRankLines();  // columns move, so the avg-rank lines must be re-placed
+}
+setCompactTable(_compactTable);
 document.getElementById("week-arrow-prev").addEventListener("click", () => navigateWeek(-1));
 document.getElementById("week-arrow-next").addEventListener("click", () => navigateWeek(1));
 

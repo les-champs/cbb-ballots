@@ -199,6 +199,8 @@ body.show-week-arrows .modal-week-arrows {
     position: relative;
 }
 
+/* Highlight average-rank lines: off unless turned on in Settings */
+body:not(.show-avg-lines) .avg-rank-line { display: none; }
 .avg-rank-line {
     position: absolute;
     top: 0;
@@ -1227,14 +1229,51 @@ body.year-loading::after {
 
 
 /* ─── Outlier highlighting ───────────────────────────────── */
-.logo-cell.outlier-high .team-logo {
-    border-radius: 50%;
-    box-shadow: 0 0 0 3px rgb(40, 167, 69);
+td.logo-cell.outlier-high,
+td.logo-cell.outlier-low {
+    position: relative;
 }
-.logo-cell.outlier-low .team-logo {
-    border-radius: 50%;
-    box-shadow: 0 0 0 3px rgb(220, 53, 69);
+/* Compact table (Settings): natural width, smaller rank headers */
+body.compact-table h1 { font-size: 27px; }
+body.compact-table .ballot-section th { font-size: 13px; padding: 0 0 4px; }
+body.compact-table .ballot-section .voters-toggle { font-size: 14px; }
+body.compact-table .ballot-section th:first-child, body.compact-table .ballot-section td:first-child { width: 150px; min-width: 150px; max-width: 150px; }
+body.compact-table .ballot-section td:first-child { padding: 2px 5px; }
+body.compact-table .ballot-section .voter-cell > .logo { width: 18px; }
+body.compact-table .ballot-section td.logo-cell .logo { display: block; margin: 0 auto; }
+
+/* Both highlight modes: solid +9 / −7 tag in the cell's top-right corner */
+.outlier-tag {
+    position: absolute;
+    top: -3px;
+    right: -2px;
+    z-index: 1;
+    font-size: 8.5px;
+    font-weight: 800;
+    line-height: 1;
+    padding: 1px 2px;
+    border-radius: 3px;
+    color: var(--color-bg-modal);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    pointer-events: none;
 }
+.outlier-high .outlier-tag { background: var(--color-win); }
+.outlier-low .outlier-tag { background: var(--color-loss); }
+/* Both highlight modes: full-width bar along the cell's bottom */
+td.logo-cell.outlier-high::after,
+td.logo-cell.outlier-low::after {
+    content: "";
+    position: absolute;
+    bottom: 1px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-radius: 2px;
+    pointer-events: none;
+}
+td.logo-cell.outlier-high::after { background: var(--color-win); }
+td.logo-cell.outlier-low::after { background: var(--color-loss); }
 .voter-omission-badge {
     display: inline-block;
     font-size: 10px;
