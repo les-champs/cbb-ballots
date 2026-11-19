@@ -41,27 +41,26 @@ function svgColors() {
     };
 }
 
-// Settings items live inside every Functions picker (shown in .settings-mode).
-// Labels name what clicking does (e.g. "Nav Arrows ON" turns them on), so refresh them whenever it changes and
-// whenever a picker opens (fragments loaded later carry the default labels).
+// Settings items live in the Settings window (#settings-modal, opened from Functions › Settings).
+// Labels name what clicking does (e.g. "Nav Arrows ON" turns them on), so refresh them whenever it changes.
 function refreshSettingsLabels(root = document) {
-    root.querySelectorAll('.sort-option[data-action="darkMode"]').forEach(o => {
+    root.querySelectorAll('.settings-item[data-action="darkMode"]').forEach(o => {
         o.textContent = isDarkMode() ? 'Light Mode' : 'Dark Mode';
     });
     const dimOn = document.body.classList.contains('highlight-dim');
-    root.querySelectorAll('.sort-option[data-action="highlightMode"]').forEach(o => {
+    root.querySelectorAll('.settings-item[data-action="highlightMode"]').forEach(o => {
         o.textContent = dimOn ? 'Glow Highlights' : 'Dim Highlights';
     });
     const compactOn = document.body.classList.contains('compact-table');
-    root.querySelectorAll('.sort-option[data-action="compactTable"]').forEach(o => {
+    root.querySelectorAll('.settings-item[data-action="compactTable"]').forEach(o => {
         o.textContent = compactOn ? 'Standard Table' : 'Compact Table';
     });
     const arrowsOn = document.body.classList.contains('show-week-arrows');
-    root.querySelectorAll('.sort-option[data-action="weekArrows"]').forEach(o => {
+    root.querySelectorAll('.settings-item[data-action="weekArrows"]').forEach(o => {
         o.textContent = arrowsOn ? 'Nav Arrows OFF' : 'Nav Arrows ON';
     });
     const avgLinesOn = document.body.classList.contains('show-avg-lines');
-    root.querySelectorAll('.sort-option[data-action="avgLines"]').forEach(o => {
+    root.querySelectorAll('.settings-item[data-action="avgLines"]').forEach(o => {
         o.textContent = avgLinesOn ? 'Avg Lines OFF' : 'Avg Lines ON';
     });
     // Dev is dimmed unless the locked keybinds are unlocked today. Reads storage directly
@@ -72,7 +71,7 @@ function refreshSettingsLabels(root = document) {
         const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         devUnlocked = localStorage.getItem('keybindsUnlockedDate') === today;
     } catch (e) {}
-    root.querySelectorAll('.sort-option[data-action="devPin"]').forEach(o => o.classList.toggle('dimmed', !devUnlocked));
+    root.querySelectorAll('.settings-item[data-action="devPin"]').forEach(o => o.classList.toggle('dimmed', !devUnlocked));
 }
 function updateDarkModeLabel() {
     refreshSettingsLabels();
@@ -886,8 +885,7 @@ function bindVotersToggle() {
                 const ts = getComputedStyle(toggle);
                 picker.style.font = ts.font;
                 toggle.style.display = "none";
-                picker.classList.remove("settings-mode", "credits-mode");
-                refreshSettingsLabels(picker);
+                picker.classList.remove("credits-mode");
                 syncDeltasMenu(picker);
                 picker.classList.add("open");
                 hideRankHeaders(block);
@@ -908,32 +906,21 @@ document.addEventListener("mousedown", e => {
     const sort = opt.dataset.sort;
     const action = opt.dataset.action;
     const picker = opt.closest(".sort-picker");
-    if (action === "devPin" && _pinLockedOut()) return;  // inert during the PIN lockout
-    // Settings and the Show toggles act in place and keep the picker open. The
+    // Credits and the Show toggles act in place and keep the picker open. The
     // row can reflow under the cursor, so swallow the click that follows this
     // mousedown — otherwise it can land outside the picker and close it.
     const showToggles = ["toggleOverall", "expandDeltas", "toggleOutliers"];
-    const inPlace = ["settings", "credits", "darkMode", "weekArrows", "highlightMode", "compactTable", "avgLines", ...showToggles].includes(action);
+    const inPlace = ["credits", ...showToggles].includes(action);
     if (inPlace) {
         const swallow = ev => ev.stopPropagation();
         window.addEventListener("click", swallow, { capture: true, once: true });
         setTimeout(() => window.removeEventListener("click", swallow, true), 1000);
-    }
-    if (action === "settings") {
-        picker.classList.add("settings-mode");
-        refreshSettingsLabels(picker);
-        return;
     }
     if (action === "credits") {
         picker.classList.add("credits-mode");
         fitCreditsText(picker);
         return;
     }
-    if (action === "darkMode") { toggleDarkMode(); return; }
-    if (action === "weekArrows") { setWeekArrowsVisible(!_showWeekArrows); return; }
-    if (action === "highlightMode") { setHighlightDim(!_highlightDim); return; }
-    if (action === "avgLines") { setAvgLinesVisible(!_showAvgLines); return; }
-    if (action === "compactTable") { setCompactTable(!_compactTable); fitCreditsText(picker); return; }
     if (showToggles.includes(action)) {
         handlePickerAction(action);
         syncDeltasMenu(picker);
@@ -984,17 +971,49 @@ function handlePickerAction(action) {
         case "toggleOutliers":
             toggleOutliers();
             break;
-        case "savePng":
-            saveTableAsPng();
-            break;
-        case "legend":
-            toggleKeybindLegend();
-            break;
-        case "devPin":
-            openPinModal();
+        case "settings":
+            showSettingsModal();
             break;
     }
 }
+
+// Settings window (Functions › Settings): display toggles act in place and keep it open;
+// the Other items close it first, then open their own window or run.
+function showSettingsModal() {
+    const modal = document.getElementById("settings-modal");
+    refreshSettingsLabels(modal);
+    modal.classList.add("open");
+    modal.querySelector(".settings-item")?.focus();
+}
+
+document.getElementById("settings-modal").addEventListener("click", e => {
+    const btn = e.target.closest(".settings-item");
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const close = () => document.getElementById("settings-modal").classList.remove("open");
+    switch (action) {
+        case "darkMode": toggleDarkMode(); break;
+        case "weekArrows": setWeekArrowsVisible(!_showWeekArrows); break;
+        case "highlightMode": setHighlightDim(!_highlightDim); break;
+        case "avgLines": setAvgLinesVisible(!_showAvgLines); break;
+        case "compactTable": setCompactTable(!_compactTable); break;
+        case "savePng": close(); saveTableAsPng(); break;
+        case "legend": close(); toggleKeybindLegend(); break;
+        case "devPin":
+            if (_pinLockedOut()) return;  // inert during the PIN lockout
+            close(); openPinModal(); break;
+    }
+});
+
+// Plain ↑/↓ move between items while the window is open (Enter/Space click the focused one).
+document.getElementById("settings-modal").addEventListener("keydown", e => {
+    if (e.shiftKey || (e.key !== "ArrowDown" && e.key !== "ArrowUp")) return;
+    const items = [...document.querySelectorAll("#settings-modal .settings-item")];
+    const i = items.indexOf(document.activeElement);
+    if (i < 0) return;
+    e.preventDefault();
+    items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus();
+});
 
 let currentSort = "alphabetic";
 
@@ -4614,7 +4633,7 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
 // its title tab is hidden and every entry point uses the default; call with "stats" to reach it.
 function showSeasonStatsModal(mode = "records") {
     // Voters tab is PIN-locked (same PIN and daily unlock as the locked keybinds).
-    // While locked it does nothing; the PIN is only entered via Settings › Other › Dev.
+    // While locked it does nothing; the PIN is only entered via Settings › Dev.
     if (mode === "voters" && !isKeybindsUnlocked()) return;
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab) return;
@@ -7002,7 +7021,7 @@ document.getElementById("reports-list").addEventListener("keydown", e => {
     items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus();
 });
 
-["tenure-modal", "conference-modal", "reports-modal"].forEach(id => {
+["tenure-modal", "conference-modal", "reports-modal", "settings-modal"].forEach(id => {
     document.getElementById(id).addEventListener("click", e => {
         if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
     });
@@ -7150,7 +7169,7 @@ document.getElementById("week-arrow-next").addEventListener("click", () => navig
 // Client-side only — a deterrent, not real security. An unlock lasts for the rest of the
 // viewer's local calendar day (localStorage `keybindsUnlockedDate`), checked each time a
 // locked action runs, so a tab left open past midnight locks again. The PIN prompt opens
-// only from Settings › Other › Dev; locked actions do nothing (no prompt) until then.
+// only from Settings › Dev; locked actions do nothing (no prompt) until then.
 const LOCKED_KEYS = new Set(["D", "X", "T", "Y", "G", "U", "W", "H", "K", "P", "S", "?"]);
 // Only a salted PBKDF2-SHA256 hash of the PIN ships in the page, never the PIN itself.
 // To change the PIN: python3 -c "import hashlib;print(hashlib.pbkdf2_hmac('sha256',b'NEWPIN',bytes.fromhex('<salt>'),300000).hex())"
@@ -7237,7 +7256,7 @@ document.addEventListener("keydown", e => {
     const _isVetChord = _chordPending === "v" && (e.key === "x" || e.key === "X");
     if (e.shiftKey && !isKeybindsUnlocked() && !_isVetChord && LOCKED_KEYS.has(e.key.length === 1 ? e.key.toUpperCase() : e.key)) {
         e.preventDefault();
-        return;  // locked: no prompt here — unlock via Settings › Other › Dev
+        return;  // locked: no prompt here — unlock via Settings › Dev
     }
     if (e.key === "Escape") {
         document.getElementById("voter-history-modal").classList.remove("open");
@@ -7247,6 +7266,7 @@ document.addEventListener("keydown", e => {
         document.getElementById("conference-modal").classList.remove("open");
         document.getElementById("heatmap-modal").classList.remove("open");
         document.getElementById("reports-modal").classList.remove("open");
+        document.getElementById("settings-modal").classList.remove("open");
     }
     // Chord: Shift+V then X → toggle veteran tags
     if (e.shiftKey && (e.key === "V" || e.key === "v")) {

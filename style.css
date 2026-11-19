@@ -489,17 +489,6 @@ body.show-overall-row .overall-row {
 .sort-option:hover {
     opacity: 0.7;
 }
-/* Dev stays dimmed until the PIN is entered (still clickable unless locked out) */
-.sort-option.dimmed,
-.sort-option.dimmed:hover {
-    opacity: 0.35;
-}
-
-/* Settings mode: the picker shows only its .settings-only items */
-.sort-picker:not(.settings-mode) > .settings-only,
-.sort-picker.settings-mode > :not(.settings-only) {
-    display: none;
-}
 
 /* Credits mode: the picker's contents are replaced by the credits text */
 .sort-picker:not(.credits-mode) > .credits-only,
@@ -1457,7 +1446,8 @@ body.dark .pin-btn.pinned {
 /* P. Rk: same gray as the totals, at the cell size. */
 #season-stats-table.season-mmp12 .mm-dim { opacity: 0.55; }
 
-/* Reports menu (Shift+R) */
+/* Reports menu (Shift+R) and Settings window (Functions › Settings) share one look */
+#settings-modal,
 #reports-modal {
     display: none;
     position: fixed;
@@ -1467,8 +1457,8 @@ body.dark .pin-btn.pinned {
     justify-content: center;
     align-items: center;
 }
-#reports-modal.open { display: flex; }
-#reports-box {
+#settings-modal.open, #reports-modal.open { display: flex; }
+#settings-box, #reports-box {
     background: var(--color-bg-modal);
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.25);
@@ -1478,9 +1468,9 @@ body.dark .pin-btn.pinned {
     overflow: auto;
     padding: 14px 14px 12px;
 }
-#reports-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
-#reports-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
-.report-item {
+#settings-title, #reports-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
+.settings-list, #reports-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.settings-item, .report-item {
     display: block;
     width: 100%;
     font: inherit;
@@ -1493,9 +1483,13 @@ body.dark .pin-btn.pinned {
     color: var(--color-heading);
     cursor: pointer;
 }
-.report-item:hover, .report-item:focus-visible { background: var(--color-bg-tab-hover); outline: none; }
+.settings-item:hover, .settings-item:focus-visible, .report-item:hover, .report-item:focus-visible { background: var(--color-bg-tab-hover); outline: none; }
 .report-item.placeholder { opacity: 0.45; cursor: default; }
 .report-lock { display: block; }
+.settings-group { margin: 10px 0 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.6; color: var(--color-heading); }
+#settings-title + .settings-group { margin-top: 0; }
+/* Dev stays dimmed until the PIN is entered (still clickable unless locked out) */
+.settings-item.dimmed, .settings-item.dimmed:hover { opacity: 0.35; }
 
 /* Conference table (Shift+K) */
 #conference-modal {

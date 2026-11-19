@@ -509,17 +509,6 @@ body.show-overall-row .overall-row {
 .sort-option:hover {
     opacity: 0.7;
 }
-/* Dev stays dimmed until the PIN is entered (still clickable unless locked out) */
-.sort-option.dimmed,
-.sort-option.dimmed:hover {
-    opacity: 0.35;
-}
-
-/* Settings mode: the picker shows only its .settings-only items */
-.sort-picker:not(.settings-mode) > .settings-only,
-.sort-picker.settings-mode > :not(.settings-only) {
-    display: none;
-}
 
 /* Credits mode: the picker's contents are replaced by the credits text */
 .sort-picker:not(.credits-mode) > .credits-only,
@@ -1477,7 +1466,8 @@ body.dark .pin-btn.pinned {
 /* P. Rk: same gray as the totals, at the cell size. */
 #season-stats-table.season-mmp12 .mm-dim { opacity: 0.55; }
 
-/* Reports menu (Shift+R) */
+/* Reports menu (Shift+R) and Settings window (Functions › Settings) share one look */
+#settings-modal,
 #reports-modal {
     display: none;
     position: fixed;
@@ -1487,8 +1477,8 @@ body.dark .pin-btn.pinned {
     justify-content: center;
     align-items: center;
 }
-#reports-modal.open { display: flex; }
-#reports-box {
+#settings-modal.open, #reports-modal.open { display: flex; }
+#settings-box, #reports-box {
     background: var(--color-bg-modal);
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.25);
@@ -1498,9 +1488,9 @@ body.dark .pin-btn.pinned {
     overflow: auto;
     padding: 14px 14px 12px;
 }
-#reports-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
-#reports-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
-.report-item {
+#settings-title, #reports-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
+.settings-list, #reports-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.settings-item, .report-item {
     display: block;
     width: 100%;
     font: inherit;
@@ -1513,9 +1503,13 @@ body.dark .pin-btn.pinned {
     color: var(--color-heading);
     cursor: pointer;
 }
-.report-item:hover, .report-item:focus-visible { background: var(--color-bg-tab-hover); outline: none; }
+.settings-item:hover, .settings-item:focus-visible, .report-item:hover, .report-item:focus-visible { background: var(--color-bg-tab-hover); outline: none; }
 .report-item.placeholder { opacity: 0.45; cursor: default; }
 .report-lock { display: block; }
+.settings-group { margin: 10px 0 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.6; color: var(--color-heading); }
+#settings-title + .settings-group { margin-top: 0; }
+/* Dev stays dimmed until the PIN is entered (still clickable unless locked out) */
+.settings-item.dimmed, .settings-item.dimmed:hover { opacity: 0.35; }
 
 /* Conference table (Shift+K) */
 #conference-modal {
@@ -1840,7 +1834,7 @@ body.dark {
   </div>
 </div>
 
-<template id="picker-template"><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Show</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Deltas</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='picker-category'>Stats</span><span class='sort-option' data-action='dotPlot'>Week</span><span class='sort-option' data-action='yearlyStats'>Records</span><span class='sort-option' data-action='results'>Results</span><span class='picker-category'>&bull;</span><span class='sort-option' data-action='settings'>Settings</span><span class='sort-option' data-action='credits'>Credits</span><span class='picker-category settings-only'>Settings</span><span class='sort-option settings-only' data-action='darkMode'>Dark Mode</span><span class='sort-option settings-only' data-action='weekArrows'>Nav Arrows ON</span><span class='sort-option settings-only' data-action='highlightMode'>Dim Highlights</span><span class='sort-option settings-only' data-action='compactTable'>Compact Table</span><span class='sort-option settings-only' data-action='avgLines'>Avg Lines ON</span><span class='picker-category settings-only'>Other</span><span class='sort-option settings-only' data-action='savePng'>Save as PNG</span><span class='sort-option settings-only' data-action='legend'>Keybinds</span><span class='sort-option settings-only' data-action='devPin'>Dev</span><span class='credits-only credits-text'>Site displays poll results from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span></span></template>
+<template id="picker-template"><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Show</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Deltas</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='picker-category'>Stats</span><span class='sort-option' data-action='dotPlot'>Week</span><span class='sort-option' data-action='yearlyStats'>Records</span><span class='sort-option' data-action='results'>Results</span><span class='picker-category'>&bull;</span><span class='sort-option' data-action='settings'>Settings</span><span class='sort-option' data-action='credits'>Credits</span><span class='credits-only credits-text'>Site displays poll results from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span></span></template>
 
 <div id="pin-modal">
   <div id="pin-box">
@@ -1870,6 +1864,26 @@ body.dark {
       <div id="conference-years"></div>
     </div>
     <div id="conference-body"></div>
+  </div>
+</div>
+
+<div id="settings-modal">
+  <div id="settings-box">
+    <h2 id="settings-title">Settings</h2>
+    <h3 class="settings-group">Display</h3>
+    <ul class="settings-list">
+      <li><button class="settings-item" data-action="avgLines">Avg Lines ON</button></li>
+      <li><button class="settings-item" data-action="compactTable">Compact Table</button></li>
+      <li><button class="settings-item" data-action="darkMode">Dark Mode</button></li>
+      <li><button class="settings-item" data-action="highlightMode">Dim Highlights</button></li>
+      <li><button class="settings-item" data-action="weekArrows">Nav Arrows ON</button></li>
+    </ul>
+    <h3 class="settings-group">Other</h3>
+    <ul class="settings-list">
+      <li><button class="settings-item" data-action="savePng">Save as PNG</button></li>
+      <li><button class="settings-item" data-action="legend">Keybinds</button></li>
+      <li><button class="settings-item" data-action="devPin">Dev</button></li>
+    </ul>
   </div>
 </div>
 
@@ -2112,23 +2126,23 @@ circleStroke:dark?"#1a1a1a":"#fff",
 };
 }
 function refreshSettingsLabels(root=document){
-root.querySelectorAll('.sort-option[data-action="darkMode"]').forEach(o=>{
+root.querySelectorAll('.settings-item[data-action="darkMode"]').forEach(o=>{
 o.textContent=isDarkMode()?'Light Mode':'Dark Mode';
 });
 const dimOn=document.body.classList.contains('highlight-dim');
-root.querySelectorAll('.sort-option[data-action="highlightMode"]').forEach(o=>{
+root.querySelectorAll('.settings-item[data-action="highlightMode"]').forEach(o=>{
 o.textContent=dimOn?'Glow Highlights':'Dim Highlights';
 });
 const compactOn=document.body.classList.contains('compact-table');
-root.querySelectorAll('.sort-option[data-action="compactTable"]').forEach(o=>{
+root.querySelectorAll('.settings-item[data-action="compactTable"]').forEach(o=>{
 o.textContent=compactOn?'Standard Table':'Compact Table';
 });
 const arrowsOn=document.body.classList.contains('show-week-arrows');
-root.querySelectorAll('.sort-option[data-action="weekArrows"]').forEach(o=>{
+root.querySelectorAll('.settings-item[data-action="weekArrows"]').forEach(o=>{
 o.textContent=arrowsOn?'Nav Arrows OFF':'Nav Arrows ON';
 });
 const avgLinesOn=document.body.classList.contains('show-avg-lines');
-root.querySelectorAll('.sort-option[data-action="avgLines"]').forEach(o=>{
+root.querySelectorAll('.settings-item[data-action="avgLines"]').forEach(o=>{
 o.textContent=avgLinesOn?'Avg Lines OFF':'Avg Lines ON';
 });
 let devUnlocked=false;
@@ -2137,7 +2151,7 @@ const d=new Date();
 const today=`${d.getFullYear()}-${String(d.getMonth()+ 1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 devUnlocked=localStorage.getItem('keybindsUnlockedDate')===today;
 }catch(e){}
-root.querySelectorAll('.sort-option[data-action="devPin"]').forEach(o=>o.classList.toggle('dimmed',!devUnlocked));
+root.querySelectorAll('.settings-item[data-action="devPin"]').forEach(o=>o.classList.toggle('dimmed',!devUnlocked));
 }
 function updateDarkModeLabel(){
 refreshSettingsLabels();
@@ -2810,8 +2824,7 @@ picker.style.left=tableLeft + "px";
 const ts=getComputedStyle(toggle);
 picker.style.font=ts.font;
 toggle.style.display="none";
-picker.classList.remove("settings-mode","credits-mode");
-refreshSettingsLabels(picker);
+picker.classList.remove("credits-mode");
 syncDeltasMenu(picker);
 picker.classList.add("open");
 hideRankHeaders(block);
@@ -2830,29 +2843,18 @@ e.stopPropagation();
 const sort=opt.dataset.sort;
 const action=opt.dataset.action;
 const picker=opt.closest(".sort-picker");
-if(action==="devPin"&&_pinLockedOut())return;
 const showToggles=["toggleOverall","expandDeltas","toggleOutliers"];
-const inPlace=["settings","credits","darkMode","weekArrows","highlightMode","compactTable","avgLines",...showToggles].includes(action);
+const inPlace=["credits",...showToggles].includes(action);
 if(inPlace){
 const swallow=ev=>ev.stopPropagation();
 window.addEventListener("click",swallow,{capture:true,once:true});
 setTimeout(()=>window.removeEventListener("click",swallow,true),1000);
-}
-if(action==="settings"){
-picker.classList.add("settings-mode");
-refreshSettingsLabels(picker);
-return;
 }
 if(action==="credits"){
 picker.classList.add("credits-mode");
 fitCreditsText(picker);
 return;
 }
-if(action==="darkMode"){toggleDarkMode();return;}
-if(action==="weekArrows"){setWeekArrowsVisible(!_showWeekArrows);return;}
-if(action==="highlightMode"){setHighlightDim(!_highlightDim);return;}
-if(action==="avgLines"){setAvgLinesVisible(!_showAvgLines);return;}
-if(action==="compactTable"){setCompactTable(!_compactTable);fitCreditsText(picker);return;}
 if(showToggles.includes(action)){
 handlePickerAction(action);
 syncDeltasMenu(picker);
@@ -2900,17 +2902,43 @@ break;
 case "toggleOutliers":
 toggleOutliers();
 break;
-case "savePng":
-saveTableAsPng();
+case "settings":
+showSettingsModal();
 break;
-case "legend":
-toggleKeybindLegend();
-break;
+}
+}
+function showSettingsModal(){
+const modal=document.getElementById("settings-modal");
+refreshSettingsLabels(modal);
+modal.classList.add("open");
+modal.querySelector(".settings-item")?.focus();
+}
+document.getElementById("settings-modal").addEventListener("click",e=>{
+const btn=e.target.closest(".settings-item");
+if(!btn)return;
+const action=btn.dataset.action;
+const close=()=>document.getElementById("settings-modal").classList.remove("open");
+switch(action){
+case "darkMode":toggleDarkMode();break;
+case "weekArrows":setWeekArrowsVisible(!_showWeekArrows);break;
+case "highlightMode":setHighlightDim(!_highlightDim);break;
+case "avgLines":setAvgLinesVisible(!_showAvgLines);break;
+case "compactTable":setCompactTable(!_compactTable);break;
+case "savePng":close();saveTableAsPng();break;
+case "legend":close();toggleKeybindLegend();break;
 case "devPin":
-openPinModal();
-break;
+if(_pinLockedOut())return;
+close();openPinModal();break;
 }
-}
+});
+document.getElementById("settings-modal").addEventListener("keydown",e=>{
+if(e.shiftKey||(e.key!=="ArrowDown"&&e.key!=="ArrowUp"))return;
+const items=[...document.querySelectorAll("#settings-modal .settings-item")];
+const i=items.indexOf(document.activeElement);
+if(i<0)return;
+e.preventDefault();
+items[(i +(e.key==="ArrowDown"?1:items.length - 1))%items.length].focus();
+});
 let currentSort="alphabetic";
 const SORT_LABELS={alphabetic:"Functions",zetabetique:"Zétabétique",consensus:"Consensus"};
 function setGlobalSort(sort){
@@ -7895,7 +7923,7 @@ if(i<0)return;
 e.preventDefault();
 items[(i +(e.key==="ArrowDown"?1:items.length - 1))%items.length].focus();
 });
-["tenure-modal","conference-modal","reports-modal"].forEach(id=>{
+["tenure-modal","conference-modal","reports-modal","settings-modal"].forEach(id=>{
 document.getElementById(id).addEventListener("click",e=>{
 if(e.target===e.currentTarget)e.currentTarget.classList.remove("open");
 });
@@ -8086,6 +8114,7 @@ document.getElementById("tenure-modal").classList.remove("open");
 document.getElementById("conference-modal").classList.remove("open");
 document.getElementById("heatmap-modal").classList.remove("open");
 document.getElementById("reports-modal").classList.remove("open");
+document.getElementById("settings-modal").classList.remove("open");
 }
 if(e.shiftKey&&(e.key==="V"||e.key==="v")){
 e.preventDefault();

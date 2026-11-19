@@ -1280,16 +1280,6 @@ PICKER_HTML = (
     f"<span class='picker-category'>&bull;</span>"
     f"<span class='sort-option' data-action='settings'>Settings</span>"
     f"<span class='sort-option' data-action='credits'>Credits</span>"
-    f"<span class='picker-category settings-only'>Settings</span>"
-    f"<span class='sort-option settings-only' data-action='darkMode'>Dark Mode</span>"
-    f"<span class='sort-option settings-only' data-action='weekArrows'>Nav Arrows ON</span>"
-    f"<span class='sort-option settings-only' data-action='highlightMode'>Dim Highlights</span>"
-    f"<span class='sort-option settings-only' data-action='compactTable'>Compact Table</span>"
-    f"<span class='sort-option settings-only' data-action='avgLines'>Avg Lines ON</span>"
-    f"<span class='picker-category settings-only'>Other</span>"
-    f"<span class='sort-option settings-only' data-action='savePng'>Save as PNG</span>"
-    f"<span class='sort-option settings-only' data-action='legend'>Keybinds</span>"
-    f"<span class='sort-option settings-only' data-action='devPin'>Dev</span>"
     f"<span class='credits-only credits-text'>Site displays poll results from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span>"
     f"</span>"
 )
@@ -1821,6 +1811,26 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
       <div id="conference-years"></div>
     </div>
     <div id="conference-body"></div>
+  </div>
+</div>
+
+<div id="settings-modal">
+  <div id="settings-box">
+    <h2 id="settings-title">Settings</h2>
+    <h3 class="settings-group">Display</h3>
+    <ul class="settings-list">
+      <li><button class="settings-item" data-action="avgLines">Avg Lines ON</button></li>
+      <li><button class="settings-item" data-action="compactTable">Compact Table</button></li>
+      <li><button class="settings-item" data-action="darkMode">Dark Mode</button></li>
+      <li><button class="settings-item" data-action="highlightMode">Dim Highlights</button></li>
+      <li><button class="settings-item" data-action="weekArrows">Nav Arrows ON</button></li>
+    </ul>
+    <h3 class="settings-group">Other</h3>
+    <ul class="settings-list">
+      <li><button class="settings-item" data-action="savePng">Save as PNG</button></li>
+      <li><button class="settings-item" data-action="legend">Keybinds</button></li>
+      <li><button class="settings-item" data-action="devPin">Dev</button></li>
+    </ul>
   </div>
 </div>
 
