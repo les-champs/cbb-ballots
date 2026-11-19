@@ -268,10 +268,10 @@ function applyHighlightStyles() {
     // Dim mode (body.highlight-dim, Settings): fade every ballot logo that isn't highlighted.
     const nots = lit.map(t => `:not([data-team="${t}"])`).join("");
     if (lit.length) {
-        rules.push(`body.highlight-dim:not(.outliers-on) td.logo-cell > .team-logo${nots} { opacity: 0.2; filter: grayscale(1); }`);
+        rules.push(`body.highlight-dim:not(.outliers-on) td.logo-cell > .team-logo${nots} { opacity: 0.22; filter: grayscale(0.8); }`);
     }
     // Dim mode + Outliers: fade everything except outlier cells and highlighted teams.
-    rules.push(`body.highlight-dim.outliers-on td.logo-cell:not(.outlier-high):not(.outlier-low) > .team-logo${nots} { opacity: 0.2; filter: grayscale(1); }`);
+    rules.push(`body.highlight-dim.outliers-on td.logo-cell:not(.outlier-high):not(.outlier-low) > .team-logo${nots} { opacity: 0.22; filter: grayscale(0.8); }`);
     highlightClasses.forEach(cls => {
         const team = highlightedTeams[cls];
         if (!team) return;
