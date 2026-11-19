@@ -1260,14 +1260,14 @@ body.compact-table .ballot-section td.logo-cell .logo { display: block; margin: 
 }
 .outlier-high .outlier-tag { background: var(--color-win); }
 .outlier-low .outlier-tag { background: var(--color-loss); }
-/* Both highlight modes: full-width bar along the cell's bottom */
+/* Both highlight modes: bar along the cell's bottom, inset slightly from the edges */
 td.logo-cell.outlier-high::after,
 td.logo-cell.outlier-low::after {
     content: "";
     position: absolute;
     bottom: 1px;
-    left: 0;
-    right: 0;
+    left: 2px;
+    right: 2px;
     height: 3px;
     border-radius: 2px;
     pointer-events: none;

@@ -267,10 +267,12 @@ function applyHighlightStyles() {
     const rules = [];
     const lit = highlightClasses.map(c => highlightedTeams[c]).filter(Boolean);
     // Dim mode (body.highlight-dim, Settings): fade every ballot logo that isn't highlighted.
+    const nots = lit.map(t => `:not([data-team="${t}"])`).join("");
     if (lit.length) {
-        const nots = lit.map(t => `:not([data-team="${t}"])`).join("");
-        rules.push(`body.highlight-dim td.logo-cell > .team-logo${nots} { opacity: 0.2; filter: grayscale(1); }`);
+        rules.push(`body.highlight-dim:not(.outliers-on) td.logo-cell > .team-logo${nots} { opacity: 0.2; filter: grayscale(1); }`);
     }
+    // Dim mode + Outliers: fade everything except outlier cells and highlighted teams.
+    rules.push(`body.highlight-dim.outliers-on td.logo-cell:not(.outlier-high):not(.outlier-low) > .team-logo${nots} { opacity: 0.2; filter: grayscale(1); }`);
     highlightClasses.forEach(cls => {
         const team = highlightedTeams[cls];
         if (!team) return;
@@ -786,6 +788,8 @@ function clearOutliers(weekBlock) {
 
 function toggleOutliers() {
     _outliersMode = !_outliersMode;
+    document.body.classList.toggle("outliers-on", _outliersMode);
+    applyHighlightStyles();
     document.querySelectorAll("[data-action='toggleOutliers']").forEach(el => {
         el.classList.toggle("active", _outliersMode);
     });

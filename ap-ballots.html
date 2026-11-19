@@ -1280,14 +1280,14 @@ body.compact-table .ballot-section td.logo-cell .logo { display: block; margin: 
 }
 .outlier-high .outlier-tag { background: var(--color-win); }
 .outlier-low .outlier-tag { background: var(--color-loss); }
-/* Both highlight modes: full-width bar along the cell's bottom */
+/* Both highlight modes: bar along the cell's bottom, inset slightly from the edges */
 td.logo-cell.outlier-high::after,
 td.logo-cell.outlier-low::after {
     content: "";
     position: absolute;
     bottom: 1px;
-    left: 0;
-    right: 0;
+    left: 2px;
+    right: 2px;
     height: 3px;
     border-radius: 2px;
     pointer-events: none;
@@ -2306,10 +2306,11 @@ document.head.appendChild(el);
 }
 const rules=[];
 const lit=highlightClasses.map(c=>highlightedTeams[c]).filter(Boolean);
-if(lit.length){
 const nots=lit.map(t=>`:not([data-team="${t}"])`).join("");
-rules.push(`body.highlight-dim td.logo-cell > .team-logo${nots} { opacity: 0.2; filter: grayscale(1); }`);
+if(lit.length){
+rules.push(`body.highlight-dim:not(.outliers-on) td.logo-cell > .team-logo${nots} { opacity: 0.2; filter: grayscale(1); }`);
 }
+rules.push(`body.highlight-dim.outliers-on td.logo-cell:not(.outlier-high):not(.outlier-low) > .team-logo${nots} { opacity: 0.2; filter: grayscale(1); }`);
 highlightClasses.forEach(cls=>{
 const team=highlightedTeams[cls];
 if(!team)return;
@@ -2725,6 +2726,8 @@ weekBlock.querySelectorAll(".voter-omission-badge").forEach(el=>el.remove());
 }
 function toggleOutliers(){
 _outliersMode=!_outliersMode;
+document.body.classList.toggle("outliers-on",_outliersMode);
+applyHighlightStyles();
 document.querySelectorAll("[data-action='toggleOutliers']").forEach(el=>{
 el.classList.toggle("active",_outliersMode);
 });
