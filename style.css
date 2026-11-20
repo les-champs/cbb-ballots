@@ -20,12 +20,11 @@
     --color-keybind-row:     #444;
     --color-kbd:             #333;
     --color-avg-label:       #555;
-    --color-delta-new:       #2563c4;
     --color-cons-hi:         var(--color-win);   /* vs Consensus outliers: Movement's green/red */
     --color-cons-lo:         var(--color-loss);
     --color-cons-hi-soft:    color-mix(in srgb, var(--color-win) 60%, var(--color-bg));   /* non-outliers */
     --color-cons-lo-soft:    color-mix(in srgb, var(--color-loss) 60%, var(--color-bg));
-    --color-delta-muted:     #6b6b6b;
+    --color-delta-muted:     #888888;
     --color-consensus-dist:  #999;
     --color-picker-cat:      #666;
     --color-spread-text:     #333;
@@ -433,7 +432,6 @@ body.delta-cons .delta-label { display: none; }
 .delta-up { color: var(--color-win); }
 .delta-down { color: var(--color-loss); }
 .delta-same { color: #888; }
-.delta-new { color: var(--color-delta-new); }
 .cons-hi { color: var(--color-cons-hi); }
 .cons-lo { color: var(--color-cons-lo); }
 
@@ -453,85 +451,6 @@ body.delta-cons .delta-label { display: none; }
     color: var(--color-delta-muted);
     font-weight: normal;
 }
-
-/* Δ beside a voter's name: on hover like pin/history, lit while that row is open */
-.delta-btn {
-    display: none;
-    cursor: pointer;
-    flex-shrink: 0;
-    font-size: 10px;
-    font-weight: bold;
-    line-height: 1;
-    padding: 1px 3px;
-    border: 1px solid currentColor;
-    border-radius: 3px;
-    color: #888;
-    opacity: 0.6;
-    user-select: none;
-}
-.delta-btn:hover { opacity: 1; }
-.voter-row.voter-cell-hover .delta-btn,
-.voter-row.row-delta .delta-btn { display: inline-block; }
-.voter-row.row-delta .delta-btn {
-    opacity: 1;
-    color: var(--color-tab-active);
-    background: var(--color-bg-tab-active);
-    border-color: var(--color-bg-tab-active);
-}
-body.delta-move .delta-btn,
-body.delta-cons .delta-btn { display: none !important; }
-
-/* Changes switch under the header */
-#delta-toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 14px;
-    margin: 0 0 10px;
-    font-size: 13px;
-    color: var(--color-heading);
-}
-#delta-toolbar[hidden] { display: none; }
-.delta-toolbar-title { font-weight: bold; }
-.delta-switch {
-    display: flex;
-    border: 1px solid var(--color-border-tab);
-    border-radius: 4px;
-    overflow: hidden;
-}
-.delta-switch button {
-    font: inherit;
-    padding: 4px 11px;
-    border: none;
-    background: var(--color-bg-tab);
-    color: var(--color-heading);
-    cursor: pointer;
-}
-.delta-switch button + button { border-left: 1px solid var(--color-border-tab); }
-.delta-switch button:hover { background: var(--color-bg-tab-hover); }
-.delta-switch button.active {
-    background: var(--color-bg-tab-active);
-    color: var(--color-tab-active);
-}
-#delta-toolbar label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-}
-#delta-toolbar label[hidden] { display: none; }
-#delta-toolbar select {
-    font: inherit;
-    padding: 2px 4px;
-    border: 1px solid var(--color-border-tab);
-    border-radius: 4px;
-    background: var(--color-bg-tab);
-    color: inherit;
-}
-
-
-
-
 
 .voters-toggle {
     cursor: pointer;
@@ -1291,8 +1210,7 @@ body.year-loading::after {
 }
 
 @media (max-device-width: 768px) {
-    .header,
-    #delta-toolbar {
+    .header {
         display: none !important;
     }
     .logo {
@@ -1403,8 +1321,7 @@ body.dark {
     --color-keybind-row:     #bbb;
     --color-kbd:             #ccc;
     --color-avg-label:       #888;
-    --color-delta-new:       #6ea8ff;
-    --color-delta-muted:     #8a8a8a;
+    --color-delta-muted:     #a6a6a6;
     --color-consensus-dist:  #888;
     --color-picker-cat:      #888;
     --color-spread-text:     #ccc;
@@ -1538,8 +1455,9 @@ body.dark .pin-btn.pinned {
 /* P. Rk: same gray as the totals, at the cell size. */
 #season-stats-table.season-mmp12 .mm-dim { opacity: 0.55; }
 
-/* Reports menu (Shift+R) and Settings window (Functions › Settings) share one look */
-#settings-modal,
+/* Reports menu (Shift+R), Settings window (Functions › Settings) and Changes window
+   (Functions › Show › Values) share one look */
+#settings-modal, #changes-modal,
 #reports-modal {
     display: none;
     position: fixed;
@@ -1549,8 +1467,8 @@ body.dark .pin-btn.pinned {
     justify-content: center;
     align-items: center;
 }
-#settings-modal.open, #reports-modal.open { display: flex; }
-#settings-box, #reports-box {
+#settings-modal.open, #changes-modal.open, #reports-modal.open { display: flex; }
+#settings-box, #changes-box, #reports-box {
     background: var(--color-bg-modal);
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.25);
@@ -1560,7 +1478,7 @@ body.dark .pin-btn.pinned {
     overflow: auto;
     padding: 14px 14px 12px;
 }
-#settings-title, #reports-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
+#settings-title, #changes-title, #reports-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
 .settings-list, #reports-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 .settings-item, .report-item {
     display: block;
@@ -1579,7 +1497,27 @@ body.dark .pin-btn.pinned {
 .report-item.placeholder { opacity: 0.45; cursor: default; }
 .report-lock { display: block; }
 .settings-group { margin: 10px 0 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.6; color: var(--color-heading); }
-#settings-title + .settings-group { margin-top: 0; }
+#settings-title + .settings-group, #changes-title + .settings-group { margin-top: 0; }
+.settings-group[hidden], .settings-list[hidden], .settings-select[hidden] { display: none; }
+.settings-group label { cursor: inherit; }
+/* Changes window: Compare With dropdown, sized and colored like a .settings-item */
+.settings-select {
+    display: block;
+    width: 100%;
+    font: inherit;
+    font-size: 12px;
+    padding: 5px 6px;
+    border: 1px solid var(--color-border-tab);
+    border-radius: 4px;
+    background: var(--color-bg-tab);
+    color: var(--color-heading);
+    cursor: pointer;
+}
+.settings-select:hover, .settings-select:focus-visible { background: var(--color-bg-tab-hover); outline: none; }
+.settings-select:disabled { opacity: 0.35; cursor: default; }
+/* Changes window: the chosen mode / comparison poll */
+.settings-item.active, .settings-item.active:hover { background: var(--color-bg-tab-active); color: var(--color-tab-active); }
+.settings-item:disabled { cursor: default; }
 /* Dev stays dimmed until the PIN is entered (still clickable unless locked out) */
 .settings-item.dimmed, .settings-item.dimmed:hover { opacity: 0.35; }
 

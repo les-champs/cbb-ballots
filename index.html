@@ -40,12 +40,11 @@
     --color-keybind-row:     #444;
     --color-kbd:             #333;
     --color-avg-label:       #555;
-    --color-delta-new:       #2563c4;
     --color-cons-hi:         var(--color-win);   /* vs Consensus outliers: Movement's green/red */
     --color-cons-lo:         var(--color-loss);
     --color-cons-hi-soft:    color-mix(in srgb, var(--color-win) 60%, var(--color-bg));   /* non-outliers */
     --color-cons-lo-soft:    color-mix(in srgb, var(--color-loss) 60%, var(--color-bg));
-    --color-delta-muted:     #6b6b6b;
+    --color-delta-muted:     #888888;
     --color-consensus-dist:  #999;
     --color-picker-cat:      #666;
     --color-spread-text:     #333;
@@ -453,7 +452,6 @@ body.delta-cons .delta-label { display: none; }
 .delta-up { color: var(--color-win); }
 .delta-down { color: var(--color-loss); }
 .delta-same { color: #888; }
-.delta-new { color: var(--color-delta-new); }
 .cons-hi { color: var(--color-cons-hi); }
 .cons-lo { color: var(--color-cons-lo); }
 
@@ -473,85 +471,6 @@ body.delta-cons .delta-label { display: none; }
     color: var(--color-delta-muted);
     font-weight: normal;
 }
-
-/* Δ beside a voter's name: on hover like pin/history, lit while that row is open */
-.delta-btn {
-    display: none;
-    cursor: pointer;
-    flex-shrink: 0;
-    font-size: 10px;
-    font-weight: bold;
-    line-height: 1;
-    padding: 1px 3px;
-    border: 1px solid currentColor;
-    border-radius: 3px;
-    color: #888;
-    opacity: 0.6;
-    user-select: none;
-}
-.delta-btn:hover { opacity: 1; }
-.voter-row.voter-cell-hover .delta-btn,
-.voter-row.row-delta .delta-btn { display: inline-block; }
-.voter-row.row-delta .delta-btn {
-    opacity: 1;
-    color: var(--color-tab-active);
-    background: var(--color-bg-tab-active);
-    border-color: var(--color-bg-tab-active);
-}
-body.delta-move .delta-btn,
-body.delta-cons .delta-btn { display: none !important; }
-
-/* Changes switch under the header */
-#delta-toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 14px;
-    margin: 0 0 10px;
-    font-size: 13px;
-    color: var(--color-heading);
-}
-#delta-toolbar[hidden] { display: none; }
-.delta-toolbar-title { font-weight: bold; }
-.delta-switch {
-    display: flex;
-    border: 1px solid var(--color-border-tab);
-    border-radius: 4px;
-    overflow: hidden;
-}
-.delta-switch button {
-    font: inherit;
-    padding: 4px 11px;
-    border: none;
-    background: var(--color-bg-tab);
-    color: var(--color-heading);
-    cursor: pointer;
-}
-.delta-switch button + button { border-left: 1px solid var(--color-border-tab); }
-.delta-switch button:hover { background: var(--color-bg-tab-hover); }
-.delta-switch button.active {
-    background: var(--color-bg-tab-active);
-    color: var(--color-tab-active);
-}
-#delta-toolbar label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-}
-#delta-toolbar label[hidden] { display: none; }
-#delta-toolbar select {
-    font: inherit;
-    padding: 2px 4px;
-    border: 1px solid var(--color-border-tab);
-    border-radius: 4px;
-    background: var(--color-bg-tab);
-    color: inherit;
-}
-
-
-
-
 
 .voters-toggle {
     cursor: pointer;
@@ -1311,8 +1230,7 @@ body.year-loading::after {
 }
 
 @media (max-device-width: 768px) {
-    .header,
-    #delta-toolbar {
+    .header {
         display: none !important;
     }
     .logo {
@@ -1423,8 +1341,7 @@ body.dark {
     --color-keybind-row:     #bbb;
     --color-kbd:             #ccc;
     --color-avg-label:       #888;
-    --color-delta-new:       #6ea8ff;
-    --color-delta-muted:     #8a8a8a;
+    --color-delta-muted:     #a6a6a6;
     --color-consensus-dist:  #888;
     --color-picker-cat:      #888;
     --color-spread-text:     #ccc;
@@ -1558,8 +1475,9 @@ body.dark .pin-btn.pinned {
 /* P. Rk: same gray as the totals, at the cell size. */
 #season-stats-table.season-mmp12 .mm-dim { opacity: 0.55; }
 
-/* Reports menu (Shift+R) and Settings window (Functions › Settings) share one look */
-#settings-modal,
+/* Reports menu (Shift+R), Settings window (Functions › Settings) and Changes window
+   (Functions › Show › Values) share one look */
+#settings-modal, #changes-modal,
 #reports-modal {
     display: none;
     position: fixed;
@@ -1569,8 +1487,8 @@ body.dark .pin-btn.pinned {
     justify-content: center;
     align-items: center;
 }
-#settings-modal.open, #reports-modal.open { display: flex; }
-#settings-box, #reports-box {
+#settings-modal.open, #changes-modal.open, #reports-modal.open { display: flex; }
+#settings-box, #changes-box, #reports-box {
     background: var(--color-bg-modal);
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.25);
@@ -1580,7 +1498,7 @@ body.dark .pin-btn.pinned {
     overflow: auto;
     padding: 14px 14px 12px;
 }
-#settings-title, #reports-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
+#settings-title, #changes-title, #reports-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
 .settings-list, #reports-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 .settings-item, .report-item {
     display: block;
@@ -1599,7 +1517,27 @@ body.dark .pin-btn.pinned {
 .report-item.placeholder { opacity: 0.45; cursor: default; }
 .report-lock { display: block; }
 .settings-group { margin: 10px 0 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.6; color: var(--color-heading); }
-#settings-title + .settings-group { margin-top: 0; }
+#settings-title + .settings-group, #changes-title + .settings-group { margin-top: 0; }
+.settings-group[hidden], .settings-list[hidden], .settings-select[hidden] { display: none; }
+.settings-group label { cursor: inherit; }
+/* Changes window: Compare With dropdown, sized and colored like a .settings-item */
+.settings-select {
+    display: block;
+    width: 100%;
+    font: inherit;
+    font-size: 12px;
+    padding: 5px 6px;
+    border: 1px solid var(--color-border-tab);
+    border-radius: 4px;
+    background: var(--color-bg-tab);
+    color: var(--color-heading);
+    cursor: pointer;
+}
+.settings-select:hover, .settings-select:focus-visible { background: var(--color-bg-tab-hover); outline: none; }
+.settings-select:disabled { opacity: 0.35; cursor: default; }
+/* Changes window: the chosen mode / comparison poll */
+.settings-item.active, .settings-item.active:hover { background: var(--color-bg-tab-active); color: var(--color-tab-active); }
+.settings-item:disabled { cursor: default; }
 /* Dev stays dimmed until the PIN is entered (still clickable unless locked out) */
 .settings-item.dimmed, .settings-item.dimmed:hover { opacity: 0.35; }
 
@@ -2101,8 +2039,8 @@ body.dark {
       <div class="keybind-section-title">Views</div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>O</kbd></span><span>Toggle Outlier Highlighting</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>L</kbd></span><span>Toggle Overall Row</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>E</kbd></span><span>Changes: Off / Movement / vs Consensus</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>1</kbd> – <kbd>9</kbd></span><span>Changes: Compare With 1–9 Polls Back</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>E</kbd></span><span>Values: Off / Movement / vs Consensus</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>1</kbd> – <kbd>9</kbd></span><span>Values: Compare With 1–9 Polls Back</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>R</kbd></span><span>Reports Menu</span></div>
     </div>
     <div class="keybind-section">
@@ -2128,7 +2066,7 @@ body.dark {
   </div>
 </div>
 
-<template id="picker-template"><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Show</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Changes</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='picker-category'>Stats</span><span class='sort-option' data-action='dotPlot'>Week</span><span class='sort-option' data-action='yearlyStats'>Records</span><span class='sort-option' data-action='results'>Results</span><span class='picker-category'>&bull;</span><span class='sort-option' data-action='settings'>Settings</span><span class='sort-option' data-action='credits'>Credits</span><span class='credits-only credits-text'>Site displays poll results from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span></span></template>
+<template id="picker-template"><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Show</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Values</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='picker-category'>Stats</span><span class='sort-option' data-action='dotPlot'>Week</span><span class='sort-option' data-action='yearlyStats'>Records</span><span class='sort-option' data-action='results'>Results</span><span class='picker-category'>&bull;</span><span class='sort-option' data-action='settings'>Settings</span><span class='sort-option' data-action='credits'>Credits</span><span class='credits-only credits-text'>Site displays poll results from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span></span></template>
 
 <div id="pin-modal">
   <div id="pin-box">
@@ -2178,6 +2116,20 @@ body.dark {
       <li><button class="settings-item" data-action="legend">Keybinds</button></li>
       <li><button class="settings-item" data-action="devPin">Dev</button></li>
     </ul>
+  </div>
+</div>
+
+<div id="changes-modal">
+  <div id="changes-box">
+    <h2 id="changes-title">Values</h2>
+    <h3 class="settings-group">Mode</h3>
+    <ul class="settings-list">
+      <li><button type="button" class="settings-item" data-delta-mode="off">Off</button></li>
+      <li><button type="button" class="settings-item" data-delta-mode="move">Movement</button></li>
+      <li><button type="button" class="settings-item" data-delta-mode="cons">vs Consensus</button></li>
+    </ul>
+    <h3 class="settings-group" id="changes-since-group"><label for="changes-since-select">Compare With</label></h3>
+    <select id="changes-since-select" class="settings-select"></select>
   </div>
 </div>
 
@@ -3049,9 +3001,6 @@ function cycleDeltaMode(){
 const i=DELTA_MODES.findIndex(([id])=>id===deltaMode);
 setDeltaMode(DELTA_MODES[(i + 1)%DELTA_MODES.length][0]);
 }
-function toggleAllDeltas(){
-setDeltaMode(deltaMode==="off"?_lastOnDeltaMode:"off");
-}
 function setDeltaWeeksBack(n){
 deltaWeeksBack=n;
 const open=deltaRows(document).filter(r=>r.classList.contains("row-delta"));
@@ -3085,58 +3034,57 @@ opts.push([k,`Week ${displayWeekNum(t)}` +(k===1?" (last poll)":"")]);
 }
 return opts;
 }
-function buildDeltaToolbar(){
-const header=document.querySelector(".header");
-if(!header||document.getElementById("delta-toolbar"))return;
-const bar=document.createElement("div");
-bar.id="delta-toolbar";
-bar.innerHTML=
-`<span class="delta-toolbar-title">Changes</span>` +
-`<div class="delta-switch" role="group" aria-label="Changes">` +
-DELTA_MODES.map(([id,label])=>`<button type="button" data-delta-mode="${id}">${label}</button>`).join("")+
-`</div>` +
-`<label class="delta-since">since <select id="delta-since"></select></label>`;
-header.after(bar);
-bar.addEventListener("click",e=>{
-const b=e.target.closest("[data-delta-mode]");
-if(b){setDeltaMode(b.dataset.deltaMode);b.blur();}
+function showChangesModal(){
+const modal=document.getElementById("changes-modal");
+syncDeltaControls();
+modal.classList.add("open");
+(modal.querySelector(".settings-item.active")||modal.querySelector(".settings-item"))?.focus();
+}
+function initChangesModal(){
+const modal=document.getElementById("changes-modal");
+if(!modal)return;
+modal.addEventListener("click",e=>{
+const b=e.target.closest(".settings-item");
+if(!b||b.disabled)return;
+if(b.dataset.deltaMode)setDeltaMode(b.dataset.deltaMode);
+modal.querySelector(`.settings-item[data-delta-mode="${b.dataset.deltaMode}"]`)?.focus();
 });
-bar.querySelector("#delta-since").addEventListener("change",e=>{
-setDeltaWeeksBack(parseInt(e.target.value,10));
-e.target.blur();
+modal.querySelector("#changes-since-select")?.addEventListener("change",e=>{
+const n=parseInt(e.target.value,10);
+if(n>0)setDeltaWeeksBack(n);
 });
 syncDeltaControls();
 }
 function syncDeltaControls(){
-const bar=document.getElementById("delta-toolbar");
-if(bar){
-bar.hidden=deltaMode==="off";
-bar.querySelectorAll("[data-delta-mode]").forEach(b=>{
+const modal=document.getElementById("changes-modal");
+if(modal){
+modal.querySelectorAll("[data-delta-mode]").forEach(b=>{
 const on=b.dataset.deltaMode===deltaMode;
 b.classList.toggle("active",on);
 b.setAttribute("aria-pressed",on?"true":"false");
 });
-const since=bar.querySelector(".delta-since");
-since.hidden=deltaMode==="cons";
-const sel=since.querySelector("select");
+const hideSince=deltaMode==="cons";
+modal.querySelector("#changes-since-group").hidden=hideSince;
+const sel=modal.querySelector("#changes-since-select");
+sel.hidden=hideSince;
 const opts=deltaSinceOptions();
+const cur=Math.min(deltaWeeksBack,Math.max(opts.length,1));
 sel.innerHTML=opts.length
-?opts.map(([k,label])=>`<option value="${k}">${label}</option>`).join("")
-:`<option value="1">—</option>`;
+?opts.map(([k,label])=>`<option value="${k}"${k===cur?" selected":""}>${label}</option>`).join("")
+:`<option value="0">No earlier poll this season</option>`;
 sel.disabled=!opts.length;
-sel.value=String(Math.min(deltaWeeksBack,Math.max(opts.length,1)));
 }
 syncDeltasMenu();
 }
 function syncDeltasMenu(root=document){
 root.querySelectorAll("[data-action='expandDeltas']").forEach(el=>el.classList.toggle("active",deltaMode!=="off"));
 }
-function initDeltaToolbar(){
+function initDeltaControls(){
 applyDeltaBodyClasses();
-buildDeltaToolbar();
+initChangesModal();
 }
-if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",initDeltaToolbar);
-else initDeltaToolbar();
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",initDeltaControls);
+else initDeltaControls();
 function makeLooConsensus(officialBallots,aggOrder){
 const totalPts={};
 Object.values(officialBallots).forEach(teams=>
@@ -3390,7 +3338,7 @@ e.stopPropagation();
 const sort=opt.dataset.sort;
 const action=opt.dataset.action;
 const picker=opt.closest(".sort-picker");
-const showToggles=["toggleOverall","expandDeltas","toggleOutliers"];
+const showToggles=["toggleOverall","toggleOutliers"];
 const inPlace=["credits",...showToggles].includes(action);
 if(inPlace){
 const swallow=ev=>ev.stopPropagation();
@@ -3444,7 +3392,7 @@ case "toggleOverall":
 toggleOverallRow();
 break;
 case "expandDeltas":
-toggleAllDeltas();
+showChangesModal();
 break;
 case "toggleOutliers":
 toggleOutliers();
@@ -3478,14 +3426,14 @@ if(_pinLockedOut())return;
 close();openPinModal();break;
 }
 });
-document.getElementById("settings-modal").addEventListener("keydown",e=>{
+["settings-modal","changes-modal"].forEach(id=>document.getElementById(id).addEventListener("keydown",e=>{
 if(e.shiftKey||(e.key!=="ArrowDown"&&e.key!=="ArrowUp"))return;
-const items=[...document.querySelectorAll("#settings-modal .settings-item")];
+const items=[...e.currentTarget.querySelectorAll(".settings-item:not(:disabled)")].filter(el=>el.offsetParent);
 const i=items.indexOf(document.activeElement);
 if(i<0)return;
 e.preventDefault();
 items[(i +(e.key==="ArrowDown"?1:items.length - 1))%items.length].focus();
-});
+}));
 let currentSort="alphabetic";
 const SORT_LABELS={alphabetic:"Functions",zetabetique:"Zétabétique",consensus:"Consensus"};
 function setGlobalSort(sort){
@@ -3651,13 +3599,6 @@ const url=cell.dataset.ballotUrl;
 if(url)window.open(url,"_blank","noopener,noreferrer");
 });
 cell.appendChild(lnk);
-}
-if(!cell.querySelector(".delta-btn")){
-const d=document.createElement("span");
-d.className="delta-btn";
-d.textContent="Δ";
-d.title="Show changes for this row";
-cell.appendChild(d);
 }
 cell.addEventListener("mouseenter",()=>{
 cell.closest("tr")?.classList.add("voter-cell-hover");
@@ -5166,8 +5107,7 @@ td.appendChild(img);
 const delta=document.createElement("span");
 delta.className="delta-label";
 if(!hasPrev){delta.textContent="—";delta.classList.add("delta-same");}
-else if(!prevRankOf[team]){delta.textContent="NEW";delta.classList.add("delta-new");}
-else setDeltaLabel(delta,prevRankOf[team]-(i + 1));
+else setDeltaLabel(delta,(prevRankOf[team]||26)-(i + 1));
 td.appendChild(delta);
 const ptsLabel=document.createElement("span");
 ptsLabel.className="avg-label";
@@ -5465,7 +5405,7 @@ label.classList.add("delta-down");
 label.textContent="";
 label.classList.add("delta-same");
 }
-if(diff!==0&&Math.abs(diff)<=2)label.classList.add("delta-small");
+if(diff!==0&&Math.abs(diff)<=4)label.classList.add("delta-small");
 }
 function apYearTabs(year){
 const tabs=ON_AP_PAGE?getSortedTabs():getSortedApTabs();
@@ -5550,11 +5490,6 @@ teams.slice(0,25).forEach((t,i)=>{prevTeamPoints[t]=(prevTeamPoints[t]||0)+(25 -
 });
 }
 const hasPrevWeek=Object.keys(prevTeamRank).length>0;
-const seasonTeamsSeen=new Set();
-for(let i=currTabIdx + 1;i<allTabsSorted.length&&allTabsSorted[i].dataset.year===currYear;i++){
-const wTeams=deltaDataForNew[allTabsSorted[i].dataset.week]?.["Official Overall"];
-if(wTeams)wTeams.forEach(t=>seasonTeamsSeen.add(t));
-}
 const outlookBands={};
 (computeOutlookBands(weekId,top25)||[]).forEach(b=>{outlookBands[b.team]=b;});
 const fmtBandRank=r=>{const n=Math.round(r);return n>=26?"NR":n;};
@@ -5582,10 +5517,8 @@ const sdRaw=count / totalVoters>0.84
 :null;
 let rankDelta='—';
 if(hasPrevWeek&&rank<=25){
-const prevRank=prevTeamRank[team];
-if(!prevRank&&!seasonTeamsSeen.has(team)){
-rankDelta=`<span class="delta-new">NEW</span>`;
-}else{
+const prevRank=prevTeamRank[team]||26;
+{
 const diff=prevRank - rank;
 if(diff>0){
 rankDelta=`<span class="delta-up">${diff}</span>`;
@@ -6404,12 +6337,6 @@ const wid=allTabsSorted[i].dataset.week;
 if(deltaData[wid]?.[username]){prevTeams=deltaData[wid][username];break;}
 }
 }
-const priorTeams=new Set();
-for(let i=currIdx + 1;i<allTabsSorted.length;i++){
-if(allTabsSorted[i].dataset.year!==currYear)break;
-const wid=allTabsSorted[i].dataset.week;
-if(deltaData[wid]?.[username])deltaData[wid][username].forEach(t=>priorTeams.add(t));
-}
 let overallPts=null;
 if(row.classList.contains("overall-row")){
 overallPts={};
@@ -6436,12 +6363,8 @@ if(prevTeams){
 const prevIdx2=prevTeams.indexOf(team);
 const label=document.createElement("span");
 label.className="delta-label";
-if(prevIdx2===-1&&!priorTeams.has(team)){
-label.textContent="NEW";label.classList.add("delta-new");
-}else{
 const effectivePrev=prevIdx2===-1?25:prevIdx2;
 setDeltaLabel(label,effectivePrev - idx);
-}
 logo.after(label);
 }
 const avgLabel=document.createElement("span");
@@ -8463,7 +8386,7 @@ if(i<0)return;
 e.preventDefault();
 items[(i +(e.key==="ArrowDown"?1:items.length - 1))%items.length].focus();
 });
-["tenure-modal","conference-modal","reports-modal","settings-modal"].forEach(id=>{
+["tenure-modal","conference-modal","reports-modal","settings-modal","changes-modal"].forEach(id=>{
 document.getElementById(id).addEventListener("click",e=>{
 if(e.target===e.currentTarget)e.currentTarget.classList.remove("open");
 });
@@ -8655,6 +8578,7 @@ document.getElementById("conference-modal").classList.remove("open");
 document.getElementById("heatmap-modal").classList.remove("open");
 document.getElementById("reports-modal").classList.remove("open");
 document.getElementById("settings-modal").classList.remove("open");
+document.getElementById("changes-modal").classList.remove("open");
 }
 if(e.shiftKey&&(e.key==="V"||e.key==="v")){
 e.preventDefault();

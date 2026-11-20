@@ -555,16 +555,16 @@ function pinRow(row, tbody) {
     applyTableSort(currentSort);
 }
 // ── Changes (deltas) ─────────────────────────────────────────────────────────
-// One label under each logo, chosen by the Changes switch (#delta-toolbar, under the header):
-//   off  — no labels, except rows opened one at a time by clicking a voter's name / Δ
-//   move — places moved since the comparison poll (deltaWeeksBack polls back); NEW = first
-//          time on this ballot this season
+// One label under each logo, chosen in the Changes window (#changes-modal, Functions › Show › Values):
+//   off  — no labels, except rows opened one at a time by clicking a voter's name
+//   move — places moved since the comparison poll (deltaWeeksBack polls back); a team
+//          unranked in that poll counts as coming from #26
 //   cons — voter rank vs this week's consensus (+ = voter ranks the team higher); the
 //          Overall and Data Ballots rows show points instead
 // applyDeltaToRow() builds both labels (.delta-label = movement, .avg-label = consensus or
 // points); the body classes delta-move / delta-cons decide what CSS shows, so a mode
 // switch only recomputes rows that have no labels yet. Small changes (1–2) are always
-// grayed. The mode is saved per viewer in localStorage; the lookback (Shift+1–9 or the "since" menu) is not.
+// grayed. The mode is saved per viewer in localStorage; the lookback (Shift+1–9 or Compare With) is not.
 let deltaWeeksBack = 1;
 const DELTA_MODES = [["off", "Off"], ["move", "Movement"], ["cons", "vs Consensus"]];
 let deltaMode = "off";
@@ -573,7 +573,7 @@ try {
     const m = localStorage.getItem("deltaMode");
     if (DELTA_MODES.some(([id]) => id === m)) deltaMode = m;
 } catch (e) {}
-// Phones have no switch (the header is hidden), so they always start with Changes off.
+// Phones always start with Changes off (labels crowd the narrow table).
 if (isMobileScreen()) deltaMode = "off";
 if (deltaMode !== "off") _lastOnDeltaMode = deltaMode;
 
@@ -625,11 +625,6 @@ function cycleDeltaMode() {
     setDeltaMode(DELTA_MODES[(i + 1) % DELTA_MODES.length][0]);
 }
 
-// Functions › Show › Changes: Off ↔ the last mode that was on.
-function toggleAllDeltas() {
-    setDeltaMode(deltaMode === "off" ? _lastOnDeltaMode : "off");
-}
-
 function setDeltaWeeksBack(n) {
     deltaWeeksBack = n;
     const open = deltaRows(document).filter(r => r.classList.contains("row-delta"));
@@ -649,7 +644,7 @@ function setDeltaWeeksBack(n) {
     syncDeltaControls();
 }
 
-// [[polls back, label], …] for the "since" menu: earlier polls of the shown week's season.
+// [[polls back, label], …] for the Changes window's Compare With dropdown: earlier polls of the shown week's season.
 function deltaSinceOptions() {
     const isAp = _apCurrentYear !== null;
     const tabs = isAp ? getSortedApTabs() : getSortedTabs();
@@ -666,63 +661,66 @@ function deltaSinceOptions() {
     return opts;
 }
 
-function buildDeltaToolbar() {
-    const header = document.querySelector(".header");
-    if (!header || document.getElementById("delta-toolbar")) return;
-    const bar = document.createElement("div");
-    bar.id = "delta-toolbar";
-    bar.innerHTML =
-        `<span class="delta-toolbar-title">Changes</span>` +
-        `<div class="delta-switch" role="group" aria-label="Changes">` +
-        DELTA_MODES.map(([id, label]) => `<button type="button" data-delta-mode="${id}">${label}</button>`).join("") +
-        `</div>` +
-        `<label class="delta-since">since <select id="delta-since"></select></label>`;
-    header.after(bar);
-    bar.addEventListener("click", e => {
-        const b = e.target.closest("[data-delta-mode]");
-        if (b) { setDeltaMode(b.dataset.deltaMode); b.blur(); }
+// Changes window (Functions › Show › Values; markup in build_full_html()): styled like
+// Settings. Mode items and the Compare With dropdown act in place and keep it open. Compare
+// With is hidden in vs Consensus (it has no lookback) and lists earlier polls of this season.
+function showChangesModal() {
+    const modal = document.getElementById("changes-modal");
+    syncDeltaControls();
+    modal.classList.add("open");
+    (modal.querySelector(".settings-item.active") || modal.querySelector(".settings-item"))?.focus();
+}
+
+function initChangesModal() {
+    const modal = document.getElementById("changes-modal");
+    if (!modal) return;
+    modal.addEventListener("click", e => {
+        const b = e.target.closest(".settings-item");
+        if (!b || b.disabled) return;
+        if (b.dataset.deltaMode) setDeltaMode(b.dataset.deltaMode);
+        // Mode buttons are relabelled above; keep focus on the clicked choice.
+        modal.querySelector(`.settings-item[data-delta-mode="${b.dataset.deltaMode}"]`)?.focus();
     });
-    // Blur after a change so Shift+arrow keys go back to week navigation.
-    bar.querySelector("#delta-since").addEventListener("change", e => {
-        setDeltaWeeksBack(parseInt(e.target.value, 10));
-        e.target.blur();
+    modal.querySelector("#changes-since-select")?.addEventListener("change", e => {
+        const n = parseInt(e.target.value, 10);
+        if (n > 0) setDeltaWeeksBack(n);
     });
     syncDeltaControls();
 }
 
 function syncDeltaControls() {
-    const bar = document.getElementById("delta-toolbar");
-    if (bar) {
-        bar.hidden = deltaMode === "off";  // only shown while Changes is on
-        bar.querySelectorAll("[data-delta-mode]").forEach(b => {
+    const modal = document.getElementById("changes-modal");
+    if (modal) {
+        modal.querySelectorAll("[data-delta-mode]").forEach(b => {
             const on = b.dataset.deltaMode === deltaMode;
             b.classList.toggle("active", on);
             b.setAttribute("aria-pressed", on ? "true" : "false");
         });
-        const since = bar.querySelector(".delta-since");
-        since.hidden = deltaMode === "cons";
-        const sel = since.querySelector("select");
+        const hideSince = deltaMode === "cons";
+        modal.querySelector("#changes-since-group").hidden = hideSince;
+        const sel = modal.querySelector("#changes-since-select");
+        sel.hidden = hideSince;
         const opts = deltaSinceOptions();
+        const cur = Math.min(deltaWeeksBack, Math.max(opts.length, 1));
         sel.innerHTML = opts.length
-            ? opts.map(([k, label]) => `<option value="${k}">${label}</option>`).join("")
-            : `<option value="1">—</option>`;
+            ? opts.map(([k, label]) => `<option value="${k}"${k === cur ? " selected" : ""}>${label}</option>`).join("")
+            : `<option value="0">No earlier poll this season</option>`;
         sel.disabled = !opts.length;
-        sel.value = String(Math.min(deltaWeeksBack, Math.max(opts.length, 1)));
     }
     syncDeltasMenu();
 }
 
-// Underline Functions › Show › Changes while a mode is on.
+// Underline Functions › Show › Values while a mode is on.
 function syncDeltasMenu(root = document) {
     root.querySelectorAll("[data-action='expandDeltas']").forEach(el => el.classList.toggle("active", deltaMode !== "off"));
 }
 
-function initDeltaToolbar() {
+function initDeltaControls() {
     applyDeltaBodyClasses();
-    buildDeltaToolbar();
+    initChangesModal();
 }
-if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initDeltaToolbar);
-else initDeltaToolbar();
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initDeltaControls);
+else initDeltaControls();
 
 // ── Distance from consensus (shared) ──────────────────────────────────────────
 // One measure used everywhere a ballot is compared to its week's consensus: the
@@ -1048,7 +1046,7 @@ document.addEventListener("mousedown", e => {
     // Credits and the Show toggles act in place and keep the picker open. The
     // row can reflow under the cursor, so swallow the click that follows this
     // mousedown — otherwise it can land outside the picker and close it.
-    const showToggles = ["toggleOverall", "expandDeltas", "toggleOutliers"];
+    const showToggles = ["toggleOverall", "toggleOutliers"];
     const inPlace = ["credits", ...showToggles].includes(action);
     if (inPlace) {
         const swallow = ev => ev.stopPropagation();
@@ -1105,7 +1103,7 @@ function handlePickerAction(action) {
             toggleOverallRow();
             break;
         case "expandDeltas":
-            toggleAllDeltas();
+            showChangesModal();
             break;
         case "toggleOutliers":
             toggleOutliers();
@@ -1145,14 +1143,15 @@ document.getElementById("settings-modal").addEventListener("click", e => {
 });
 
 // Plain ↑/↓ move between items while the window is open (Enter/Space click the focused one).
-document.getElementById("settings-modal").addEventListener("keydown", e => {
+// Same in the Changes window.
+["settings-modal", "changes-modal"].forEach(id => document.getElementById(id).addEventListener("keydown", e => {
     if (e.shiftKey || (e.key !== "ArrowDown" && e.key !== "ArrowUp")) return;
-    const items = [...document.querySelectorAll("#settings-modal .settings-item")];
+    const items = [...e.currentTarget.querySelectorAll(".settings-item:not(:disabled)")].filter(el => el.offsetParent);
     const i = items.indexOf(document.activeElement);
     if (i < 0) return;
     e.preventDefault();
     items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus();
-});
+}));
 
 let currentSort = "alphabetic";
 
@@ -1354,15 +1353,6 @@ function bindVoterCells(root) {
                 if (url) window.open(url, "_blank", "noopener,noreferrer");
             });
             cell.appendChild(lnk);
-        }
-
-        // Δ: shows this voter's movement (clicking anywhere on the name cell does the same)
-        if (!cell.querySelector(".delta-btn")) {
-            const d = document.createElement("span");
-            d.className = "delta-btn";
-            d.textContent = "Δ";
-            d.title = "Show changes for this row";
-            cell.appendChild(d);
         }
 
         cell.addEventListener("mouseenter", () => {
@@ -3187,8 +3177,7 @@ function _buildPointsRankingRow(label, ranked, pts, prevRankOf, hasPrev, key = l
             const delta = document.createElement("span");
             delta.className = "delta-label";
             if (!hasPrev) { delta.textContent = "—"; delta.classList.add("delta-same"); }
-            else if (!prevRankOf[team]) { delta.textContent = "NEW"; delta.classList.add("delta-new"); }
-            else setDeltaLabel(delta, prevRankOf[team] - (i + 1));
+            else setDeltaLabel(delta, (prevRankOf[team] || 26) - (i + 1)); // unranked = #26
             td.appendChild(delta);
 
             const ptsLabel = document.createElement("span");
@@ -3539,7 +3528,7 @@ function applyDataBallotOrder(block) {
 })();
 
 // Movement text for a rank change (positive diff = moved up): ▲3 / ▼3, blank for no
-// change. Moves of 1–2 get delta-small, which are always grayed out.
+// change. Moves of 1–4 get delta-small, which are always grayed out.
 function setDeltaLabel(label, diff) {
     if (diff > 0) {
         label.textContent = "▲" + diff;
@@ -3551,7 +3540,7 @@ function setDeltaLabel(label, diff) {
         label.textContent = "";
         label.classList.add("delta-same");
     }
-    if (diff !== 0 && Math.abs(diff) <= 2) label.classList.add("delta-small");
+    if (diff !== 0 && Math.abs(diff) <= 4) label.classList.add("delta-small");
 }
 
 function apYearTabs(year) {
@@ -3654,13 +3643,6 @@ function buildWeekStatsTableHtml(weekId) {
     }
     const hasPrevWeek = Object.keys(prevTeamRank).length > 0;
 
-    // Build set of all teams that appeared in any prior week's top 25 this season
-    const seasonTeamsSeen = new Set();
-    for (let i = currTabIdx + 1; i < allTabsSorted.length && allTabsSorted[i].dataset.year === currYear; i++) {
-        const wTeams = deltaDataForNew[allTabsSorted[i].dataset.week]?.["Official Overall"];
-        if (wTeams) wTeams.forEach(t => seasonTeamsSeen.add(t));
-    }
-
     // Outlook graph bands (inner ~50%, outer ~77.5%) for this week's top 25
     const outlookBands = {};
     (computeOutlookBands(weekId, top25) || []).forEach(b => { outlookBands[b.team] = b; });
@@ -3691,10 +3673,8 @@ function buildWeekStatsTableHtml(weekId) {
             : null;
         let rankDelta = '—';
         if (hasPrevWeek && rank <= 25) {
-            const prevRank = prevTeamRank[team];
-            if (!prevRank && !seasonTeamsSeen.has(team)) {
-                rankDelta = `<span class="delta-new">NEW</span>`;
-            } else {
+            const prevRank = prevTeamRank[team] || 26; // unranked = #26
+            {
                 const diff = prevRank - rank;
                 if (diff > 0) {
                     rankDelta = `<span class="delta-up">${diff}</span>`;
@@ -4685,14 +4665,6 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
     }
     // No earlier ballot this season: no movement labels, but consensus/points still apply.
 
-    // Build set of all teams this voter has ranked previously this year
-    const priorTeams = new Set();
-    for (let i = currIdx + 1; i < allTabsSorted.length; i++) {
-        if (allTabsSorted[i].dataset.year !== currYear) break;
-        const wid = allTabsSorted[i].dataset.week;
-        if (deltaData[wid]?.[username]) deltaData[wid][username].forEach(t => priorTeams.add(t));
-    }
-
     // Overall row: its consensus label shows the team's points from this week's
     // official ballots (25 for #1 … 1 for #25) instead of a consensus diff.
     let overallPts = null;
@@ -4726,14 +4698,9 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
             const prevIdx2 = prevTeams.indexOf(team);
             const label = document.createElement("span");
             label.className = "delta-label";
-            if (prevIdx2 === -1 && !priorTeams.has(team)) {
-                // Truly first time ranked this year
-                label.textContent = "NEW"; label.classList.add("delta-new");
-            } else {
-                // Was unranked last period but ranked before — treat as coming from #26
-                const effectivePrev = prevIdx2 === -1 ? 25 : prevIdx2; // 0-indexed, so 25 = rank 26
-                setDeltaLabel(label, effectivePrev - idx);
-            }
+            // Unranked last period counts as coming from #26
+            const effectivePrev = prevIdx2 === -1 ? 25 : prevIdx2; // 0-indexed, so 25 = rank 26
+            setDeltaLabel(label, effectivePrev - idx);
             logo.after(label);
         }
 
@@ -4756,7 +4723,7 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
                 avgLabel.textContent = diff > 0 ? "+" + diff : diff < 0 ? "−" + -diff : "";
                 if (diff > 0) avgLabel.classList.add("cons-hi");
                 else if (diff < 0) avgLabel.classList.add("cons-lo");
-                if (diff !== 0 && Math.abs(diff) <= 3) avgLabel.classList.add("delta-small");  // vs Consensus grays 1–3 (Movement: 1–2)
+                if (diff !== 0 && Math.abs(diff) <= 3) avgLabel.classList.add("delta-small");  // vs Consensus grays 1–3 (Movement: 1–4)
                 else if (teamStats && outlierKind(idx + 1, consensusIdx + 1, teamStats[team])) avgLabel.classList.add("cons-outlier");
             }
         }
@@ -7156,7 +7123,7 @@ document.getElementById("reports-list").addEventListener("keydown", e => {
     items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus();
 });
 
-["tenure-modal", "conference-modal", "reports-modal", "settings-modal"].forEach(id => {
+["tenure-modal", "conference-modal", "reports-modal", "settings-modal", "changes-modal"].forEach(id => {
     document.getElementById(id).addEventListener("click", e => {
         if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
     });
@@ -7402,6 +7369,7 @@ document.addEventListener("keydown", e => {
         document.getElementById("heatmap-modal").classList.remove("open");
         document.getElementById("reports-modal").classList.remove("open");
         document.getElementById("settings-modal").classList.remove("open");
+        document.getElementById("changes-modal").classList.remove("open");
     }
     // Chord: Shift+V then X → toggle veteran tags
     if (e.shiftKey && (e.key === "V" || e.key === "v")) {

@@ -1271,7 +1271,7 @@ PICKER_HTML = (
     f"<span class='sort-option' data-sort='consensus'>Consensus</span>"
     f"<span class='picker-category'>Show</span>"
     f"<span class='sort-option' data-action='toggleOverall'>Overall</span>"
-    f"<span class='sort-option' data-action='expandDeltas'>Changes</span>"
+    f"<span class='sort-option' data-action='expandDeltas'>Values</span>"
     f"<span class='sort-option' data-action='toggleOutliers'>Outliers</span>"
     f"<span class='picker-category'>Stats</span>"
     f"<span class='sort-option' data-action='dotPlot'>Week</span>"
@@ -1753,8 +1753,8 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
       <div class="keybind-section-title">Views</div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>O</kbd></span><span>Toggle Outlier Highlighting</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>L</kbd></span><span>Toggle Overall Row</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>E</kbd></span><span>Changes: Off / Movement / vs Consensus</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>1</kbd> – <kbd>9</kbd></span><span>Changes: Compare With 1–9 Polls Back</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>E</kbd></span><span>Values: Off / Movement / vs Consensus</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>1</kbd> – <kbd>9</kbd></span><span>Values: Compare With 1–9 Polls Back</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>R</kbd></span><span>Reports Menu</span></div>
     </div>
     <div class="keybind-section">
@@ -1830,6 +1830,20 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
       <li><button class="settings-item" data-action="legend">Keybinds</button></li>
       <li><button class="settings-item" data-action="devPin">Dev</button></li>
     </ul>
+  </div>
+</div>
+
+<div id="changes-modal">
+  <div id="changes-box">
+    <h2 id="changes-title">Values</h2>
+    <h3 class="settings-group">Mode</h3>
+    <ul class="settings-list">
+      <li><button type="button" class="settings-item" data-delta-mode="off">Off</button></li>
+      <li><button type="button" class="settings-item" data-delta-mode="move">Movement</button></li>
+      <li><button type="button" class="settings-item" data-delta-mode="cons">vs Consensus</button></li>
+    </ul>
+    <h3 class="settings-group" id="changes-since-group"><label for="changes-since-select">Compare With</label></h3>
+    <select id="changes-since-select" class="settings-select"></select>
   </div>
 </div>
 
