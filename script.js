@@ -279,7 +279,7 @@ function applyHighlightStyles() {
         // Logos outside the ballot tables (modals, stats tables) keep the square glow.
         rules.push(`.team-logo[data-team="${team}"] { border-radius: 4px; box-shadow: 0 0 0 2px ${color}, 0 0 20px 6px ${color}; }`);
         // Ballot tables frame the cell instead: glowing frame in Glow mode, plain frame in
-        // Dim mode and on delta rows. Outlier marks live on the cell too (tag / bar).
+        // Dim mode and on rows showing Changes labels. Outlier marks live on the cell too (tag / bar).
         const cell = `td.logo-cell:has(> .team-logo[data-team="${team}"])`;
         rules.push(`td.logo-cell > .team-logo[data-team="${team}"] { box-shadow: none; }`);
         // The frame is a ::before layer: collapsed-border table cells ignore border-radius
@@ -287,7 +287,7 @@ function applyHighlightStyles() {
         rules.push(`${cell} { position: relative; z-index: 1; }`);
         rules.push(`${cell}::before { content: ""; position: absolute; inset: 1px; border-radius: 3px; pointer-events: none; }`);
         rules.push(`body:not(.highlight-dim) ${cell}::before { box-shadow: inset 0 0 0 2px ${color}, 0 0 12px 2px ${color}; }`);
-        rules.push(`body:not(.highlight-dim) .row-delta ${cell}::before, body.highlight-dim ${cell}::before { box-shadow: inset 0 0 0 2px ${color}; }`);
+        rules.push(`body:not(.highlight-dim) .row-delta ${cell}::before, body.delta-move:not(.highlight-dim) ${cell}::before, body.delta-cons:not(.highlight-dim) ${cell}::before, body.highlight-dim ${cell}::before { box-shadow: inset 0 0 0 2px ${color}; }`);
         rules.push(`.chart-logo-ring[data-team="${team}"] { display: inline; stroke: ${color}; fill: ${color}; filter: url(#chart-glow-${cls}); }`);
         rules.push(`.chart-stroke[data-team="${team}"] { stroke: ${color}; filter: url(#chart-glow-${cls}); }`);
         rules.push(`.chart-fill[data-team="${team}"] { fill: ${color}; filter: url(#chart-glow-${cls}); }`);
@@ -554,54 +554,175 @@ function pinRow(row, tbody) {
     // spot (e.g. consensus order) and pinned voters stay on top.
     applyTableSort(currentSort);
 }
-function toggleAllDeltas() {
-    const allRows = Array.from(document.querySelectorAll(".voter-row, .overall-row"));
-    const allExpanded = allRows.every(r => r.classList.contains("row-delta"));
-    const deltaData = buildDeltaData();
-    const sortedTabs = getSortedTabs();
-    if (allExpanded) {
-        // Collapse all
-        allRows.forEach(r => {
-            r.classList.remove("row-delta");
-            if (!r.classList.contains("row-weighted-ranking")) {
-                r.querySelectorAll(".delta-label, .avg-label").forEach(el => el.remove());
-            }
-        });
-    } else {
-        // Expand all
-        allRows.forEach(r => {
-            if (!r.classList.contains("row-delta")) {
-                r.classList.add("row-delta");
-                if (r.classList.contains("row-weighted-ranking")) return;
-                const weekId = r.closest(".week-block")?.id;
-                if (weekId) applyDeltaToRow(r, weekId, deltaData, sortedTabs);
-            }
-        });
-    }
+// ── Changes (deltas) ─────────────────────────────────────────────────────────
+// One label under each logo, chosen by the Changes switch (#delta-toolbar, under the header):
+//   off  — no labels, except rows opened one at a time by clicking a voter's name / Δ
+//   move — places moved since the comparison poll (deltaWeeksBack polls back); NEW = first
+//          time on this ballot this season
+//   cons — voter rank vs this week's consensus (+ = voter ranks the team higher); the
+//          Overall and Data Ballots rows show points instead
+// applyDeltaToRow() builds both labels (.delta-label = movement, .avg-label = consensus or
+// points); the body classes delta-move / delta-cons decide what CSS shows, so a mode
+// switch only recomputes rows that have no labels yet. Small changes (1–2) are always
+// grayed. The mode is saved per viewer in localStorage; the lookback (Shift+1–9 or the "since" menu) is not.
+let deltaWeeksBack = 1;
+const DELTA_MODES = [["off", "Off"], ["move", "Movement"], ["cons", "vs Consensus"]];
+let deltaMode = "off";
+let _lastOnDeltaMode = "move";
+try {
+    const m = localStorage.getItem("deltaMode");
+    if (DELTA_MODES.some(([id]) => id === m)) deltaMode = m;
+} catch (e) {}
+// Phones have no switch (the header is hidden), so they always start with Changes off.
+if (isMobileScreen()) deltaMode = "off";
+if (deltaMode !== "off") _lastOnDeltaMode = deltaMode;
+
+function isMobileScreen() { return screen.width <= 768; }
+
+function applyDeltaBodyClasses() {
+    document.body.classList.toggle("delta-move", deltaMode === "move");
+    document.body.classList.toggle("delta-cons", deltaMode === "cons");
 }
 
-// Underline the Deltas menu item when every row is expanded — the same test
-// toggleAllDeltas uses, so the underline always predicts what a click will do.
-// Rows can be expanded one at a time too, so this is checked when a picker opens.
-function syncDeltasMenu(root = document) {
-    const allRows = Array.from(document.querySelectorAll(".voter-row, .overall-row"));
-    const on = allRows.length > 0 && allRows.every(r => r.classList.contains("row-delta"));
-    root.querySelectorAll("[data-action='expandDeltas']").forEach(el => el.classList.toggle("active", on));
+// Ballot rows that get computed labels (Data Ballots ranking rows build their own).
+function deltaRows(root) {
+    return Array.from(root.querySelectorAll(".voter-row:not(.row-weighted-ranking), .overall-row"));
 }
 
-function expandAllDeltas() {
-    const allRows = Array.from(document.querySelectorAll(".voter-row, .overall-row"));
+function activeWeekBlock() {
+    if (_apCurrentYear !== null) return document.getElementById(`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`);
+    const id = document.querySelector(".week-tab.active")?.dataset.week;
+    return id ? document.getElementById(id) : null;
+}
+
+// While a mode is on, give every ballot row in the shown week its labels.
+function ensureDeltaLabels(block = activeWeekBlock()) {
+    if (!block || deltaMode === "off") return;
+    const rows = deltaRows(block).filter(r => r._deltaBack !== deltaWeeksBack || !r.querySelector(".delta-label"));
+    if (!rows.length) return;
     const deltaData = buildDeltaData();
     const sortedTabs = getSortedTabs();
-    allRows.forEach(r => {
-        if (!r.classList.contains("row-delta")) {
-            r.classList.add("row-delta");
-            if (r.classList.contains("row-weighted-ranking")) return;
-            const weekId = r.closest(".week-block")?.id;
-            if (weekId) applyDeltaToRow(r, weekId, deltaData, sortedTabs);
-        }
+    rows.forEach(r => {
+        r._deltaBack = deltaWeeksBack;
+        applyDeltaToRow(r, block.id, deltaData, sortedTabs);
     });
 }
+
+function setDeltaMode(mode) {
+    deltaMode = mode;
+    if (mode !== "off") _lastOnDeltaMode = mode;
+    try { localStorage.setItem("deltaMode", mode); } catch (e) {}
+    // Rows opened one at a time belong to Off; any mode switch starts from a clean table.
+    document.querySelectorAll(".row-delta").forEach(r => r.classList.remove("row-delta"));
+    applyDeltaBodyClasses();
+    ensureDeltaLabels();
+    syncDeltaControls();
+}
+
+// Shift+E: Off → Movement → vs Consensus → Off.
+function cycleDeltaMode() {
+    const i = DELTA_MODES.findIndex(([id]) => id === deltaMode);
+    setDeltaMode(DELTA_MODES[(i + 1) % DELTA_MODES.length][0]);
+}
+
+// Functions › Show › Changes: Off ↔ the last mode that was on.
+function toggleAllDeltas() {
+    setDeltaMode(deltaMode === "off" ? _lastOnDeltaMode : "off");
+}
+
+function setDeltaWeeksBack(n) {
+    deltaWeeksBack = n;
+    const open = deltaRows(document).filter(r => r.classList.contains("row-delta"));
+    deltaRows(document).forEach(r => {
+        r._deltaBack = undefined;
+        r.querySelectorAll(".delta-label, .avg-label").forEach(el => el.remove());
+    });
+    if (open.length) {
+        const deltaData = buildDeltaData();
+        const sortedTabs = getSortedTabs();
+        open.forEach(r => {
+            const wid = r.closest(".week-block")?.id;
+            if (wid) { r._deltaBack = n; applyDeltaToRow(r, wid, deltaData, sortedTabs); }
+        });
+    }
+    ensureDeltaLabels();
+    syncDeltaControls();
+}
+
+// [[polls back, label], …] for the "since" menu: earlier polls of the shown week's season.
+function deltaSinceOptions() {
+    const isAp = _apCurrentYear !== null;
+    const tabs = isAp ? getSortedApTabs() : getSortedTabs();
+    const curId = isAp ? `week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`
+        : document.querySelector(".week-tab.active")?.dataset.week;
+    const i = tabs.findIndex(t => t.dataset.week === curId);
+    const opts = [];
+    if (i < 0) return opts;
+    for (let k = 1; k <= 9; k++) {
+        const t = tabs[i + k];
+        if (!t || t.dataset.year !== tabs[i].dataset.year) break;
+        opts.push([k, `Week ${displayWeekNum(t)}` + (k === 1 ? " (last poll)" : "")]);
+    }
+    return opts;
+}
+
+function buildDeltaToolbar() {
+    const header = document.querySelector(".header");
+    if (!header || document.getElementById("delta-toolbar")) return;
+    const bar = document.createElement("div");
+    bar.id = "delta-toolbar";
+    bar.innerHTML =
+        `<span class="delta-toolbar-title">Changes</span>` +
+        `<div class="delta-switch" role="group" aria-label="Changes">` +
+        DELTA_MODES.map(([id, label]) => `<button type="button" data-delta-mode="${id}">${label}</button>`).join("") +
+        `</div>` +
+        `<label class="delta-since">since <select id="delta-since"></select></label>`;
+    header.after(bar);
+    bar.addEventListener("click", e => {
+        const b = e.target.closest("[data-delta-mode]");
+        if (b) { setDeltaMode(b.dataset.deltaMode); b.blur(); }
+    });
+    // Blur after a change so Shift+arrow keys go back to week navigation.
+    bar.querySelector("#delta-since").addEventListener("change", e => {
+        setDeltaWeeksBack(parseInt(e.target.value, 10));
+        e.target.blur();
+    });
+    syncDeltaControls();
+}
+
+function syncDeltaControls() {
+    const bar = document.getElementById("delta-toolbar");
+    if (bar) {
+        bar.hidden = deltaMode === "off";  // only shown while Changes is on
+        bar.querySelectorAll("[data-delta-mode]").forEach(b => {
+            const on = b.dataset.deltaMode === deltaMode;
+            b.classList.toggle("active", on);
+            b.setAttribute("aria-pressed", on ? "true" : "false");
+        });
+        const since = bar.querySelector(".delta-since");
+        since.hidden = deltaMode === "cons";
+        const sel = since.querySelector("select");
+        const opts = deltaSinceOptions();
+        sel.innerHTML = opts.length
+            ? opts.map(([k, label]) => `<option value="${k}">${label}</option>`).join("")
+            : `<option value="1">—</option>`;
+        sel.disabled = !opts.length;
+        sel.value = String(Math.min(deltaWeeksBack, Math.max(opts.length, 1)));
+    }
+    syncDeltasMenu();
+}
+
+// Underline Functions › Show › Changes while a mode is on.
+function syncDeltasMenu(root = document) {
+    root.querySelectorAll("[data-action='expandDeltas']").forEach(el => el.classList.toggle("active", deltaMode !== "off"));
+}
+
+function initDeltaToolbar() {
+    applyDeltaBodyClasses();
+    buildDeltaToolbar();
+}
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initDeltaToolbar);
+else initDeltaToolbar();
 
 // ── Distance from consensus (shared) ──────────────────────────────────────────
 // One measure used everywhere a ballot is compared to its week's consensus: the
@@ -705,6 +826,25 @@ function computeTeamStats(section) {
     return stats;
 }
 
+// The outlier test, shared by applyOutliers() and the vs Consensus labels:
+// "high" / "low" / null for a team at voterRank on a ballot, given its consensus
+// rank (26 = unranked) and its section stats from computeTeamStats().
+function outlierKind(voterRank, cRank, stat) {
+    const deviation = cRank - voterRank;
+    if (!stat || !(stat.sd > 0) || Math.abs(deviation) < 3) return null;
+    if (Math.abs(voterRank - stat.avg) / stat.sd < OUTLIER_SD_THRESHOLD) return null;
+    // High outliers only count in the top 20; #21-25 is ordinary ballot filler.
+    if (deviation > 0 && voterRank > OUTLIER_HIGH_MAX_RANK) return null;
+    return deviation > 0 ? "high" : "low";
+}
+
+// computeTeamStats() per ballot section, cached (ballots in a section don't change).
+const _sectionStatsCache = new WeakMap();
+function sectionTeamStats(section) {
+    if (!_sectionStatsCache.has(section)) _sectionStatsCache.set(section, computeTeamStats(section));
+    return _sectionStatsCache.get(section);
+}
+
 function applyOutliers(weekBlock) {
     const consensus = getConsensusOrder(weekBlock);
     if (!consensus || consensus.length === 0) return;
@@ -735,12 +875,10 @@ function applyOutliers(weekBlock) {
             const deviation = cRank - voterRank;
             const stat = teamStats[team];
             clearOutlierCell(cell);
-            if (!stat || !(stat.sd > 0) || Math.abs(deviation) < 3) return;
+            const kind = outlierKind(voterRank, cRank, stat);
+            if (!kind) return;
             const z = Math.abs(voterRank - stat.avg) / stat.sd;
-            if (z < OUTLIER_SD_THRESHOLD) return;
-            // High outliers only count in the top 20; #21-25 is ordinary ballot filler.
-            if (deviation > 0 && voterRank > OUTLIER_HIGH_MAX_RANK) return;
-            const high = deviation > 0;
+            const high = kind === "high";
             cell.classList.add(high ? "outlier-high" : "outlier-low");
             // Both modes show this tag plus a full-width bar (CSS).
             const tag = document.createElement("span");
@@ -888,6 +1026,7 @@ function bindVotersToggle() {
                 picker.classList.remove("credits-mode");
                 syncDeltasMenu(picker);
                 picker.classList.add("open");
+                trackOpenSortPickers();
                 hideRankHeaders(block);
             } else {
                 toggle.style.display = "";
@@ -1217,6 +1356,15 @@ function bindVoterCells(root) {
             cell.appendChild(lnk);
         }
 
+        // Δ: shows this voter's movement (clicking anywhere on the name cell does the same)
+        if (!cell.querySelector(".delta-btn")) {
+            const d = document.createElement("span");
+            d.className = "delta-btn";
+            d.textContent = "Δ";
+            d.title = "Show changes for this row";
+            cell.appendChild(d);
+        }
+
         cell.addEventListener("mouseenter", () => {
             cell.closest("tr")?.classList.add("voter-cell-hover");
         });
@@ -1226,6 +1374,7 @@ function bindVoterCells(root) {
 
         cell.addEventListener("click", e => {
             const row = cell.closest("tr");
+            if (deltaMode !== "off") return;
 
             // Special handling for the Recency aggregate row
             if (row.classList.contains("row-weighted-ranking")) {
@@ -2719,6 +2868,7 @@ function injectOverallRows(block) {
         if (cell) {
             cell.dataset.bound = "1"; // skip bindVoterCells (no pin/history buttons)
             cell.addEventListener("click", () => {
+                if (deltaMode !== "off") return;
                 if (row.classList.toggle("row-delta")) {
                     applyDeltaToRow(row, block.id, buildDeltaData(), getSortedTabs());
                 } else {
@@ -2783,6 +2933,8 @@ async function showWeek(weekId) {
     applyTableSort(currentSort);
     updateAvgRankLines();
     if (block) { if (_outliersMode) applyOutliers(block); else clearOutliers(block); }
+    ensureDeltaLabels(block);
+    syncDeltaControls();
 }
 
 // Show a specific AP week — the AP-mode equivalent of showWeek().
@@ -2818,7 +2970,9 @@ async function showApWeek(year, weekNum) {
         lazyLoadWeek(apBlock);
         refreshBlockLogos(apBlock);
         if (showApAggregate) injectApWeightedRankingRow(apBlock, `week-ap-${year}-${weekNum}`, year);
+        ensureDeltaLabels(apBlock);
     }
+    syncDeltaControls();
 
     if (!isMobile()) {
         const apTab = document.querySelector(`.week-tab[data-poll="ap"][data-year="${year}"][data-weeknum="${weekNum}"]`);
@@ -3024,18 +3178,18 @@ function _buildPointsRankingRow(label, ranked, pts, prevRankOf, hasPrev, key = l
         td.className = "logo-cell";
         const team = ranked[i];
         if (team) {
+            const img = document.createElement("img");
+            img.className = "logo team-logo";
+            img.dataset.team = team;
+            img.src = logoSrc(team);
+            td.appendChild(img);
+
             const delta = document.createElement("span");
             delta.className = "delta-label";
             if (!hasPrev) { delta.textContent = "—"; delta.classList.add("delta-same"); }
             else if (!prevRankOf[team]) { delta.textContent = "NEW"; delta.classList.add("delta-new"); }
             else setDeltaLabel(delta, prevRankOf[team] - (i + 1));
             td.appendChild(delta);
-
-            const img = document.createElement("img");
-            img.className = "logo team-logo";
-            img.dataset.team = team;
-            img.src = logoSrc(team);
-            td.appendChild(img);
 
             const ptsLabel = document.createElement("span");
             ptsLabel.className = "avg-label";
@@ -3384,18 +3538,20 @@ function applyDataBallotOrder(block) {
     document.addEventListener("pointercancel", end);
 })();
 
-// Up/down/same delta text for a rank change (positive diff = moved up).
+// Movement text for a rank change (positive diff = moved up): ▲3 / ▼3, blank for no
+// change. Moves of 1–2 get delta-small, which are always grayed out.
 function setDeltaLabel(label, diff) {
     if (diff > 0) {
-        label.textContent = diff >= 5 ? "▲" + diff : String(diff);
+        label.textContent = "▲" + diff;
         label.classList.add("delta-up");
     } else if (diff < 0) {
-        label.textContent = -diff >= 5 ? "▼" + -diff : String(-diff);
+        label.textContent = "▼" + -diff;
         label.classList.add("delta-down");
     } else {
-        label.textContent = "—";
+        label.textContent = "";
         label.classList.add("delta-same");
     }
+    if (diff !== 0 && Math.abs(diff) <= 2) label.classList.add("delta-small");
 }
 
 function apYearTabs(year) {
@@ -4040,17 +4196,32 @@ window.addEventListener("resize", () => {
     _pickerResizeRaf = requestAnimationFrame(refitOpenPickers);
 });
 
-// Keep open sort pickers pinned to their header cell while scrolling. The
-// picker is position:fixed on <body> and its toggle is hidden, so track the
-// toggle's <th> (sticky) using the offset recorded when it opened.
-document.addEventListener("scroll", () => {
-    document.querySelectorAll(".sort-picker.open").forEach(p => {
+// Keep open sort pickers pinned to their header cell. The picker is
+// position:fixed on <body> and its toggle is hidden, so track the toggle's
+// <th> (sticky) using the offset recorded when it opened. Runs on scroll and
+// every frame while a picker is open, so it also follows the table when the
+// layout above it shifts (e.g. the Changes toolbar appearing/disappearing).
+function pinOpenSortPickers() {
+    const open = document.querySelectorAll(".sort-picker.open");
+    open.forEach(p => {
         const th = p._toggle && p._toggle.closest("th");
-        if (!th) return;
-        p.style.top = (th.getBoundingClientRect().top + (p._thOffsetY || 0)) + "px";
-        p.style.left = (th.closest("table") || th).getBoundingClientRect().left + "px";
+        if (!th || !th.isConnected) return;
+        const top = (th.getBoundingClientRect().top + (p._thOffsetY || 0)) + "px";
+        const left = (th.closest("table") || th).getBoundingClientRect().left + "px";
+        if (p.style.top !== top) p.style.top = top;
+        if (p.style.left !== left) p.style.left = left;
     });
-}, { passive: true });
+    return open.length > 0;
+}
+let _sortPickerTrackRaf = 0;
+function trackOpenSortPickers() {
+    if (_sortPickerTrackRaf) return;
+    const tick = () => {
+        _sortPickerTrackRaf = pinOpenSortPickers() ? requestAnimationFrame(tick) : 0;
+    };
+    _sortPickerTrackRaf = requestAnimationFrame(tick);
+}
+document.addEventListener("scroll", pinOpenSortPickers, { passive: true });
 
 // Close pickers when clicking elsewhere (respects pinned state)
 document.addEventListener("click", e => {
@@ -4483,8 +4654,6 @@ function _readDeltaData(isProvisional) {
     return data;
 }
 
-let deltaWeeksBack = 1;
-let deltaSubMode = "consensus-diff"; // "consensus-diff" | "recency"
 
 function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
     // buildDeltaData() indexes every block's aggregate row as "Official Overall"
@@ -4514,15 +4683,7 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
             if (deltaData[wid]?.[username]) { prevTeams = deltaData[wid][username]; break; }
         }
     }
-    if (!prevTeams) return;
-
-    // Build last 5 calendar weeks (same year only)
-    const last5 = [];
-    for (let i = currIdx; i < allTabsSorted.length && i < currIdx + 5; i++) {
-        if (allTabsSorted[i].dataset.year !== currYear) break;
-        const wid = allTabsSorted[i].dataset.week;
-        last5.push(deltaData[wid]?.[username] || null);
-    }
+    // No earlier ballot this season: no movement labels, but consensus/points still apply.
 
     // Build set of all teams this voter has ranked previously this year
     const priorTeams = new Set();
@@ -4532,7 +4693,7 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
         if (deltaData[wid]?.[username]) deltaData[wid][username].forEach(t => priorTeams.add(t));
     }
 
-    // Overall row: below-logo label shows the team's points from this week's
+    // Overall row: its consensus label shows the team's points from this week's
     // official ballots (25 for #1 … 1 for #25) instead of a consensus diff.
     let overallPts = null;
     if (row.classList.contains("overall-row")) {
@@ -4545,6 +4706,11 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
             });
         });
     }
+    const isAggSection = row.closest(".ballot-section")?.id?.endsWith("-aggregate");
+    const consensusTeams = deltaData[weekId]?.["Official Overall"] || [];
+    // Outlier stats for this row's section: outlier diffs keep full green/red, others are lighter.
+    const rowSection = row.closest(".ballot-section");
+    const teamStats = !overallPts && !isAggSection && rowSection ? sectionTeamStats(rowSection) : null;
 
     const logos = row.querySelectorAll(".team-logo");
     logos.forEach((logo, idx) => {
@@ -4555,77 +4721,46 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
         wrapper.querySelector(".delta-label")?.remove();
         wrapper.querySelector(".avg-label")?.remove();
 
-        // Delta label above
-        const prevIdx2 = prevTeams.indexOf(team);
-        const label = document.createElement("span");
-        label.className = "delta-label";
-        if (prevIdx2 === -1 && !priorTeams.has(team)) {
-            // Truly first time ranked this year
-            label.textContent = "NEW"; label.classList.add("delta-new");
-        } else {
-            // Was unranked last period but ranked before — treat as coming from #26
-            const effectivePrev = prevIdx2 === -1 ? 25 : prevIdx2; // 0-indexed, so 25 = rank 26
-            setDeltaLabel(label, effectivePrev - idx);
-        }
-        wrapper.insertBefore(label, logo);
-
-        if (overallPts) {
-            const ptsLabel = document.createElement("span");
-            ptsLabel.className = "avg-label";
-            ptsLabel.textContent = String(overallPts[team] || 0);
-            wrapper.appendChild(ptsLabel);
-            return;
-        }
-
-        // Below-logo label — skipped for aggregate section rows
-        const isAggSection = row.closest('.ballot-section')?.id?.endsWith('-aggregate');
-        if (!isAggSection) {
-            if (deltaSubMode === "recency") {
-                // Weighted avg label (linear weights: most recent=5, oldest=1, missing weeks skipped)
-                let weightedSum = 0, totalWeight = 0;
-                last5.forEach((ballot, wi) => {
-                    if (!ballot) return;
-                    const weight = 5 - wi;
-                    const pos = ballot.indexOf(team);
-                    const rank = pos === -1 ? 26 : pos + 1;
-                    weightedSum += rank * weight;
-                    totalWeight += weight;
-                });
-                if (totalWeight > 0) {
-                    const avg = weightedSum / totalWeight;
-                    const avgLabel = document.createElement("span");
-                    avgLabel.className = "avg-label";
-                    avgLabel.textContent = avg.toFixed(1);
-                    wrapper.appendChild(avgLabel);
-                }
+        // Movement label (under the logo; shown in Movement mode and for rows opened in Off)
+        if (prevTeams) {
+            const prevIdx2 = prevTeams.indexOf(team);
+            const label = document.createElement("span");
+            label.className = "delta-label";
+            if (prevIdx2 === -1 && !priorTeams.has(team)) {
+                // Truly first time ranked this year
+                label.textContent = "NEW"; label.classList.add("delta-new");
             } else {
-                // Consensus diff: voter rank vs consensus rank for this week
-                const consensusTeams = deltaData[weekId]?.["Official Overall"] || [];
-                const voterRank = idx + 1;
-                const consensusIdx = consensusTeams.indexOf(team);
-                const avgLabel = document.createElement("span");
-                avgLabel.className = "avg-label";
-                if (consensusIdx !== -1) {
-                    const consensusRank = consensusIdx + 1;
-                    const diff = consensusRank - voterRank;
-                    if (diff > 0) {
-                        avgLabel.textContent = "+" + diff;
-                        avgLabel.classList.add("delta-up");
-                    } else if (diff < 0) {
-                        avgLabel.textContent = String(diff);
-                        avgLabel.classList.add("delta-down");
-                    } else {
-                        avgLabel.textContent = "0";
-                        avgLabel.classList.add("delta-same");
-                    }
-                    if (Math.abs(consensusRank - voterRank) > 4) avgLabel.classList.add("avg-bold");
-                } else {
-                    avgLabel.textContent = "—";
-                    avgLabel.classList.add("delta-same");
-                }
-                wrapper.appendChild(avgLabel);
+                // Was unranked last period but ranked before — treat as coming from #26
+                const effectivePrev = prevIdx2 === -1 ? 25 : prevIdx2; // 0-indexed, so 25 = rank 26
+                setDeltaLabel(label, effectivePrev - idx);
+            }
+            logo.after(label);
+        }
+
+        // Consensus label (vs Consensus mode): points on the Overall row, none in Data Ballots
+        const avgLabel = document.createElement("span");
+        avgLabel.className = "avg-label";
+        if (overallPts) {
+            avgLabel.textContent = String(overallPts[team] || 0);
+            avgLabel.title = "Overall points";
+        } else if (isAggSection) {
+            return;
+        } else {
+            const consensusIdx = consensusTeams.indexOf(team);
+            if (consensusIdx === -1) {
+                avgLabel.textContent = "—";
+                avgLabel.classList.add("delta-same");
+            } else {
+                // + = this voter ranks the team higher than the consensus does
+                const diff = consensusIdx - idx;
+                avgLabel.textContent = diff > 0 ? "+" + diff : diff < 0 ? "−" + -diff : "";
+                if (diff > 0) avgLabel.classList.add("cons-hi");
+                else if (diff < 0) avgLabel.classList.add("cons-lo");
+                if (diff !== 0 && Math.abs(diff) <= 3) avgLabel.classList.add("delta-small");  // vs Consensus grays 1–3 (Movement: 1–2)
+                else if (teamStats && outlierKind(idx + 1, consensusIdx + 1, teamStats[team])) avgLabel.classList.add("cons-outlier");
             }
         }
+        wrapper.appendChild(avgLabel);
     });
 }
 
@@ -7313,20 +7448,7 @@ document.addEventListener("keydown", e => {
 
     if (e.key === "E" || e.key === "e") {
         e.preventDefault();
-        toggleAllDeltas();
-        return;
-    }
-
-    if (e.key === "J" || e.key === "j") {
-        e.preventDefault();
-        deltaSubMode = deltaSubMode === "recency" ? "consensus-diff" : "recency";
-        const deltaData2 = buildDeltaData();
-        const sortedTabs2 = getSortedTabs();
-        document.querySelectorAll(".voter-row.row-delta").forEach(r => {
-            r.querySelectorAll(".avg-label").forEach(el => el.remove());
-            const wid = r.closest(".week-block")?.id;
-            if (wid) applyDeltaToRow(r, wid, deltaData2, sortedTabs2);
-        });
+        cycleDeltaMode();
         return;
     }
 
@@ -7421,15 +7543,7 @@ document.addEventListener("keydown", e => {
 
     if (e.code >= "Digit1" && e.code <= "Digit9") {
         e.preventDefault();
-        deltaWeeksBack = parseInt(e.code.replace("Digit", ""));
-        // Re-apply deltas to all currently active delta rows
-        const deltaData = buildDeltaData();
-        const sortedTabs = getSortedTabs();
-        document.querySelectorAll(".voter-row.row-delta").forEach(r => {
-            r.querySelectorAll(".delta-label, .avg-label").forEach(el => el.remove());
-            const wid = r.closest(".week-block")?.id;
-            if (wid) applyDeltaToRow(r, wid, deltaData, sortedTabs);
-        });
+        setDeltaWeeksBack(parseInt(e.code.replace("Digit", ""), 10));
         return;
     }
 

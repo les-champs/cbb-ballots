@@ -1271,7 +1271,7 @@ PICKER_HTML = (
     f"<span class='sort-option' data-sort='consensus'>Consensus</span>"
     f"<span class='picker-category'>Show</span>"
     f"<span class='sort-option' data-action='toggleOverall'>Overall</span>"
-    f"<span class='sort-option' data-action='expandDeltas'>Deltas</span>"
+    f"<span class='sort-option' data-action='expandDeltas'>Changes</span>"
     f"<span class='sort-option' data-action='toggleOutliers'>Outliers</span>"
     f"<span class='picker-category'>Stats</span>"
     f"<span class='sort-option' data-action='dotPlot'>Week</span>"
@@ -1753,9 +1753,8 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
       <div class="keybind-section-title">Views</div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>O</kbd></span><span>Toggle Outlier Highlighting</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>L</kbd></span><span>Toggle Overall Row</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>E</kbd></span><span>Toggle Deltas</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>J</kbd></span><span>Toggle Delta Sub-label (Consensus Diff / Recency)</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>1</kbd> – <kbd>9</kbd></span><span>Adjust Delta Lookback Window</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>E</kbd></span><span>Changes: Off / Movement / vs Consensus</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>1</kbd> – <kbd>9</kbd></span><span>Changes: Compare With 1–9 Polls Back</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>R</kbd></span><span>Reports Menu</span></div>
     </div>
     <div class="keybind-section">

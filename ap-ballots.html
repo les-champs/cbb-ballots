@@ -40,6 +40,12 @@
     --color-keybind-row:     #444;
     --color-kbd:             #333;
     --color-avg-label:       #555;
+    --color-delta-new:       #2563c4;
+    --color-cons-hi:         var(--color-win);   /* vs Consensus outliers: Movement's green/red */
+    --color-cons-lo:         var(--color-loss);
+    --color-cons-hi-soft:    color-mix(in srgb, var(--color-win) 60%, var(--color-bg));   /* non-outliers */
+    --color-cons-lo-soft:    color-mix(in srgb, var(--color-loss) 60%, var(--color-bg));
+    --color-delta-muted:     #6b6b6b;
     --color-consensus-dist:  #999;
     --color-picker-cat:      #666;
     --color-spread-text:     #333;
@@ -425,39 +431,122 @@ body.show-overall-row .overall-row {
 }
 
 
-.voter-row.row-delta .delta-label,
-.voter-row.row-delta .avg-label,
-.overall-row.row-delta .delta-label,
-.overall-row.row-delta .avg-label {
-    display: block;
-    text-align: center;
-}
-
-.delta-label {
+/* Changes labels: one line under each logo. .delta-label = movement, .avg-label =
+   vs consensus (points on Overall / Data Ballots rows). Body classes from deltaMode in
+   script.js pick which shows; .row-delta = a row opened on its own while Changes is Off. */
+.delta-label,
+.avg-label {
     display: none;
     font-size: 11px;
     font-weight: bold;
     line-height: 1;
-    margin-bottom: 1px;
+    min-height: 11px;
+    margin-top: 2px;
     white-space: nowrap;
+    text-align: center;
 }
+.row-delta .delta-label,
+body.delta-move .delta-label { display: block; }
+body.delta-cons .avg-label { display: block; }
+body.delta-cons .delta-label { display: none; }
 
 .delta-up { color: var(--color-win); }
 .delta-down { color: var(--color-loss); }
 .delta-same { color: #888; }
-.delta-new { color: #3388dd; }
+.delta-new { color: var(--color-delta-new); }
+.cons-hi { color: var(--color-cons-hi); }
+.cons-lo { color: var(--color-cons-lo); }
 
 .avg-label {
-    display: none;
-    font-size: 11px;
-    line-height: 1;
-    margin-top: 1px;
+    font-weight: normal;
     color: var(--color-avg-label);
 }
+/* .avg-label-qualified so these beat the gray .avg-label rule above. Lighter unless the
+   diff is an outlier (same test as Outliers mode); 1–3 stay gray (.delta-small, below). */
+.avg-label.cons-hi { color: var(--color-cons-hi-soft); font-weight: bold; }
+.avg-label.cons-lo { color: var(--color-cons-lo-soft); font-weight: bold; }
+.avg-label.cons-hi.cons-outlier { color: var(--color-cons-hi); }
+.avg-label.cons-lo.cons-outlier { color: var(--color-cons-lo); }
 
-.avg-label.avg-bold {
+.delta-label.delta-small,
+.avg-label.delta-small {
+    color: var(--color-delta-muted);
+    font-weight: normal;
+}
+
+/* Δ beside a voter's name: on hover like pin/history, lit while that row is open */
+.delta-btn {
+    display: none;
+    cursor: pointer;
+    flex-shrink: 0;
+    font-size: 10px;
     font-weight: bold;
-    white-space: nowrap;
+    line-height: 1;
+    padding: 1px 3px;
+    border: 1px solid currentColor;
+    border-radius: 3px;
+    color: #888;
+    opacity: 0.6;
+    user-select: none;
+}
+.delta-btn:hover { opacity: 1; }
+.voter-row.voter-cell-hover .delta-btn,
+.voter-row.row-delta .delta-btn { display: inline-block; }
+.voter-row.row-delta .delta-btn {
+    opacity: 1;
+    color: var(--color-tab-active);
+    background: var(--color-bg-tab-active);
+    border-color: var(--color-bg-tab-active);
+}
+body.delta-move .delta-btn,
+body.delta-cons .delta-btn { display: none !important; }
+
+/* Changes switch under the header */
+#delta-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    margin: 0 0 10px;
+    font-size: 13px;
+    color: var(--color-heading);
+}
+#delta-toolbar[hidden] { display: none; }
+.delta-toolbar-title { font-weight: bold; }
+.delta-switch {
+    display: flex;
+    border: 1px solid var(--color-border-tab);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.delta-switch button {
+    font: inherit;
+    padding: 4px 11px;
+    border: none;
+    background: var(--color-bg-tab);
+    color: var(--color-heading);
+    cursor: pointer;
+}
+.delta-switch button + button { border-left: 1px solid var(--color-border-tab); }
+.delta-switch button:hover { background: var(--color-bg-tab-hover); }
+.delta-switch button.active {
+    background: var(--color-bg-tab-active);
+    color: var(--color-tab-active);
+}
+#delta-toolbar label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+#delta-toolbar label[hidden] { display: none; }
+#delta-toolbar select {
+    font: inherit;
+    padding: 2px 4px;
+    border: 1px solid var(--color-border-tab);
+    border-radius: 4px;
+    background: var(--color-bg-tab);
+    color: inherit;
 }
 
 
@@ -1222,7 +1311,8 @@ body.year-loading::after {
 }
 
 @media (max-device-width: 768px) {
-    .header {
+    .header,
+    #delta-toolbar {
         display: none !important;
     }
     .logo {
@@ -1333,6 +1423,8 @@ body.dark {
     --color-keybind-row:     #bbb;
     --color-kbd:             #ccc;
     --color-avg-label:       #888;
+    --color-delta-new:       #6ea8ff;
+    --color-delta-muted:     #8a8a8a;
     --color-consensus-dist:  #888;
     --color-picker-cat:      #888;
     --color-spread-text:     #ccc;
@@ -1806,9 +1898,8 @@ body.dark {
       <div class="keybind-section-title">Views</div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>O</kbd></span><span>Toggle Outlier Highlighting</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>L</kbd></span><span>Toggle Overall Row</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>E</kbd></span><span>Toggle Deltas</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>J</kbd></span><span>Toggle Delta Sub-label (Consensus Diff / Recency)</span></div>
-      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>1</kbd> – <kbd>9</kbd></span><span>Adjust Delta Lookback Window</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>E</kbd></span><span>Changes: Off / Movement / vs Consensus</span></div>
+      <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>1</kbd> – <kbd>9</kbd></span><span>Changes: Compare With 1–9 Polls Back</span></div>
       <div class="keybind-row"><span class="keybind-keys"><kbd>Shift</kbd><kbd>R</kbd></span><span>Reports Menu</span></div>
     </div>
     <div class="keybind-section">
@@ -1834,7 +1925,7 @@ body.dark {
   </div>
 </div>
 
-<template id="picker-template"><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Show</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Deltas</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='picker-category'>Stats</span><span class='sort-option' data-action='dotPlot'>Week</span><span class='sort-option' data-action='yearlyStats'>Records</span><span class='sort-option' data-action='results'>Results</span><span class='picker-category'>&bull;</span><span class='sort-option' data-action='settings'>Settings</span><span class='sort-option' data-action='credits'>Credits</span><span class='credits-only credits-text'>Site displays poll results from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span></span></template>
+<template id="picker-template"><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Show</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Changes</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='picker-category'>Stats</span><span class='sort-option' data-action='dotPlot'>Week</span><span class='sort-option' data-action='yearlyStats'>Records</span><span class='sort-option' data-action='results'>Results</span><span class='picker-category'>&bull;</span><span class='sort-option' data-action='settings'>Settings</span><span class='sort-option' data-action='credits'>Credits</span><span class='credits-only credits-text'>Site displays poll results from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span></span></template>
 
 <div id="pin-modal">
   <div id="pin-box">
@@ -2335,7 +2426,7 @@ rules.push(`td.logo-cell > .team-logo[data-team="${team}"] { box-shadow: none; }
 rules.push(`${cell} { position: relative; z-index: 1; }`);
 rules.push(`${cell}::before { content: ""; position: absolute; inset: 1px; border-radius: 3px; pointer-events: none; }`);
 rules.push(`body:not(.highlight-dim) ${cell}::before { box-shadow: inset 0 0 0 2px ${color}, 0 0 12px 2px ${color}; }`);
-rules.push(`body:not(.highlight-dim) .row-delta ${cell}::before, body.highlight-dim ${cell}::before { box-shadow: inset 0 0 0 2px ${color}; }`);
+rules.push(`body:not(.highlight-dim) .row-delta ${cell}::before, body.delta-move:not(.highlight-dim) ${cell}::before, body.delta-cons:not(.highlight-dim) ${cell}::before, body.highlight-dim ${cell}::before { box-shadow: inset 0 0 0 2px ${color}; }`);
 rules.push(`.chart-logo-ring[data-team="${team}"] { display: inline; stroke: ${color}; fill: ${color}; filter: url(#chart-glow-${cls}); }`);
 rules.push(`.chart-stroke[data-team="${team}"] { stroke: ${color}; filter: url(#chart-glow-${cls}); }`);
 rules.push(`.chart-fill[data-team="${team}"] { fill: ${color}; filter: url(#chart-glow-${cls}); }`);
@@ -2561,47 +2652,141 @@ syncPinnedToAggregate(username,!isPinned);
 allRows.forEach(r=>r.classList.remove("voter-cell-hover"));
 applyTableSort(currentSort);
 }
-function toggleAllDeltas(){
-const allRows=Array.from(document.querySelectorAll(".voter-row, .overall-row"));
-const allExpanded=allRows.every(r=>r.classList.contains("row-delta"));
+let deltaWeeksBack=1;
+const DELTA_MODES=[["off","Off"],["move","Movement"],["cons","vs Consensus"]];
+let deltaMode="off";
+let _lastOnDeltaMode="move";
+try{
+const m=localStorage.getItem("deltaMode");
+if(DELTA_MODES.some(([id])=>id===m))deltaMode=m;
+}catch(e){}
+if(isMobileScreen())deltaMode="off";
+if(deltaMode!=="off")_lastOnDeltaMode=deltaMode;
+function isMobileScreen(){return screen.width<=768;}
+function applyDeltaBodyClasses(){
+document.body.classList.toggle("delta-move",deltaMode==="move");
+document.body.classList.toggle("delta-cons",deltaMode==="cons");
+}
+function deltaRows(root){
+return Array.from(root.querySelectorAll(".voter-row:not(.row-weighted-ranking), .overall-row"));
+}
+function activeWeekBlock(){
+if(_apCurrentYear!==null)return document.getElementById(`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`);
+const id=document.querySelector(".week-tab.active")?.dataset.week;
+return id?document.getElementById(id):null;
+}
+function ensureDeltaLabels(block=activeWeekBlock()){
+if(!block||deltaMode==="off")return;
+const rows=deltaRows(block).filter(r=>r._deltaBack!==deltaWeeksBack||!r.querySelector(".delta-label"));
+if(!rows.length)return;
 const deltaData=buildDeltaData();
 const sortedTabs=getSortedTabs();
-if(allExpanded){
-allRows.forEach(r=>{
-r.classList.remove("row-delta");
-if(!r.classList.contains("row-weighted-ranking")){
+rows.forEach(r=>{
+r._deltaBack=deltaWeeksBack;
+applyDeltaToRow(r,block.id,deltaData,sortedTabs);
+});
+}
+function setDeltaMode(mode){
+deltaMode=mode;
+if(mode!=="off")_lastOnDeltaMode=mode;
+try{localStorage.setItem("deltaMode",mode);}catch(e){}
+document.querySelectorAll(".row-delta").forEach(r=>r.classList.remove("row-delta"));
+applyDeltaBodyClasses();
+ensureDeltaLabels();
+syncDeltaControls();
+}
+function cycleDeltaMode(){
+const i=DELTA_MODES.findIndex(([id])=>id===deltaMode);
+setDeltaMode(DELTA_MODES[(i + 1)%DELTA_MODES.length][0]);
+}
+function toggleAllDeltas(){
+setDeltaMode(deltaMode==="off"?_lastOnDeltaMode:"off");
+}
+function setDeltaWeeksBack(n){
+deltaWeeksBack=n;
+const open=deltaRows(document).filter(r=>r.classList.contains("row-delta"));
+deltaRows(document).forEach(r=>{
+r._deltaBack=undefined;
 r.querySelectorAll(".delta-label, .avg-label").forEach(el=>el.remove());
-}
 });
-}else{
-allRows.forEach(r=>{
-if(!r.classList.contains("row-delta")){
-r.classList.add("row-delta");
-if(r.classList.contains("row-weighted-ranking"))return;
-const weekId=r.closest(".week-block")?.id;
-if(weekId)applyDeltaToRow(r,weekId,deltaData,sortedTabs);
-}
+if(open.length){
+const deltaData=buildDeltaData();
+const sortedTabs=getSortedTabs();
+open.forEach(r=>{
+const wid=r.closest(".week-block")?.id;
+if(wid){r._deltaBack=n;applyDeltaToRow(r,wid,deltaData,sortedTabs);}
 });
 }
+ensureDeltaLabels();
+syncDeltaControls();
+}
+function deltaSinceOptions(){
+const isAp=_apCurrentYear!==null;
+const tabs=isAp?getSortedApTabs():getSortedTabs();
+const curId=isAp?`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`
+:document.querySelector(".week-tab.active")?.dataset.week;
+const i=tabs.findIndex(t=>t.dataset.week===curId);
+const opts=[];
+if(i<0)return opts;
+for(let k=1;k<=9;k++){
+const t=tabs[i + k];
+if(!t||t.dataset.year!==tabs[i].dataset.year)break;
+opts.push([k,`Week ${displayWeekNum(t)}` +(k===1?" (last poll)":"")]);
+}
+return opts;
+}
+function buildDeltaToolbar(){
+const header=document.querySelector(".header");
+if(!header||document.getElementById("delta-toolbar"))return;
+const bar=document.createElement("div");
+bar.id="delta-toolbar";
+bar.innerHTML=
+`<span class="delta-toolbar-title">Changes</span>` +
+`<div class="delta-switch" role="group" aria-label="Changes">` +
+DELTA_MODES.map(([id,label])=>`<button type="button" data-delta-mode="${id}">${label}</button>`).join("")+
+`</div>` +
+`<label class="delta-since">since <select id="delta-since"></select></label>`;
+header.after(bar);
+bar.addEventListener("click",e=>{
+const b=e.target.closest("[data-delta-mode]");
+if(b){setDeltaMode(b.dataset.deltaMode);b.blur();}
+});
+bar.querySelector("#delta-since").addEventListener("change",e=>{
+setDeltaWeeksBack(parseInt(e.target.value,10));
+e.target.blur();
+});
+syncDeltaControls();
+}
+function syncDeltaControls(){
+const bar=document.getElementById("delta-toolbar");
+if(bar){
+bar.hidden=deltaMode==="off";
+bar.querySelectorAll("[data-delta-mode]").forEach(b=>{
+const on=b.dataset.deltaMode===deltaMode;
+b.classList.toggle("active",on);
+b.setAttribute("aria-pressed",on?"true":"false");
+});
+const since=bar.querySelector(".delta-since");
+since.hidden=deltaMode==="cons";
+const sel=since.querySelector("select");
+const opts=deltaSinceOptions();
+sel.innerHTML=opts.length
+?opts.map(([k,label])=>`<option value="${k}">${label}</option>`).join("")
+:`<option value="1">—</option>`;
+sel.disabled=!opts.length;
+sel.value=String(Math.min(deltaWeeksBack,Math.max(opts.length,1)));
+}
+syncDeltasMenu();
 }
 function syncDeltasMenu(root=document){
-const allRows=Array.from(document.querySelectorAll(".voter-row, .overall-row"));
-const on=allRows.length>0&&allRows.every(r=>r.classList.contains("row-delta"));
-root.querySelectorAll("[data-action='expandDeltas']").forEach(el=>el.classList.toggle("active",on));
+root.querySelectorAll("[data-action='expandDeltas']").forEach(el=>el.classList.toggle("active",deltaMode!=="off"));
 }
-function expandAllDeltas(){
-const allRows=Array.from(document.querySelectorAll(".voter-row, .overall-row"));
-const deltaData=buildDeltaData();
-const sortedTabs=getSortedTabs();
-allRows.forEach(r=>{
-if(!r.classList.contains("row-delta")){
-r.classList.add("row-delta");
-if(r.classList.contains("row-weighted-ranking"))return;
-const weekId=r.closest(".week-block")?.id;
-if(weekId)applyDeltaToRow(r,weekId,deltaData,sortedTabs);
+function initDeltaToolbar(){
+applyDeltaBodyClasses();
+buildDeltaToolbar();
 }
-});
-}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",initDeltaToolbar);
+else initDeltaToolbar();
 function makeLooConsensus(officialBallots,aggOrder){
 const totalPts={};
 Object.values(officialBallots).forEach(teams=>
@@ -2672,6 +2857,18 @@ stats[team]={avg,sd};
 }
 return stats;
 }
+function outlierKind(voterRank,cRank,stat){
+const deviation=cRank - voterRank;
+if(!stat||!(stat.sd>0)||Math.abs(deviation)<3)return null;
+if(Math.abs(voterRank - stat.avg)/ stat.sd<OUTLIER_SD_THRESHOLD)return null;
+if(deviation>0&&voterRank>OUTLIER_HIGH_MAX_RANK)return null;
+return deviation>0?"high":"low";
+}
+const _sectionStatsCache=new WeakMap();
+function sectionTeamStats(section){
+if(!_sectionStatsCache.has(section))_sectionStatsCache.set(section,computeTeamStats(section));
+return _sectionStatsCache.get(section);
+}
 function applyOutliers(weekBlock){
 const consensus=getConsensusOrder(weekBlock);
 if(!consensus||consensus.length===0)return;
@@ -2696,11 +2893,10 @@ const cRank=consensusRankMap[team]??26;
 const deviation=cRank - voterRank;
 const stat=teamStats[team];
 clearOutlierCell(cell);
-if(!stat||!(stat.sd>0)||Math.abs(deviation)<3)return;
+const kind=outlierKind(voterRank,cRank,stat);
+if(!kind)return;
 const z=Math.abs(voterRank - stat.avg)/ stat.sd;
-if(z<OUTLIER_SD_THRESHOLD)return;
-if(deviation>0&&voterRank>OUTLIER_HIGH_MAX_RANK)return;
-const high=deviation>0;
+const high=kind==="high";
 cell.classList.add(high?"outlier-high":"outlier-low");
 const tag=document.createElement("span");
 tag.className="outlier-tag";
@@ -2827,6 +3023,7 @@ toggle.style.display="none";
 picker.classList.remove("credits-mode");
 syncDeltasMenu(picker);
 picker.classList.add("open");
+trackOpenSortPickers();
 hideRankHeaders(block);
 }else{
 toggle.style.display="";
@@ -3105,6 +3302,13 @@ if(url)window.open(url,"_blank","noopener,noreferrer");
 });
 cell.appendChild(lnk);
 }
+if(!cell.querySelector(".delta-btn")){
+const d=document.createElement("span");
+d.className="delta-btn";
+d.textContent="Δ";
+d.title="Show changes for this row";
+cell.appendChild(d);
+}
 cell.addEventListener("mouseenter",()=>{
 cell.closest("tr")?.classList.add("voter-cell-hover");
 });
@@ -3113,6 +3317,7 @@ cell.closest("tr")?.classList.remove("voter-cell-hover");
 });
 cell.addEventListener("click",e=>{
 const row=cell.closest("tr");
+if(deltaMode!=="off")return;
 if(row.classList.contains("row-weighted-ranking")){
 row.classList.toggle("row-delta");
 return;
@@ -4346,6 +4551,7 @@ const cell=row.querySelector(".voter-cell");
 if(cell){
 cell.dataset.bound="1";
 cell.addEventListener("click",()=>{
+if(deltaMode!=="off")return;
 if(row.classList.toggle("row-delta")){
 applyDeltaToRow(row,block.id,buildDeltaData(),getSortedTabs());
 }else{
@@ -4406,6 +4612,8 @@ bindVotersToggle();
 applyTableSort(currentSort);
 updateAvgRankLines();
 if(block){if(_outliersMode)applyOutliers(block);else clearOutliers(block);}
+ensureDeltaLabels(block);
+syncDeltaControls();
 }
 async function showApWeek(year,weekNum){
 year=String(year);
@@ -4434,7 +4642,9 @@ syncOverallMenu();
 lazyLoadWeek(apBlock);
 refreshBlockLogos(apBlock);
 if(showApAggregate)injectApWeightedRankingRow(apBlock,`week-ap-${year}-${weekNum}`,year);
+ensureDeltaLabels(apBlock);
 }
+syncDeltaControls();
 if(!isMobile()){
 const apTab=document.querySelector(`.week-tab[data-poll="ap"][data-year="${year}"][data-weeknum="${weekNum}"]`);
 const wn=parseInt(weekNum);
@@ -4598,17 +4808,17 @@ const td=document.createElement("td");
 td.className="logo-cell";
 const team=ranked[i];
 if(team){
+const img=document.createElement("img");
+img.className="logo team-logo";
+img.dataset.team=team;
+img.src=logoSrc(team);
+td.appendChild(img);
 const delta=document.createElement("span");
 delta.className="delta-label";
 if(!hasPrev){delta.textContent="—";delta.classList.add("delta-same");}
 else if(!prevRankOf[team]){delta.textContent="NEW";delta.classList.add("delta-new");}
 else setDeltaLabel(delta,prevRankOf[team]-(i + 1));
 td.appendChild(delta);
-const img=document.createElement("img");
-img.className="logo team-logo";
-img.dataset.team=team;
-img.src=logoSrc(team);
-td.appendChild(img);
 const ptsLabel=document.createElement("span");
 ptsLabel.className="avg-label";
 ptsLabel.textContent=pts[team];
@@ -4896,15 +5106,16 @@ document.addEventListener("pointercancel",end);
 })();
 function setDeltaLabel(label,diff){
 if(diff>0){
-label.textContent=diff>=5?"▲" + diff:String(diff);
+label.textContent="▲" + diff;
 label.classList.add("delta-up");
 }else if(diff<0){
-label.textContent=-diff>=5?"▼" + -diff:String(-diff);
+label.textContent="▼" + -diff;
 label.classList.add("delta-down");
 }else{
-label.textContent="—";
+label.textContent="";
 label.classList.add("delta-same");
 }
+if(diff!==0&&Math.abs(diff)<=2)label.classList.add("delta-small");
 }
 function apYearTabs(year){
 const tabs=ON_AP_PAGE?getSortedTabs():getSortedApTabs();
@@ -5453,14 +5664,27 @@ window.addEventListener("resize",()=>{
 cancelAnimationFrame(_pickerResizeRaf);
 _pickerResizeRaf=requestAnimationFrame(refitOpenPickers);
 });
-document.addEventListener("scroll",()=>{
-document.querySelectorAll(".sort-picker.open").forEach(p=>{
+function pinOpenSortPickers(){
+const open=document.querySelectorAll(".sort-picker.open");
+open.forEach(p=>{
 const th=p._toggle&&p._toggle.closest("th");
-if(!th)return;
-p.style.top=(th.getBoundingClientRect().top +(p._thOffsetY||0))+ "px";
-p.style.left=(th.closest("table")||th).getBoundingClientRect().left + "px";
+if(!th||!th.isConnected)return;
+const top=(th.getBoundingClientRect().top +(p._thOffsetY||0))+ "px";
+const left=(th.closest("table")||th).getBoundingClientRect().left + "px";
+if(p.style.top!==top)p.style.top=top;
+if(p.style.left!==left)p.style.left=left;
 });
-},{passive:true});
+return open.length>0;
+}
+let _sortPickerTrackRaf=0;
+function trackOpenSortPickers(){
+if(_sortPickerTrackRaf)return;
+const tick=()=>{
+_sortPickerTrackRaf=pinOpenSortPickers()?requestAnimationFrame(tick):0;
+};
+_sortPickerTrackRaf=requestAnimationFrame(tick);
+}
+document.addEventListener("scroll",pinOpenSortPickers,{passive:true});
 document.addEventListener("click",e=>{
 const yearPickerOpen=document.getElementById("year-picker").classList.contains("open");
 closeAllPickers(true);
@@ -5810,8 +6034,6 @@ data[weekId]["Official Overall"]=teams;
 });
 return data;
 }
-let deltaWeeksBack=1;
-let deltaSubMode="consensus-diff";
 function applyDeltaToRow(row,weekId,deltaData,allTabsSorted){
 const username=row.classList.contains("overall-row")?"Official Overall":getVoterName(row);
 if(!username)return;
@@ -5832,13 +6054,6 @@ const wid=allTabsSorted[i].dataset.week;
 if(deltaData[wid]?.[username]){prevTeams=deltaData[wid][username];break;}
 }
 }
-if(!prevTeams)return;
-const last5=[];
-for(let i=currIdx;i<allTabsSorted.length&&i<currIdx + 5;i++){
-if(allTabsSorted[i].dataset.year!==currYear)break;
-const wid=allTabsSorted[i].dataset.week;
-last5.push(deltaData[wid]?.[username]||null);
-}
 const priorTeams=new Set();
 for(let i=currIdx + 1;i<allTabsSorted.length;i++){
 if(allTabsSorted[i].dataset.year!==currYear)break;
@@ -5856,6 +6071,10 @@ overallPts[t]=(overallPts[t]||0)+(25 - i);
 });
 });
 }
+const isAggSection=row.closest(".ballot-section")?.id?.endsWith("-aggregate");
+const consensusTeams=deltaData[weekId]?.["Official Overall"]||[];
+const rowSection=row.closest(".ballot-section");
+const teamStats=!overallPts&&!isAggSection&&rowSection?sectionTeamStats(rowSection):null;
 const logos=row.querySelectorAll(".team-logo");
 logos.forEach((logo,idx)=>{
 const team=logo.dataset.team;
@@ -5863,6 +6082,7 @@ const wrapper=logo.closest("td");
 if(!wrapper)return;
 wrapper.querySelector(".delta-label")?.remove();
 wrapper.querySelector(".avg-label")?.remove();
+if(prevTeams){
 const prevIdx2=prevTeams.indexOf(team);
 const label=document.createElement("span");
 label.className="delta-label";
@@ -5872,60 +6092,30 @@ label.textContent="NEW";label.classList.add("delta-new");
 const effectivePrev=prevIdx2===-1?25:prevIdx2;
 setDeltaLabel(label,effectivePrev - idx);
 }
-wrapper.insertBefore(label,logo);
+logo.after(label);
+}
+const avgLabel=document.createElement("span");
+avgLabel.className="avg-label";
 if(overallPts){
-const ptsLabel=document.createElement("span");
-ptsLabel.className="avg-label";
-ptsLabel.textContent=String(overallPts[team]||0);
-wrapper.appendChild(ptsLabel);
+avgLabel.textContent=String(overallPts[team]||0);
+avgLabel.title="Overall points";
+}else if(isAggSection){
 return;
-}
-const isAggSection=row.closest('.ballot-section')?.id?.endsWith('-aggregate');
-if(!isAggSection){
-if(deltaSubMode==="recency"){
-let weightedSum=0,totalWeight=0;
-last5.forEach((ballot,wi)=>{
-if(!ballot)return;
-const weight=5 - wi;
-const pos=ballot.indexOf(team);
-const rank=pos===-1?26:pos + 1;
-weightedSum +=rank*weight;
-totalWeight +=weight;
-});
-if(totalWeight>0){
-const avg=weightedSum / totalWeight;
-const avgLabel=document.createElement("span");
-avgLabel.className="avg-label";
-avgLabel.textContent=avg.toFixed(1);
-wrapper.appendChild(avgLabel);
-}
 }else{
-const consensusTeams=deltaData[weekId]?.["Official Overall"]||[];
-const voterRank=idx + 1;
 const consensusIdx=consensusTeams.indexOf(team);
-const avgLabel=document.createElement("span");
-avgLabel.className="avg-label";
-if(consensusIdx!==-1){
-const consensusRank=consensusIdx + 1;
-const diff=consensusRank - voterRank;
-if(diff>0){
-avgLabel.textContent="+" + diff;
-avgLabel.classList.add("delta-up");
-}else if(diff<0){
-avgLabel.textContent=String(diff);
-avgLabel.classList.add("delta-down");
-}else{
-avgLabel.textContent="0";
-avgLabel.classList.add("delta-same");
-}
-if(Math.abs(consensusRank - voterRank)>4)avgLabel.classList.add("avg-bold");
-}else{
+if(consensusIdx===-1){
 avgLabel.textContent="—";
 avgLabel.classList.add("delta-same");
+}else{
+const diff=consensusIdx - idx;
+avgLabel.textContent=diff>0?"+" + diff:diff<0?"−" + -diff:"";
+if(diff>0)avgLabel.classList.add("cons-hi");
+else if(diff<0)avgLabel.classList.add("cons-lo");
+if(diff!==0&&Math.abs(diff)<=3)avgLabel.classList.add("delta-small");
+else if(teamStats&&outlierKind(idx + 1,consensusIdx + 1,teamStats[team]))avgLabel.classList.add("cons-outlier");
+}
 }
 wrapper.appendChild(avgLabel);
-}
-}
 });
 }
 function showSeasonStatsModal(mode="records"){
@@ -8154,19 +8344,7 @@ return;
 }
 if(e.key==="E"||e.key==="e"){
 e.preventDefault();
-toggleAllDeltas();
-return;
-}
-if(e.key==="J"||e.key==="j"){
-e.preventDefault();
-deltaSubMode=deltaSubMode==="recency"?"consensus-diff":"recency";
-const deltaData2=buildDeltaData();
-const sortedTabs2=getSortedTabs();
-document.querySelectorAll(".voter-row.row-delta").forEach(r=>{
-r.querySelectorAll(".avg-label").forEach(el=>el.remove());
-const wid=r.closest(".week-block")?.id;
-if(wid)applyDeltaToRow(r,wid,deltaData2,sortedTabs2);
-});
+cycleDeltaMode();
 return;
 }
 if(e.key==="C"||e.key==="c"){
@@ -8248,14 +8426,7 @@ return;
 }
 if(e.code>="Digit1"&&e.code<="Digit9"){
 e.preventDefault();
-deltaWeeksBack=parseInt(e.code.replace("Digit",""));
-const deltaData=buildDeltaData();
-const sortedTabs=getSortedTabs();
-document.querySelectorAll(".voter-row.row-delta").forEach(r=>{
-r.querySelectorAll(".delta-label, .avg-label").forEach(el=>el.remove());
-const wid=r.closest(".week-block")?.id;
-if(wid)applyDeltaToRow(r,wid,deltaData,sortedTabs);
-});
+setDeltaWeeksBack(parseInt(e.code.replace("Digit",""),10));
 return;
 }
 if(e.key==="P"||e.key==="p"){
