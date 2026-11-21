@@ -5952,8 +5952,8 @@ function buildPickerTableHtml(season, data, error) {
         : "Unofficial quadrant record, BPI for NET (D1 only)";
     const head = `<colgroup>
         <col style="width:28px"><col style="width:26px"><col>
-        <col style="width:52px"><col style="width:40px"><col style="width:46px">
-        ${"<col style=\"width:40px\">".repeat(4)}<col>
+        <col style="width:44px"><col style="width:40px"><col style="width:46px">
+        ${"<col style=\"width:34px\">".repeat(4)}<col>
     </colgroup><thead><tr>
         <th>#</th><th></th><th class="team-col">Team</th><th>W-L</th>
         <th title="ESPN Strength of Record rank (lower is better)">SOR</th>
