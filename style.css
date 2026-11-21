@@ -8,6 +8,7 @@
     --color-bg-tab-active:   #333;
     --color-bg-spread:       #f5f5f5;
     --color-bg-spread-hover: #e8e8e8;
+    --color-bg-drag:         #fff8d1;
     --color-bg-kbd:          #f0f0f0;
 
     --color-heading:         #333;
@@ -897,7 +898,8 @@ kbd {
 #season-stats-table.season-records > thead > tr > th, #season-stats-table.season-records > tbody > tr > td { border-right: none; }
 #season-stats-table.season-records > thead > tr > th:nth-child(6):not(:last-child), #season-stats-table.season-records > tbody > tr > td:nth-child(6):not(:last-child) { border-right: 1px solid var(--color-border-nth); }
 #season-stats-table.season-records tr.records-team-row { cursor: pointer; }
-#season-stats-table.season-records tr.records-team-row:hover > td,
+/* No hover highlight in the Records views (Userpoll / Conferences / Tool); the MM + P12 report keeps it */
+#season-stats-table.season-mmp12 tr.records-team-row:hover > td,
 #season-stats-table.season-records tr.records-team-row.expanded > td { background: var(--color-bg-spread-hover); }
 /* Expanded game list (Records row click) */
 /* The game-list row itself is never striped: when it landed on an even row its shading matched the
@@ -989,10 +991,23 @@ kbd {
 #season-stats-table.season-teampicker tr.tp-row td.tp-handle { touch-action: none; }
 #season-stats-table.season-teampicker tbody.tp-drag-active,
 #season-stats-table.season-teampicker tbody.tp-drag-active tr.tp-row { cursor: grabbing; }
-#season-stats-table.season-teampicker tr.tp-row:hover > td { background: var(--color-bg-spread-hover); }
-#season-stats-table.season-teampicker tbody.tp-drag-active tr.tp-row:not(.tp-dragging):hover > td { background: none; }
-#season-stats-table.season-teampicker tr.tp-row.tp-dragging > td { background: var(--color-bg-spread-hover); box-shadow: inset 0 1px 0 var(--color-border-nth), inset 0 -1px 0 var(--color-border-nth); }
-#season-stats-table.season-teampicker tr.tp-row.tp-dragging td.tp-num { color: var(--color-modal-h2); font-weight: bold; }
+/* While dragging (initPickerDrag) rows move only by transform; the rows the dragged one passes slide.
+   Stripes, the #25 line and the dragged row's lift are paint-only (no layout) until the drop. */
+#season-stats-table.season-teampicker > tbody.tp-drag-active > tr { transition: transform 140ms ease-out; }
+#season-stats-table.season-teampicker > tbody.tp-drag-active.tp-no-slide > tr,
+#season-stats-table.season-teampicker > tbody.tp-drag-active > tr.tp-dragging,
+#season-stats-table.season-teampicker > tbody.tp-drag-active > tr.tp-dragging + tr.records-games-row { transition: none; }
+#season-stats-table.season-teampicker > tbody.tp-drag-active > tr.tp-row.tp-row:nth-child(n) { background-color: transparent; }
+#season-stats-table.season-teampicker > tbody.tp-drag-active > tr.tp-row.tp-alt:nth-child(n) { background-color: var(--color-bg-row-alt); }
+#season-stats-table.season-teampicker > tbody.tp-drag-active > tr.records-t25-end > td { border-bottom-color: transparent; }
+#season-stats-table.season-teampicker > tbody.tp-drag-active > tr.tp-line > td { box-shadow: inset 0 -1px 0 var(--color-border-nth); }
+/* The dragged row is one composited layer above every other row, also while it settles after the drop */
+#season-stats-table.season-teampicker > tbody > tr.tp-dragging,
+#season-stats-table.season-teampicker > tbody > tr.tp-dragging + tr.records-games-row { position: relative; z-index: 2; will-change: transform; }
+#season-stats-table.season-teampicker > tbody > tr.tp-settling,
+#season-stats-table.season-teampicker > tbody > tr.tp-settling + tr.records-games-row { position: relative; z-index: 2; }
+/* The dragged row's only styling: a flat light-yellow highlight, the same on striped and plain rows */
+#season-stats-table.season-teampicker > tbody > tr.tp-row.tp-dragging.tp-dragging > td { background: var(--color-bg-drag); box-shadow: none; }
 /* Last 7 Games: Week Stats Games chips, one line per row so rows keep the same height while dragging */
 #season-stats-table.season-teampicker > thead > tr > th.tp-wins-col { text-align: left; padding-left: 10px; }
 #season-stats-table.season-teampicker > tbody > tr > td.tp-wins { text-align: left; white-space: nowrap; font-size: 11px; line-height: 1.3; padding: 2px 6px 2px 10px; }
@@ -1309,6 +1324,7 @@ body.dark {
     --color-bg-tab-active:   #d0d0d0;
     --color-bg-spread:       #2a2a2a;
     --color-bg-spread-hover: #383838;
+    --color-bg-drag:         #4a4426;
     --color-bg-kbd:          #333;
 
     --color-heading:         #d0d0d0;

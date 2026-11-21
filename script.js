@@ -663,7 +663,7 @@ function deltaSinceOptions() {
 
 // Changes window (Functions › Show › Values; markup in build_full_html()): styled like
 // Settings. Mode items and the Compare With dropdown act in place and keep it open. Compare
-// With is hidden in vs Consensus (it has no lookback) and lists earlier polls of this season.
+// With shows only in Movement (Off and vs Consensus have no lookback) and lists earlier polls of this season.
 function showChangesModal() {
     const modal = document.getElementById("changes-modal");
     syncDeltaControls();
@@ -696,7 +696,7 @@ function syncDeltaControls() {
             b.classList.toggle("active", on);
             b.setAttribute("aria-pressed", on ? "true" : "false");
         });
-        const hideSince = deltaMode === "cons";
+        const hideSince = deltaMode !== "move";
         modal.querySelector("#changes-since-group").hidden = hideSince;
         const sel = modal.querySelector("#changes-since-select");
         sel.hidden = hideSince;
@@ -4713,19 +4713,17 @@ function applyDeltaToRow(row, weekId, deltaData, allTabsSorted) {
         } else if (isAggSection) {
             return;
         } else {
-            const consensusIdx = consensusTeams.indexOf(team);
-            if (consensusIdx === -1) {
-                avgLabel.textContent = "—";
-                avgLabel.classList.add("delta-same");
-            } else {
-                // + = this voter ranks the team higher than the consensus does
-                const diff = consensusIdx - idx;
-                avgLabel.textContent = diff > 0 ? "+" + diff : diff < 0 ? "−" + -diff : "";
-                if (diff > 0) avgLabel.classList.add("cons-hi");
-                else if (diff < 0) avgLabel.classList.add("cons-lo");
-                if (diff !== 0 && Math.abs(diff) <= 3) avgLabel.classList.add("delta-small");  // vs Consensus grays 1–3 (Movement: 1–4)
-                else if (teamStats && outlierKind(idx + 1, consensusIdx + 1, teamStats[team])) avgLabel.classList.add("cons-outlier");
-            }
+            // Unranked by consensus counts as #26 (0-indexed 25), same as the outlier tags
+            const foundIdx = consensusTeams.indexOf(team);
+            const consensusIdx = foundIdx === -1 ? 25 : foundIdx;
+            // + = this voter ranks the team higher than the consensus does
+            const diff = consensusIdx - idx;
+            avgLabel.textContent = diff > 0 ? "+" + diff : diff < 0 ? "−" + -diff : "";
+            if (diff > 0) avgLabel.classList.add("cons-hi");
+            else if (diff < 0) avgLabel.classList.add("cons-lo");
+            if (diff !== 0 && Math.abs(diff) <= 3) avgLabel.classList.add("delta-small");  // vs Consensus grays 1–3 (Movement: 1–4)
+            else if (teamStats && outlierKind(idx + 1, consensusIdx + 1, teamStats[team])) avgLabel.classList.add("cons-outlier");
+            if (foundIdx === -1) avgLabel.title = "Unranked by consensus (counted as #26)";
         }
         wrapper.appendChild(avgLabel);
     });
@@ -6027,49 +6025,116 @@ function buildPickerTableHtml(season, data, error) {
 
 // Drag-to-reorder for the Picker rows. Mouse: drag anywhere on a row; touch/pen: drag by the
 // #, logo or name cells (touch-action: none there) so the rest of the row still scrolls.
-// Rows move live as the pointer passes other rows' midpoints; the # cells and the line after
-// #25 stay with the position, not the team. Near the window's top/bottom edge it autoscrolls.
-// A row's open game list (records-games-row, from a click; toggleTeamGames()) moves with it.
+// The DOM isn't touched until the drop: row geometry is measured once at pointer-down-and-move,
+// then each frame (pointer moves are coalesced to one update per animation frame) only sets
+// `transform`s: the dragged row follows the pointer and the rows it passes slide out of its way
+// (CSS transition on .tp-drag-active rows). That keeps dragging off the layout / nth-child
+// restyle path of a 100-row auto-layout table. A row takes a neighbour's slot once the pointer
+// is PICKER_SWAP_AT (a quarter) of the way into it; moving back needs a quarter into the other
+// row again, so rows don't flicker at the boundary. Positional bits (the # cells, zebra stripes
+// via .tp-alt, the line after #25 via .tp-line) follow the slots with paint-only changes.
+// Drop = one DOM reorder, then the dragged row settles into its slot. Near the window's
+// top/bottom edge it autoscrolls. A row's open game list (records-games-row, from a click;
+// toggleTeamGames()) moves with it as one unit.
+const PICKER_SWAP_AT = 0.25;
+const PICKER_SLIDE_MS = 140;
 function initPickerDrag(tbody, season, onDrop) {
     const box = tbody.closest("#season-stats-box") || document.scrollingElement;
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     let drag = null;
     const rows = () => [...tbody.querySelectorAll("tr.tp-row")];
-    const renumber = () => rows().forEach((tr, i) => {
-        tr.firstElementChild.textContent = i + 1;
-        tr.classList.toggle("records-t25-end", i === 24);
-    });
-    const place = y => {
-        let before = null;
-        for (const r of rows()) {
-            if (r === drag.tr) continue;
-            const b = r.getBoundingClientRect();
-            if (y < b.top + b.height / 2) { before = r; break; }
-        }
-        const games = drag.tr.nextElementSibling?.classList.contains("records-games-row") ? drag.tr.nextElementSibling : null;
-        const tail = games || drag.tr;
-        if (before ? tail.nextElementSibling === before : tbody.lastElementChild === tail) return;
-        tbody.insertBefore(drag.tr, before);
-        if (games) drag.tr.after(games);
-        renumber();
+    const gamesOf = tr => tr.nextElementSibling?.classList.contains("records-games-row") ? tr.nextElementSibling : null;
+    const boxTop = () => box === document.scrollingElement ? 0 : box.getBoundingClientRect().top;
+    // Pointer y in scroll-content coordinates, so autoscroll needs no re-measuring.
+    const contentY = clientY => clientY - drag.boxTop + box.scrollTop;
+    const setTransform = (u, dy) => {
+        if (u.dy === dy) return;
+        u.dy = dy;
+        const t = dy ? `translateY(${dy}px)` : "";
+        for (const el of u.els) el.style.transform = t;
     };
+
+    const start = () => {
+        drag.boxTop = boxTop();
+        const scroll = box.scrollTop;
+        // One unit per team: its row plus an open game list. Tops/heights in content coordinates.
+        drag.units = rows().map((tr, i) => {
+            const els = [tr, gamesOf(tr)].filter(Boolean);
+            const r0 = els[0].getBoundingClientRect(), r1 = els.at(-1).getBoundingClientRect();
+            return { tr, els, top: r0.top - drag.boxTop + scroll, h: r1.bottom - r0.top, dy: 0, slot: i };
+        });
+        drag.unit = drag.units.find(u => u.tr === drag.tr);
+        drag.order = drag.units.slice();            // current visual order, dragged unit included
+        drag.base = drag.units[0].top;
+        drag.grabOff = contentY(drag.y) - drag.unit.top;
+        drag.tr.classList.add("tp-dragging");
+        tbody.classList.add("tp-drag-active");
+        if (reduceMotion) tbody.classList.add("tp-no-slide");
+        drag.order.forEach((u, i) => u.tr.classList.toggle("tp-alt", i % 2 === 1));
+        drag.units[24]?.tr.classList.add("tp-line");
+    };
+
+    // Re-lay the visual order from the pointer position; only the changed units get new styles.
+    const update = () => {
+        drag.raf = 0;
+        if (!tbody.isConnected) return;
+        const y = contentY(drag.lastY);
+        const { order, unit } = drag;
+        const from = order.indexOf(unit);
+        // Slot tops for the current order.
+        const tops = [];
+        let acc = drag.base;
+        for (const u of order) { tops.push(acc); acc += u.h; }
+        let to = from;
+        for (let i = from - 1; i >= 0; i--) {         // up: a quarter of the way up into each row above
+            if (y < tops[i] + order[i].h * (1 - PICKER_SWAP_AT)) to = i; else break;
+        }
+        if (to === from) {                             // down: a quarter of the way down into each row below
+            for (let i = from + 1; i < order.length; i++) {
+                if (y > tops[i] + order[i].h * PICKER_SWAP_AT) to = i; else break;
+            }
+        }
+        if (to !== from) {
+            order.splice(from, 1);
+            order.splice(to, 0, unit);
+            let top = drag.base;
+            order.forEach((u, i) => {
+                if (u !== unit) setTransform(u, top - u.top);
+                if (u.slot !== i) {
+                    u.slot = i;
+                    u.tr.firstElementChild.textContent = i + 1;
+                    u.tr.classList.toggle("tp-alt", i % 2 === 1);
+                    u.tr.classList.toggle("tp-line", i === 24);
+                }
+                top += u.h;
+            });
+        }
+        // The dragged unit sits under the pointer where it was grabbed, kept inside the table.
+        const want = Math.max(drag.base, Math.min(acc - unit.h, y - drag.grabOff));
+        setTransform(unit, want - unit.top);
+    };
+    const schedule = () => { if (!drag.raf) drag.raf = requestAnimationFrame(update); };
+
     const autoScroll = () => {
         if (!drag?.started || !tbody.isConnected) return;
-        const b = box.getBoundingClientRect();
+        const b = box === document.scrollingElement ? { top: 0, bottom: innerHeight } : box.getBoundingClientRect();
         const edge = 48;
         const dy = drag.lastY < b.top + edge ? drag.lastY - (b.top + edge)
             : drag.lastY > b.bottom - edge ? drag.lastY - (b.bottom - edge) : 0;
         if (dy) {
+            const before = box.scrollTop;
             box.scrollTop += Math.max(-24, Math.min(24, dy / 2));
-            place(drag.lastY);
+            if (box.scrollTop !== before) update();
         }
         requestAnimationFrame(autoScroll);
     };
+
     tbody.addEventListener("pointerdown", e => {
         if (e.button !== 0) return;
         const tr = e.target.closest("tr.tp-row");
         if (!tr) return;
         if (e.pointerType !== "mouse" && !e.target.closest(".tp-handle")) return;
-        drag = { tr, id: e.pointerId, x: e.clientX, y: e.clientY, lastY: e.clientY, started: false };
+        drag = { tr, id: e.pointerId, x: e.clientX, y: e.clientY, lastY: e.clientY, started: false, raf: 0 };
     });
     tbody.addEventListener("pointermove", e => {
         if (!drag || e.pointerId !== drag.id) return;
@@ -6077,21 +6142,48 @@ function initPickerDrag(tbody, season, onDrop) {
         if (!drag.started) {
             if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 5) return;
             drag.started = true;
-            drag.tr.classList.add("tp-dragging");
-            tbody.classList.add("tp-drag-active");
             try { tbody.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
+            start();
             requestAnimationFrame(autoScroll);
         }
         e.preventDefault();
-        place(e.clientY);
+        schedule();
     });
     const end = e => {
         if (!drag || e.pointerId !== drag.id) return;
         const d = drag;
         drag = null;
         if (!d.started) return;
+        if (d.raf) cancelAnimationFrame(d.raf);
+        if (!tbody.isConnected) return;
+        // Where the dragged unit is drawn now, so it can glide from there into its slot.
+        const shown = d.unit.top + d.unit.dy;
+        // One DOM reorder into the visual order, then drop every drag-time style.
+        const frag = document.createDocumentFragment();
+        for (const u of d.order) frag.append(...u.els);
+        tbody.append(frag);
+        tbody.classList.add("tp-no-slide");
+        for (const u of d.units) {
+            for (const el of u.els) el.style.transform = "";
+            u.tr.classList.remove("tp-alt", "tp-line");
+        }
+        d.order.forEach((u, i) => {
+            u.tr.firstElementChild.textContent = i + 1;
+            u.tr.classList.toggle("records-t25-end", i === 24);
+        });
         d.tr.classList.remove("tp-dragging");
         tbody.classList.remove("tp-drag-active");
+        tbody.getBoundingClientRect();     // commit the un-transformed layout before re-enabling slides
+        tbody.classList.remove("tp-no-slide");
+        const settle = shown - d.order.slice(0, d.order.indexOf(d.unit)).reduce((t, u) => t + u.h, d.base);
+        if (settle && !reduceMotion) {
+            // Glide on top of the other rows: .tp-settling keeps the row's z-index through the glide,
+            // which after an upward drag ends over the row below it (later in the DOM).
+            d.tr.classList.add("tp-settling");
+            const anims = d.unit.els.map(el => el.animate([{ transform: `translateY(${settle}px)` }, { transform: "none" }],
+                { duration: PICKER_SLIDE_MS, easing: "ease-out" }));
+            anims[0]?.finished.then(() => d.tr.classList.remove("tp-settling"), () => d.tr.classList.remove("tp-settling"));
+        }
         _pickerSuppressClickUntil = Date.now() + 300;   // the click that ends a drag isn't a logo click
         pickerSaveOrder(season, rows().map(r => r.dataset.team));
         onDrop?.();
