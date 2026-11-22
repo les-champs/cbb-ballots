@@ -225,6 +225,11 @@ def get_dark_logo_teams():
             teams.append(m.group(1))
     return sorted(teams)
 
+def get_logo_teams():
+    """Return sorted list of team name stems that have a (light) logo file: Team.webp."""
+    return sorted(f[:-5] for f in os.listdir(OUTPUT_DIR)
+                  if f.endswith(".webp") and not f.endswith("-dark.webp") and not f.startswith("ncaa-"))
+
 def download_dark_logos():
     """Download ESPN dark-mode logos for all teams we have regular logos for."""
     api_url = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams?limit=1000"
@@ -1683,6 +1688,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
     ap_tenure_counts_js = json.dumps(ap_tenure_counts or {})
     ap_fragment_years_js = json.dumps(ap_fragment_years or [])
     dark_logo_teams_js = "new Set(" + json.dumps(get_dark_logo_teams()) + ")"
+    logo_teams_js = "new Set(" + json.dumps(get_logo_teams()) + ")"
     ncaa_light, ncaa_dark = nond1_logos.logo_ids(OUTPUT_DIR)
     ncaa_logo_ids_js = "new Set(" + json.dumps(ncaa_light) + ")"
     ncaa_dark_logo_ids_js = "new Set(" + json.dumps(ncaa_dark) + ")"
@@ -1883,6 +1889,7 @@ const FRAGMENT_YEARS = {fragment_years_js};
 const TENURE_COUNTS = {tenure_counts_js};
 const AP_TENURE_COUNTS = {ap_tenure_counts_js};
 const DARK_LOGO_TEAMS = {dark_logo_teams_js};
+const LOGO_TEAMS = {logo_teams_js};
 const NCAA_LOGO_IDS = {ncaa_logo_ids_js};
 const NCAA_DARK_LOGO_IDS = {ncaa_dark_logo_ids_js};
 const CONFERENCE_DATA = {conference_data_js};

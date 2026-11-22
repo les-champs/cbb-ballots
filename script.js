@@ -97,12 +97,84 @@ function setLogoSrc(img, team) {
     }
 }
 
+// ─── CSS logos (Safari performance) ─────────────────────────
+// Safari spends ~1.1–1.4 ms of main-thread time starting every <img> load of an
+// http(s) URL (Chrome ~0.01 ms), even cached/cloned/lazy/blob: ones (measured
+// 2026-11-22, Safari 26.2), and the page assigns ~6,600 ballot logos, so loading
+// them froze clicks for seconds. data: URLs avoid that but make every style recalc
+// ~5× slower (long attribute values). So in Safari, bulk ballot logos get no src:
+// a per-team class whose rule sets `content: url(...)` (one load per team, shared
+// by every img; dark variants via body.dark rules, so Dark Mode needs no per-img
+// work). Such imgs carry data-css-logo and have naturalWidth 0;
+// materializeCssLogos() gives them a real src where one is needed (Save as PNG).
+// Other browsers keep plain src (Firefox's support for content on <img> is unsure).
+const CSS_LOGOS = /AppleWebKit/.test(navigator.userAgent) && !/Chrome|Chromium|Edg|Android/.test(navigator.userAgent);
+const _cssLogoTeams = new Set();
+let _cssLogoStyle = null;
+
+function cssLogoClass(team) { return `lg-${team.replace(/[^A-Za-z0-9_-]/g, c => "_" + c.charCodeAt(0).toString(16))}`; }
+
+// Adds the content rules for any team in `teams` that doesn't have them yet.
+function ensureCssLogoRules(teams) {
+    const add = [];
+    for (const t of new Set(teams)) if (t && !_cssLogoTeams.has(t)) { _cssLogoTeams.add(t); add.push(t); }
+    if (!add.length) return;
+    if (!_cssLogoStyle) {
+        _cssLogoStyle = document.createElement("style");
+        _cssLogoStyle.id = "css-logo-styles";
+        document.head.appendChild(_cssLogoStyle);
+    }
+    const url = f => `url("cbb-logos/${f.replace(/["\\]/g, "\\$&")}.webp")`;
+    _cssLogoStyle.appendChild(document.createTextNode(add.map(t => {
+        const c = cssLogoClass(t);
+        const light = `img.${c}{content:${url(t)}}`;
+        return DARK_LOGO_TEAMS.has(t) ? `${light}body.dark img.${c}{content:${url(t + "-dark")}}` : light;
+    }).join("")));
+}
+
+// Shows `team`'s logo on a bulk ballot img: CSS logo in Safari, else setLogoSrc().
+function setBallotLogo(img, team) {
+    if (!CSS_LOGOS) { setLogoSrc(img, team); return; }
+    ensureCssLogoRules([team]);
+    img.classList.add(cssLogoClass(team));
+    img.dataset.cssLogo = "1";
+}
+
+// Sets every pending img's logo (team = data-src) in chunks, so clicks get through.
+const LOGO_ASSIGN_CHUNK = 500;
+async function assignBallotLogos(imgs) {
+    imgs = Array.from(imgs);
+    if (CSS_LOGOS) ensureCssLogoRules(imgs.map(img => img.dataset.src));
+    for (let i = 0; i < imgs.length; i += LOGO_ASSIGN_CHUNK) {
+        if (i) await new Promise(r => setTimeout(r, 0));
+        imgs.slice(i, i + LOGO_ASSIGN_CHUNK).forEach(img => {
+            const team = img.dataset.src;
+            if (!team) return;  // done meanwhile by another path
+            setBallotLogo(img, team);
+            img.removeAttribute("data-src");
+        });
+    }
+}
+
+// Gives CSS-logo imgs under `root` a real src (current mode) and waits for them.
+function materializeCssLogos(root) {
+    const loads = [];
+    root.querySelectorAll("img[data-css-logo]").forEach(img => {
+        const src = logoSrc(img.dataset.team);
+        if (img.getAttribute("src") === src && img.complete) return;
+        img.src = src;
+        loads.push(img.decode().catch(() => {}));
+    });
+    return Promise.all(loads);
+}
+
 function refreshBlockLogos(block) {
     // Update already-loaded logos in a single block to the current dark/light mode.
     // Images still pending lazy-load (data-src present) are skipped — they call
     // setLogoSrc() themselves when loaded and pick up the current mode automatically.
+    // CSS logos follow body.dark by themselves (their content rule wins over any src).
     if (!block) return;
-    block.querySelectorAll('img[data-team]:not([data-src])').forEach(img => {
+    block.querySelectorAll('img[data-team]:not([data-src]):not([data-css-logo])').forEach(img => {
         const team = img.dataset.team;
         if (DARK_LOGO_TEAMS.has(team)) setLogoSrc(img, team);
     });
@@ -417,10 +489,7 @@ function updateAvgRankLines() {
 
 function lazyLoadWeek(block) {
     if (!block) return;
-    block.querySelectorAll("img[data-src]").forEach(img => {
-        setLogoSrc(img, img.dataset.src);
-        img.removeAttribute("data-src");
-    });
+    assignBallotLogos(block.querySelectorAll("img[data-src]"));
 }
 
 function getSortedTabs() {
@@ -2175,6 +2244,7 @@ function showWeekHighLowChart(weekId, mode = "stats") {
         table.style.cssText = "display:block; white-space:normal; width:100%;";
         table.innerHTML = "";
         table.appendChild(view);
+        initRecordsLogos(view);
         modal.dataset.chartType = "highlow";
         modal.dataset.chartMode = mode;
         modal.classList.add("open");
@@ -2192,6 +2262,7 @@ function showWeekHighLowChart(weekId, mode = "stats") {
     const statsTable = document.createElement("table");
     statsTable.className = "week-stats-table";
     statsTable.innerHTML = html;
+    initRecordsLogos(statsTable);
     fillWeekResults(statsTable, weekId);
     fillWeekRecords(statsTable, weekId);
     statsTable.addEventListener("click", e => {
@@ -3171,7 +3242,7 @@ function _buildPointsRankingRow(label, ranked, pts, prevRankOf, hasPrev, key = l
             const img = document.createElement("img");
             img.className = "logo team-logo";
             img.dataset.team = team;
-            img.src = logoSrc(team);
+            setBallotLogo(img, team);
             td.appendChild(img);
 
             const delta = document.createElement("span");
@@ -3704,7 +3775,7 @@ function buildWeekStatsTableHtml(weekId) {
         const espnAttr = espnId ? ` data-espn="${espnId}"` : "";
         return `<tr data-team="${teamAttr}">
             <td>${rankDisplay}</td>
-            <td style="padding:2px 4px;"><img class="logo-sm" src="${logoSrc(team)}"></td>
+            <td style="padding:2px 4px;"><img class="logo-sm records-logo" data-team="${teamAttr}"${espnAttr} alt=""></td>
             <td class="team-col">${formatTeamName(team)}<span class="ws-rec"></span></td>
             <td style="white-space:nowrap">${rankDelta}</td>
             <td>${count}</td>
@@ -3946,7 +4017,7 @@ function buildConferenceView(weekId) {
             <td>${g.prevShare === null ? "—" : deltaSpan((g.share - g.prevShare) * 100, x => x.toFixed(1))}</td>
             <td class="conf-teams">${g.teams.map(t => {
                 const r = stats.rankOf[t];
-                return `<span class="conf-team">${r <= 25 ? `<span class="conf-team-rank">${r}</span>` : ""}<img class="logo-sm team-logo" data-team="${t}" src="${logoSrc(t)}" title="${formatTeamName(t)}${r <= 25 ? ` (#${r})` : ""}"></span>`;
+                return `<span class="conf-team">${r <= 25 ? `<span class="conf-team-rank">${r}</span>` : ""}<img class="logo-sm team-logo records-logo" data-team="${t}" title="${formatTeamName(t)}${r <= 25 ? ` (#${r})` : ""}"></span>`;
             }).join("")}</td>
         </tr>`;
     const tbl = document.createElement("table");
@@ -4253,6 +4324,8 @@ function getBackgroundImageQueue() {
 
 function loadImageQueue(queue) {
     if (queue.length === 0) return Promise.resolve();
+    // Safari: no per-img loads to throttle (see "CSS logos"), just chunked assignment.
+    if (CSS_LOGOS) return assignBallotLogos(queue);
     return new Promise(resolve => {
         let index = 0;
         const CONCURRENCY = 16;
@@ -4480,9 +4553,12 @@ function saveTableAsPng() {
     if (!table) return;
     const container = table.closest(".table-container") || table;
     const plan = pngPanelPlan(table);
-    const logos = pngSharpLogos(table, plan.scale);
     container.dataset.pngTarget = "1";
-    loadHtml2canvas().then(() => html2canvas(container, {
+    // CSS logos (Safari) have no src for html2canvas or resampling: give them one first.
+    let logos;
+    Promise.all([loadHtml2canvas(), materializeCssLogos(table)]).then(() => {
+        logos = pngSharpLogos(table, plan.scale);
+    }).then(() => html2canvas(container, {
         useCORS: true,
         scale: plan.scale,
         // The clone's iframe must be wide enough to lay the panels out side by side.
@@ -5537,7 +5613,18 @@ function replaceWithLogoFiller(img, name) {
 // Our logo files for img.records-logo[data-team], falling back to ESPN's logo, then to a
 // filler; ESPN-only images (img[data-filler]) fall back to the filler directly.
 function initRecordsLogos(root) {
-    root.querySelectorAll("img.records-logo[data-team]").forEach(img => {
+    let imgs = [...root.querySelectorAll("img.records-logo[data-team]:not([data-logo-init])")];
+    imgs.forEach(img => { img.dataset.logoInit = "1"; });
+    // Safari: teams with a logo file get CSS logos (see "CSS logos"); a few hundred
+    // src loads made the Records views take 1–2 s there. No error fallback is needed,
+    // since LOGO_TEAMS lists only files that exist.
+    if (CSS_LOGOS && typeof LOGO_TEAMS !== "undefined") {
+        const css = imgs.filter(img => LOGO_TEAMS.has(img.dataset.team));
+        ensureCssLogoRules(css.map(img => img.dataset.team));
+        css.forEach(img => setBallotLogo(img, img.dataset.team));
+        imgs = imgs.filter(img => !img.dataset.cssLogo);
+    }
+    imgs.forEach(img => {
         const onError = () => {
             if (img.dataset.espn && !img.dataset.fallback) {
                 img.dataset.fallback = "1";
