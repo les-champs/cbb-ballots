@@ -325,6 +325,12 @@ body.hide-veteran-tags .veteran-tag,
     color: var(--color-consensus-dist);
 }
 
+.consensus-dist.similar-method {
+    cursor: pointer;
+    text-decoration: underline dotted;
+    text-underline-offset: 2px;
+}
+
 .veteran-tag.veteran-elite {
     color: rgba(235, 183, 33, 0.63);
 }

@@ -856,6 +856,43 @@ function consensusDistance(teams, cons) {
     return consensusGaps(teams, cons).reduce((s, g) => s + g, 0) / 2;
 }
 
+// ── Ballot-to-ballot distance (Similar sort) ──────────────────────────────────
+// Like consensusDistance() but between two voters, and ranking a team the other voter
+// leaves unranked costs an extra SIMILAR_UNSHARED_PENALTY places: "would rank them" vs
+// "wouldn't" counts for more than a shuffle inside the top 25. Both top 25s hold the
+// same number of unshared teams, so the Flat halved total stays a whole number.
+//
+// Two methods (similarMethod, toggled by clicking the reference row's label):
+//   flat     — every place counts the same.
+//   weighted — tuned to what voters notice: (1) do we agree on the top teams, (2) do we
+//              rank the same teams. r = where the higher of the two voters has the team.
+//              Teams both rank: gap × 4·0.8^r (×4 at #1, ×1.6 at #5, ×0.5 at #10, ~0 by
+//              #20), so the top order dominates and bubble shuffles are nearly free.
+//              Teams only one ranks: gap × max(2·(25−r)/25, 1), never below ×1, so a
+//              different #25 team still costs 4 and leaving off a top team costs extra.
+//              Totals are fractional; labels round to whole numbers.
+const SIMILAR_UNSHARED_PENALTY = 3;
+const SIMILAR_METHODS = { flat: "Flat", weighted: "Weighted" };
+let similarMethod = "weighted";
+try { if (SIMILAR_METHODS[localStorage.getItem("similarMethod")]) similarMethod = localStorage.getItem("similarMethod"); } catch (e) {}
+function ballotGaps(a, b) {
+    const ra = {}, rb = {};
+    a.slice(0, 25).forEach((t, i) => { ra[t] = i; });
+    b.slice(0, 25).forEach((t, i) => { rb[t] = i; });
+    return [...new Set([...Object.keys(ra), ...Object.keys(rb)])].map(t => {
+        const pa = ra[t] ?? 25, pb = rb[t] ?? 25;
+        const shared = t in ra && t in rb;
+        const gap = Math.abs(pa - pb) + (shared ? 0 : SIMILAR_UNSHARED_PENALTY);
+        if (similarMethod !== "weighted") return gap;
+        const r = Math.min(pa, pb);
+        return gap * (shared ? 4 * 0.8 ** r : Math.max((25 - r) / 25 * 2, 1));
+    });
+}
+function ballotDistance(a, b) {
+    if (!a?.length || !b?.length) return Infinity;
+    return ballotGaps(a, b).reduce((s, g) => s + g, 0) / 2;
+}
+
 // Rendered Official Overall order from a week block's aggregate section.
 function renderedConsensusOrder(sections) {
     const aggRow = sections[2]?.querySelector(".voter-row:not(.row-weighted-ranking):not(.row-pinned-agg)");
@@ -1393,8 +1430,7 @@ function applyTableSort(sort) {
     }
 
     if (sort === "similar") {
-        // Distance to the reference voter's ballot, using consensusDistance() with their
-        // ballot as the target: half the summed rank gaps over both top 25s (unranked = #26).
+        // Distance to the reference voter's ballot (ballotDistance()).
         const rowTeams = r => Array.from(r.querySelectorAll(".team-logo")).map(img => img.dataset.team);
         const refRow = allRows.find(r => getVoterName(r) === similarTo && !r.classList.contains("row-pinned-agg"))
             || allRows.find(r => getVoterName(r) === similarTo);
@@ -1408,11 +1444,11 @@ function applyTableSort(sort) {
         const teamsOf = {};
         allRows.forEach(r => { teamsOf[getVoterName(r)] = rowTeams(r); });
         const scores = {};
-        rows.forEach(r => { const u = getVoterName(r); scores[u] = consensusDistance(teamsOf[u], ref); });
+        rows.forEach(r => { const u = getVoterName(r); scores[u] = ballotDistance(teamsOf[u], ref); });
         rows.sort((a, b) => {
             const ua = getVoterName(a), ub = getVoterName(b);
             if (scores[ua] !== scores[ub]) return scores[ua] - scores[ub];
-            const ga = consensusGaps(teamsOf[ua], ref), gb = consensusGaps(teamsOf[ub], ref);
+            const ga = ballotGaps(teamsOf[ua], ref).sort((x, y) => y - x), gb = ballotGaps(teamsOf[ub], ref).sort((x, y) => y - x);
             for (let i = 0; i < Math.min(ga.length, gb.length); i++) if (ga[i] !== gb[i]) return ga[i] - gb[i];
             return ua.localeCompare(ub);
         });
@@ -1420,13 +1456,24 @@ function applyTableSort(sort) {
             tbody.appendChild(r);
             if (!userPinned.includes(r)) return;
             const name = getVoterName(r);
-            if (name === similarTo) addVoterLabel(r, "ref");
-            else { const d = consensusDistance(teamsOf[name], ref); if (d !== Infinity) addVoterLabel(r, `${d}`); }
+            if (name === similarTo) {
+                // Clickable method switch on the reference row: "ref · Weighted" ⇄ "ref · Flat"
+                addVoterLabel(r, `ref · ${SIMILAR_METHODS[similarMethod]}`);
+                const lbl = r.querySelector(".consensus-dist");
+                lbl.classList.add("similar-method");
+                lbl.title = "Switch between Weighted (top ranks count more) and Flat (every place equal)";
+                lbl.addEventListener("click", e => {
+                    e.stopPropagation();
+                    similarMethod = similarMethod === "weighted" ? "flat" : "weighted";
+                    try { localStorage.setItem("similarMethod", similarMethod); } catch (err) {}
+                    applyTableSort("similar");
+                });
+            } else { const d = ballotDistance(teamsOf[name], ref); if (d !== Infinity) addVoterLabel(r, `${Math.round(d)}`); }
         });
         rows.forEach(r => {
             tbody.appendChild(r);
             const d = scores[getVoterName(r)];
-            if (d !== Infinity) addVoterLabel(r, `${d}`);
+            if (d !== Infinity) addVoterLabel(r, `${Math.round(d)}`);
         });
         return;
     }
