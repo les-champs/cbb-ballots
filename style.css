@@ -398,13 +398,6 @@ body.sort-similar .similar-btn.active {
     justify-content: center;
 }
 
-.overall-row {
-    display: none;
-}
-
-body.show-overall-row .overall-row {
-    display: table-row;
-}
 
 .ballot-link-btn {
     display: none;
@@ -1489,9 +1482,9 @@ body.dark .pin-btn.pinned {
 /* P. Rk: same gray as the totals, at the cell size. */
 #season-stats-table.season-mmp12 .mm-dim { opacity: 0.55; }
 
-/* Reports menu (Shift+R), Settings window (Functions › Settings) and Changes window
-   (Functions › Show › Values) share one look */
-#settings-modal, #changes-modal,
+/* Reports menu (Shift+R), Settings window (Functions › Settings), Changes window
+   (Functions › Show › Values) and Rankings window (Functions › Show › Rankings) share one look */
+#settings-modal, #changes-modal, #rankings-modal,
 #reports-modal {
     display: none;
     position: fixed;
@@ -1501,8 +1494,8 @@ body.dark .pin-btn.pinned {
     justify-content: center;
     align-items: center;
 }
-#settings-modal.open, #changes-modal.open, #reports-modal.open { display: flex; }
-#settings-box, #changes-box, #reports-box {
+#settings-modal.open, #changes-modal.open, #rankings-modal.open, #reports-modal.open { display: flex; }
+#settings-box, #changes-box, #rankings-box, #reports-box {
     background: var(--color-bg-modal);
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.25);
@@ -1512,7 +1505,7 @@ body.dark .pin-btn.pinned {
     overflow: auto;
     padding: 14px 14px 12px;
 }
-#settings-title, #changes-title, #reports-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
+#settings-title, #changes-title, #rankings-title, #reports-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
 .settings-list, #reports-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 .settings-item, .report-item {
     display: block;
@@ -1531,7 +1524,7 @@ body.dark .pin-btn.pinned {
 .report-item.placeholder { opacity: 0.45; cursor: default; }
 .report-lock { display: block; }
 .settings-group { margin: 10px 0 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.6; color: var(--color-heading); }
-#settings-title + .settings-group, #changes-title + .settings-group { margin-top: 0; }
+#settings-title + .settings-group, #changes-title + .settings-group, #rankings-title + .settings-group { margin-top: 0; }
 .settings-group[hidden], .settings-list[hidden], .settings-select[hidden] { display: none; }
 .settings-group label { cursor: inherit; }
 /* Changes window: Compare With dropdown, sized and colored like a .settings-item */
@@ -1549,7 +1542,7 @@ body.dark .pin-btn.pinned {
 }
 .settings-select:hover, .settings-select:focus-visible { background: var(--color-bg-tab-hover); outline: none; }
 .settings-select:disabled { opacity: 0.35; cursor: default; }
-/* Changes window: the chosen mode / comparison poll */
+/* Changes window: the chosen mode / comparison poll; Rankings window: the shown rows */
 .settings-item.active, .settings-item.active:hover { background: var(--color-bg-tab-active); color: var(--color-tab-active); }
 .settings-item:disabled { cursor: default; }
 /* Dev stays dimmed until the PIN is entered (still clickable unless locked out) */

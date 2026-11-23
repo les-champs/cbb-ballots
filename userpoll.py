@@ -1275,7 +1275,7 @@ PICKER_HTML = (
     f"<span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span>"
     f"<span class='sort-option' data-sort='consensus'>Consensus</span>"
     f"<span class='picker-category'>Show</span>"
-    f"<span class='sort-option' data-action='toggleOverall'>Overall</span>"
+    f"<span class='sort-option' data-action='rankings'>Rankings</span>"
     f"<span class='sort-option' data-action='expandDeltas'>Values</span>"
     f"<span class='sort-option' data-action='toggleOutliers'>Outliers</span>"
     f"<span class='picker-category'>Stats</span>"
@@ -1850,6 +1850,21 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
     </ul>
     <h3 class="settings-group" id="changes-since-group"><label for="changes-since-select">Compare With</label></h3>
     <select id="changes-since-select" class="settings-select"></select>
+  </div>
+</div>
+
+<div id="rankings-modal">
+  <div id="rankings-box">
+    <h2 id="rankings-title">Rankings</h2>
+    <h3 class="settings-group">Show</h3>
+    <ul class="settings-list">
+      <li><button type="button" class="settings-item" data-ranking="Overall">Overall</button></li>
+      <li><button type="button" class="settings-item" data-ranking="AP 25">AP 25</button></li>
+      <li><button type="button" class="settings-item" data-ranking="BPI">BPI</button></li>
+      <li><button type="button" class="settings-item" data-ranking="SOR">SOR</button></li>
+      <li><button type="button" class="settings-item" data-ranking=">20 Ballots">&gt;20 Ballots</button></li>
+      <li><button type="button" class="settings-item" data-ranking="Veterans">Veterans</button></li>
+    </ul>
   </div>
 </div>
 

@@ -418,13 +418,6 @@ body.sort-similar .similar-btn.active {
     justify-content: center;
 }
 
-.overall-row {
-    display: none;
-}
-
-body.show-overall-row .overall-row {
-    display: table-row;
-}
 
 .ballot-link-btn {
     display: none;
@@ -1509,9 +1502,9 @@ body.dark .pin-btn.pinned {
 /* P. Rk: same gray as the totals, at the cell size. */
 #season-stats-table.season-mmp12 .mm-dim { opacity: 0.55; }
 
-/* Reports menu (Shift+R), Settings window (Functions › Settings) and Changes window
-   (Functions › Show › Values) share one look */
-#settings-modal, #changes-modal,
+/* Reports menu (Shift+R), Settings window (Functions › Settings), Changes window
+   (Functions › Show › Values) and Rankings window (Functions › Show › Rankings) share one look */
+#settings-modal, #changes-modal, #rankings-modal,
 #reports-modal {
     display: none;
     position: fixed;
@@ -1521,8 +1514,8 @@ body.dark .pin-btn.pinned {
     justify-content: center;
     align-items: center;
 }
-#settings-modal.open, #changes-modal.open, #reports-modal.open { display: flex; }
-#settings-box, #changes-box, #reports-box {
+#settings-modal.open, #changes-modal.open, #rankings-modal.open, #reports-modal.open { display: flex; }
+#settings-box, #changes-box, #rankings-box, #reports-box {
     background: var(--color-bg-modal);
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.25);
@@ -1532,7 +1525,7 @@ body.dark .pin-btn.pinned {
     overflow: auto;
     padding: 14px 14px 12px;
 }
-#settings-title, #changes-title, #reports-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
+#settings-title, #changes-title, #rankings-title, #reports-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
 .settings-list, #reports-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 .settings-item, .report-item {
     display: block;
@@ -1551,7 +1544,7 @@ body.dark .pin-btn.pinned {
 .report-item.placeholder { opacity: 0.45; cursor: default; }
 .report-lock { display: block; }
 .settings-group { margin: 10px 0 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.6; color: var(--color-heading); }
-#settings-title + .settings-group, #changes-title + .settings-group { margin-top: 0; }
+#settings-title + .settings-group, #changes-title + .settings-group, #rankings-title + .settings-group { margin-top: 0; }
 .settings-group[hidden], .settings-list[hidden], .settings-select[hidden] { display: none; }
 .settings-group label { cursor: inherit; }
 /* Changes window: Compare With dropdown, sized and colored like a .settings-item */
@@ -1569,7 +1562,7 @@ body.dark .pin-btn.pinned {
 }
 .settings-select:hover, .settings-select:focus-visible { background: var(--color-bg-tab-hover); outline: none; }
 .settings-select:disabled { opacity: 0.35; cursor: default; }
-/* Changes window: the chosen mode / comparison poll */
+/* Changes window: the chosen mode / comparison poll; Rankings window: the shown rows */
 .settings-item.active, .settings-item.active:hover { background: var(--color-bg-tab-active); color: var(--color-tab-active); }
 .settings-item:disabled { cursor: default; }
 /* Dev stays dimmed until the PIN is entered (still clickable unless locked out) */
@@ -2102,7 +2095,7 @@ body.dark {
   </div>
 </div>
 
-<template id="picker-template"><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Show</span><span class='sort-option' data-action='toggleOverall'>Overall</span><span class='sort-option' data-action='expandDeltas'>Values</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='picker-category'>Stats</span><span class='sort-option' data-action='dotPlot'>Week</span><span class='sort-option' data-action='yearlyStats'>Records</span><span class='sort-option' data-action='results'>Results</span><span class='picker-category'>&bull;</span><span class='sort-option' data-action='settings'>Settings</span><span class='sort-option' data-action='credits'>Credits</span><span class='credits-only credits-text'>Site displays poll results from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span></span></template>
+<template id="picker-template"><span class='sort-picker'><span class='picker-category'>Sort</span><span class='sort-option active' data-sort='alphabetic'>Alphabetic</span><span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span><span class='sort-option' data-sort='consensus'>Consensus</span><span class='picker-category'>Show</span><span class='sort-option' data-action='rankings'>Rankings</span><span class='sort-option' data-action='expandDeltas'>Values</span><span class='sort-option' data-action='toggleOutliers'>Outliers</span><span class='picker-category'>Stats</span><span class='sort-option' data-action='dotPlot'>Week</span><span class='sort-option' data-action='yearlyStats'>Records</span><span class='sort-option' data-action='results'>Results</span><span class='picker-category'>&bull;</span><span class='sort-option' data-action='settings'>Settings</span><span class='sort-option' data-action='credits'>Credits</span><span class='credits-only credits-text'>Site displays poll results from <a href='https://www.cbbpoll.net' target='_blank' rel='noopener'>cbbpoll.net</a>. Thank you to the mods and voters of the r/CollegeBasketball Userpoll.</span></span></template>
 
 <div id="pin-modal">
   <div id="pin-box">
@@ -2166,6 +2159,21 @@ body.dark {
     </ul>
     <h3 class="settings-group" id="changes-since-group"><label for="changes-since-select">Compare With</label></h3>
     <select id="changes-since-select" class="settings-select"></select>
+  </div>
+</div>
+
+<div id="rankings-modal">
+  <div id="rankings-box">
+    <h2 id="rankings-title">Rankings</h2>
+    <h3 class="settings-group">Show</h3>
+    <ul class="settings-list">
+      <li><button type="button" class="settings-item" data-ranking="Overall">Overall</button></li>
+      <li><button type="button" class="settings-item" data-ranking="AP 25">AP 25</button></li>
+      <li><button type="button" class="settings-item" data-ranking="BPI">BPI</button></li>
+      <li><button type="button" class="settings-item" data-ranking="SOR">SOR</button></li>
+      <li><button type="button" class="settings-item" data-ranking=">20 Ballots">&gt;20 Ballots</button></li>
+      <li><button type="button" class="settings-item" data-ranking="Veterans">Veterans</button></li>
+    </ul>
   </div>
 </div>
 
@@ -3123,7 +3131,8 @@ r.classList.add("row-pinned");
 r.querySelector(".pin-btn")?.classList.add("pinned");
 const siblings=Array.from(rTbody.querySelectorAll("tr"));
 const lastPinned=siblings.filter(s=>s!==r&&s.classList.contains("row-pinned")).pop();
-const overallRow=rTbody.querySelector(".overall-row");
+const rankingRows=rTbody.querySelectorAll(":scope > .overall-row");
+const overallRow=rankingRows[rankingRows.length - 1];
 if(lastPinned)lastPinned.after(r);
 else if(overallRow)overallRow.after(r);
 else rTbody.prepend(r);
@@ -3153,7 +3162,7 @@ document.body.classList.toggle("delta-move",deltaMode==="move");
 document.body.classList.toggle("delta-cons",deltaMode==="cons");
 }
 function deltaRows(root){
-return Array.from(root.querySelectorAll(".voter-row:not(.row-weighted-ranking), .overall-row"));
+return Array.from(root.querySelectorAll(".voter-row:not(.row-weighted-ranking), .overall-row:not(.ranking-row)"));
 }
 function activeWeekBlock(){
 if(_apCurrentYear!==null)return document.getElementById(`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`);
@@ -3486,7 +3495,7 @@ picker.querySelectorAll(".sort-option[data-sort]").forEach(o=>{
 o.classList.toggle("active",o.dataset.sort===currentSort);
 });
 picker.querySelectorAll("[data-action='toggleOutliers']").forEach(o=>o.classList.toggle("active",_outliersMode));
-picker.querySelectorAll("[data-action='toggleOverall']").forEach(o=>o.classList.toggle("active",_showOverallRow));
+syncRankingsMenu(picker);
 toggle.after(picker);
 return picker;
 }
@@ -3542,7 +3551,7 @@ e.stopPropagation();
 const sort=opt.dataset.sort;
 const action=opt.dataset.action;
 const picker=opt.closest(".sort-picker");
-const showToggles=["toggleOverall","toggleOutliers"];
+const showToggles=["toggleOutliers"];
 const inPlace=["credits",...showToggles].includes(action);
 if(inPlace){
 const swallow=ev=>ev.stopPropagation();
@@ -3592,11 +3601,11 @@ const isAp=_apCurrentYear!==null||ON_AP_PAGE;
 showVoterHistory(isAp?"AP Overall":"Official Overall");
 break;
 }
-case "toggleOverall":
-toggleOverallRow();
-break;
 case "expandDeltas":
 showChangesModal();
+break;
+case "rankings":
+showRankingsModal();
 break;
 case "toggleOutliers":
 toggleOutliers();
@@ -3630,7 +3639,7 @@ if(_pinLockedOut())return;
 close();openPinModal();break;
 }
 });
-["settings-modal","changes-modal"].forEach(id=>document.getElementById(id).addEventListener("keydown",e=>{
+["settings-modal","changes-modal","rankings-modal"].forEach(id=>document.getElementById(id).addEventListener("keydown",e=>{
 if(e.shiftKey||(e.key!=="ArrowDown"&&e.key!=="ArrowUp"))return;
 const items=[...e.currentTarget.querySelectorAll(".settings-item:not(:disabled)")].filter(el=>el.offsetParent);
 const i=items.indexOf(document.activeElement);
@@ -5089,33 +5098,64 @@ weekPicker.appendChild(btn);
 });
 }
 }
-let _showOverallRow=false;
-try{_showOverallRow=localStorage.getItem("showOverallRow")==="1";}catch(e){}
-document.body.classList.toggle("show-overall-row",_showOverallRow);
-function syncOverallMenu(){
-document.querySelectorAll("[data-action='toggleOverall']").forEach(el=>{
-el.classList.toggle("active",_showOverallRow);
+const RANKING_ROWS=["Overall","AP 25","BPI","SOR",">20 Ballots","Veterans"];
+const RANKINGS_KEY="shownRankings";
+const RANKING_TENURE={
+">20 Ballots":{key:">20 Ballots",label:">20 Ballots",test:n=>n>20,tip:"Voters with more than 20 career ballots"},
+"Veterans":{key:"Veterans",label:"Veterans",test:n=>n>=100,tip:"Voters with 100+ career ballots"},
+};
+let _shownRankings=new Set();
+try{
+const saved=JSON.parse(localStorage.getItem(RANKINGS_KEY));
+if(Array.isArray(saved)){
+_shownRankings=new Set(saved.filter(k=>RANKING_ROWS.includes(k)));
+}else if(localStorage.getItem("showOverallRow")==="1"){
+_shownRankings.add("Overall");
+localStorage.setItem(RANKINGS_KEY,JSON.stringify([..._shownRankings]));
+}
+localStorage.removeItem("showOverallRow");
+}catch(e){}
+function showRankingsModal(){
+const modal=document.getElementById("rankings-modal");
+if(!modal)return;
+syncRankingsMenu();
+modal.classList.add("open");
+(modal.querySelector(".settings-item.active")||modal.querySelector(".settings-item"))?.focus();
+}
+document.getElementById("rankings-modal")?.addEventListener("click",e=>{
+const b=e.target.closest(".settings-item[data-ranking]");
+if(b)toggleRanking(b.dataset.ranking);
+});
+function syncRankingsMenu(root=document){
+root.querySelectorAll("[data-ranking]").forEach(el=>{
+const on=_shownRankings.has(el.dataset.ranking);
+el.classList.toggle("active",on);
+el.setAttribute("aria-pressed",on?"true":"false");
+});
+root.querySelectorAll("[data-action='rankings']").forEach(el=>{
+el.classList.toggle("active",_shownRankings.size>0);
 });
 }
-function toggleOverallRow(){
-_showOverallRow=!_showOverallRow;
-document.body.classList.toggle("show-overall-row",_showOverallRow);
-syncOverallMenu();
-try{localStorage.setItem("showOverallRow",_showOverallRow?"1":"0");}catch(e){}
+function toggleRanking(key){
+if(!RANKING_ROWS.includes(key))return;
+if(!_shownRankings.delete(key))_shownRankings.add(key);
+try{localStorage.setItem(RANKINGS_KEY,JSON.stringify(RANKING_ROWS.filter(k=>_shownRankings.has(k))));}catch(e){}
+syncRankingsMenu();
+syncRankingRows(activeWeekBlock());
 }
-function injectOverallRows(block){
-if(!block)return;
-const sections=block.querySelectorAll(".ballot-section");
-const aggRow=sections[2]?.querySelector(".voter-row:not(.row-weighted-ranking):not(.row-pinned-agg)");
-if(!aggRow)return;
-const aggName=getVoterName(aggRow);
-[sections[0],sections[1]].forEach(section=>{
-const tbody=section?.querySelector("tbody");
-if(!tbody||tbody.querySelector(".overall-row"))return;
-if(!tbody.querySelector(".voter-row"))return;
+function toggleOverallRow(){toggleRanking("Overall");}
+function _placeRankingRow(tbody,row){
+const idx=RANKING_ROWS.indexOf(row.dataset.ranking);
+const before=Array.from(tbody.querySelectorAll(":scope > .overall-row"))
+.filter(r=>RANKING_ROWS.indexOf(r.dataset.ranking)<idx);
+const anchor=before[before.length - 1];
+if(anchor)anchor.after(row);else tbody.prepend(row);
+}
+function _overallRankingRow(block,aggRow){
 const row=aggRow.cloneNode(true);
 row.className="overall-row";
-row.dataset.voterAlias=aggName;
+row.dataset.ranking="Overall";
+row.dataset.voterAlias=getVoterName(aggRow);
 row.querySelectorAll(".pin-btn, .history-btn, .similar-btn, .ballot-link-btn, .delta-label, .avg-label, .consensus-dist")
 .forEach(el=>el.remove());
 row.querySelectorAll(".team-logo").forEach(img=>{img.dataset.bound="";});
@@ -5133,7 +5173,69 @@ row.querySelectorAll(".delta-label, .avg-label").forEach(el=>el.remove());
 }
 });
 }
-tbody.prepend(row);
+return row;
+}
+function _sourceRankingRow(tpl,key){
+const row=tpl.cloneNode(true);
+row.className="overall-row ranking-row";
+row.dataset.ranking=key;
+delete row.dataset.group;
+row.querySelectorAll(".team-logo").forEach(img=>{img.dataset.bound="";});
+const cell=row.querySelector(".voter-cell");
+if(cell){
+cell.dataset.bound="1";
+cell.addEventListener("click",()=>{if(deltaMode==="off")row.classList.toggle("row-delta");});
+}
+return row;
+}
+function _rankingTemplate(block,key){
+const cache=block._rankingTpl||(block._rankingTpl={});
+if(cache[key])return cache[key];
+const weekId=block.id;
+let p;
+if(key==="AP 25")p=buildEspnApRow(weekId);
+else if(key==="BPI"||key==="SOR")p=buildSnapshotRow(weekId,key);
+else if(RANKING_TENURE[key]){
+const tabs=getSortedTabs();
+const i=tabs.findIndex(t=>t.dataset.week===weekId);
+const prev=tabs[i + 1]?.dataset.year===tabs[i]?.dataset.year?tabs[i + 1].dataset.week:null;
+p=Promise.resolve(buildTenureRow(RANKING_TENURE[key],weekId,prev,buildDeltaData(true)));
+}else p=Promise.resolve(null);
+p=p.then(tr=>{
+if(!tr){delete cache[key];return null;}
+const name=tr.querySelector(".voter-name");
+if(RANKING_TENURE[key])name.title=RANKING_TENURE[key].tip;
+else name.textContent=key;
+return tr;
+},()=>{delete cache[key];return null;});
+return cache[key]=p;
+}
+function syncRankingRows(block){
+if(!block)return;
+const sections=block.querySelectorAll(".ballot-section");
+const tbodies=[sections[0],sections[1]].map(s=>s?.querySelector("tbody"))
+.filter(tb=>tb&&tb.querySelector(".voter-row"));
+if(!tbodies.length)return;
+tbodies.forEach(tb=>tb.querySelectorAll(":scope > .overall-row").forEach(r=>{
+if(!_shownRankings.has(r.dataset.ranking))r.remove();
+}));
+const isAp=ON_AP_PAGE||block.id.startsWith("week-ap-");
+const year=getSortedTabs().find(t=>t.dataset.week===block.id)?.dataset.year;
+const userpollOnly=!isAp&&year&&!isHiddenYear(year);
+const missing=key=>tbodies.filter(tb=>!tb.querySelector(`:scope > .overall-row[data-ranking="${CSS.escape(key)}"]`));
+RANKING_ROWS.forEach(key=>{
+if(!_shownRankings.has(key)||!missing(key).length)return;
+if(key==="Overall"){
+const aggRow=sections[2]?.querySelector(".voter-row:not(.row-weighted-ranking):not(.row-pinned-agg)");
+if(aggRow)missing(key).forEach(tb=>_placeRankingRow(tb,_overallRankingRow(block,aggRow)));
+return;
+}
+if(!userpollOnly)return;
+_rankingTemplate(block,key).then(tpl=>{
+if(!tpl||!_shownRankings.has(key))return;
+missing(key).forEach(tb=>_placeRankingRow(tb,_sourceRankingRow(tpl,key)));
+bindTeamLogos(block);
+});
 });
 }
 async function showWeek(weekId){
@@ -5164,8 +5266,7 @@ else if(isProvisional)targetSection=sections[1];
 else targetSection=sections[0];
 if(targetSection)targetSection.style.display="block";
 else if(sections[0])sections[0].style.display="block";
-injectOverallRows(block);
-syncOverallMenu();
+syncRankingRows(block);
 lazyLoadWeek(block);
 refreshBlockLogos(block);
 if(isAggregate){
@@ -5211,8 +5312,7 @@ apSections[2].style.display="block";
 }else if(apSections[0]){
 apSections[0].style.display="block";
 }
-injectOverallRows(apBlock);
-syncOverallMenu();
+syncRankingRows(apBlock);
 lazyLoadWeek(apBlock);
 refreshBlockLogos(apBlock);
 if(showApAggregate)injectApWeightedRankingRow(apBlock,`week-ap-${year}-${weekNum}`,year);
@@ -5428,9 +5528,18 @@ const prevWeekId=currIdx + 1<yearTabs.length?yearTabs[currIdx + 1].dataset.week:
 const rankRows=aggTbody.querySelectorAll(".row-weighted-ranking");
 let anchor=rankRows[rankRows.length - 1]||aggTbody.querySelector(".voter-row:not(.row-pinned-agg)");
 TENURE_GROUPS.forEach(group=>{
+const tr=buildTenureRow(group,weekId,prevWeekId,deltaData);
+if(!tr)return;
+if(expanded.has(group.key))tr.classList.add("row-delta");
+if(anchor)anchor.after(tr);else aggTbody.appendChild(tr);
+anchor=tr;
+});
+bindTeamLogos();
+}
+function buildTenureRow(group,weekId,prevWeekId,deltaData){
 const ballots=tenureBallots(deltaData[weekId],group.test);
 const pts=weekBallotPoints(ballots);
-if(!Object.keys(pts).length)return;
+if(!Object.keys(pts).length)return null;
 const voters=Object.values(ballots).filter(t=>t&&t.length).length;
 const ranked=Object.keys(pts).sort((a,b)=>pts[b]- pts[a]).slice(0,25);
 const prevPts=prevWeekId?weekBallotPoints(tenureBallots(deltaData[prevWeekId],group.test)):{};
@@ -5440,11 +5549,7 @@ Object.keys(prevPts).sort((a,b)=>prevPts[b]- prevPts[a]).slice(0,25)
 .forEach((t,i)=>{prevRankOf[t]=i + 1;});
 const tr=_buildPointsRankingRow(`${group.label} (${voters})`,ranked,pts,prevRankOf,hasPrev,group.key);
 tr.classList.add("row-tenure-ranking");
-if(expanded.has(group.key))tr.classList.add("row-delta");
-if(anchor)anchor.after(tr);else aggTbody.appendChild(tr);
-anchor=tr;
-});
-bindTeamLogos();
+return tr;
 }
 const ESPN_CORE_BASE="https://sports.core.api.espn.com/v2/sports/basketball/leagues/mens-college-basketball";
 const ESPN_AP_MATCH_MS=3*86400000;
@@ -5482,15 +5587,21 @@ return null;
 async function injectEspnApRow(block,weekId){
 if(ON_AP_PAGE||!block||weekId.startsWith("week-ap-"))return;
 const token=block._espnApToken={};
-let poll;
-try{poll=await espnApPollForWeek(weekId);}catch{poll=null;}
+const tr=await buildEspnApRow(weekId);
 if(block._espnApToken!==token)return;
 const aggTbody=block.querySelectorAll(".ballot-section")[2]?.querySelector("tbody");
 if(!aggTbody)return;
 const old=aggTbody.querySelector(".row-espn-ap");
 const expanded=old?.classList.contains("row-delta");
 old?.remove();
-if(!poll)return;
+if(!tr)return;
+if(expanded)tr.classList.add("row-delta");
+_insertSourceRow(block,aggTbody,tr);
+}
+async function buildEspnApRow(weekId){
+let poll;
+try{poll=await espnApPollForWeek(weekId);}catch{poll=null;}
+if(!poll)return null;
 const keyOf=e=>espnTeamKey(e.id)||`espn:${e.id}`;
 const ranked=poll.ranks.slice(0,25).map(keyOf);
 const pts={},prevRankOf={};
@@ -5498,7 +5609,6 @@ poll.ranks.forEach(e=>{pts[keyOf(e)]=e.pts;if(e.prev)prevRankOf[keyOf(e)]=e.prev
 const hasPrev=poll.ranks.some(e=>e.prev);
 const tr=_buildPointsRankingRow(ESPN_AP_LABEL,ranked,pts,prevRankOf,hasPrev);
 tr.classList.add("row-espn-ap");
-if(expanded)tr.classList.add("row-delta");
 const nameCell=tr.querySelector(".voter-name");
 nameCell.title=`AP poll via ESPN, ${new Date(poll.date).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"})}`;
 tr.querySelectorAll("img.team-logo").forEach((img,i)=>{
@@ -5511,7 +5621,7 @@ delete img.dataset.team;
 img.src=espnLogoUrl(e.id);
 }
 });
-_insertSourceRow(block,aggTbody,tr);
+return tr;
 }
 const SOURCE_ROW_ORDER=["Overall","AP Top 25","BPI","SOR"];
 function _insertSourceRow(block,aggTbody,tr){
@@ -5563,21 +5673,27 @@ async function _injectSnapshotRow(block,weekId,kind){
 if(ON_AP_PAGE||!block||weekId.startsWith("week-ap-"))return;
 const cfg=SNAPSHOT_ROWS[kind];
 const token=block[cfg.tokenKey]={};
-const tabs0=getSortedTabs();
-const season=tabs0.find(t=>t.dataset.week===weekId)?.dataset.year;
-let snaps;
-try{snaps=season?await fetchBpiHistory(season):[];}catch{snaps=[];}
+const tr=await buildSnapshotRow(weekId,kind);
 if(block[cfg.tokenKey]!==token)return;
 const aggTbody=block.querySelectorAll(".ballot-section")[2]?.querySelector("tbody");
 if(!aggTbody)return;
 const old=aggTbody.querySelector("." + cfg.cls);
 const expanded=old?.classList.contains("row-delta");
 old?.remove();
+if(!tr)return;
+if(expanded)tr.classList.add("row-delta");
+_insertSourceRow(block,aggTbody,tr);
+}
+async function buildSnapshotRow(weekId,kind){
+const cfg=SNAPSHOT_ROWS[kind];
+const season=getSortedTabs().find(t=>t.dataset.week===weekId)?.dataset.year;
+let snaps;
+try{snaps=season?await fetchBpiHistory(season):[];}catch{snaps=[];}
 const tabs=getSortedTabs().filter(t=>t.dataset.year===season);
 const i=tabs.findIndex(t=>t.dataset.week===weekId);
 const snap=bpiSnapshotForTab(snaps,tabs,i);
 const list=snap&&cfg.list(snap);
-if(!list?.length)return;
+if(!list?.length)return null;
 const prevSnap=bpiSnapshotForTab(snaps,tabs,i + 1);
 const prevList=prevSnap&&cfg.list(prevSnap);
 const top=list.slice(0,25);
@@ -5587,7 +5703,6 @@ top.forEach(t=>{pts[t[0]]=cfg.label(t);});
 (prevList||[]).forEach(t=>{prevRankOf[t[0]]=t[1];});
 const tr=_buildPointsRankingRow(kind,ranked,pts,prevRankOf,!!prevList?.length);
 tr.classList.add(cfg.cls);
-if(expanded)tr.classList.add("row-delta");
 const when=new Date(snap.at).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});
 tr.querySelector(".voter-name").title=`${cfg.title}${snap.final?", final":""}, as of ${when}`;
 tr.querySelectorAll("img.team-logo").forEach((img,j)=>{
@@ -5600,7 +5715,7 @@ delete img.dataset.team;
 img.src=espnLogoUrl(t[0].slice(5));
 }
 });
-_insertSourceRow(block,aggTbody,tr);
+return tr;
 }
 const DATA_BALLOT_ORDER_KEY="dataBallotOrder";
 function dataBallotRowKey(row){
@@ -8769,7 +8884,7 @@ if(i<0)return;
 e.preventDefault();
 items[(i +(e.key==="ArrowDown"?1:items.length - 1))%items.length].focus();
 });
-["tenure-modal","conference-modal","reports-modal","settings-modal","changes-modal"].forEach(id=>{
+["tenure-modal","conference-modal","reports-modal","settings-modal","changes-modal","rankings-modal"].forEach(id=>{
 document.getElementById(id).addEventListener("click",e=>{
 if(e.target===e.currentTarget)e.currentTarget.classList.remove("open");
 });
@@ -8962,6 +9077,7 @@ document.getElementById("heatmap-modal").classList.remove("open");
 document.getElementById("reports-modal").classList.remove("open");
 document.getElementById("settings-modal").classList.remove("open");
 document.getElementById("changes-modal").classList.remove("open");
+document.getElementById("rankings-modal").classList.remove("open");
 }
 if(e.shiftKey&&(e.key==="V"||e.key==="v")){
 e.preventDefault();

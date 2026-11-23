@@ -611,7 +611,8 @@ function pinRow(row, tbody) {
             r.querySelector(".pin-btn")?.classList.add("pinned");
             const siblings = Array.from(rTbody.querySelectorAll("tr"));
             const lastPinned = siblings.filter(s => s !== r && s.classList.contains("row-pinned")).pop();
-            const overallRow = rTbody.querySelector(".overall-row");
+            const rankingRows = rTbody.querySelectorAll(":scope > .overall-row");
+            const overallRow = rankingRows[rankingRows.length - 1];
             if (lastPinned) lastPinned.after(r);
             else if (overallRow) overallRow.after(r);
             else rTbody.prepend(r);
@@ -662,7 +663,7 @@ function applyDeltaBodyClasses() {
 
 // Ballot rows that get computed labels (Data Ballots ranking rows build their own).
 function deltaRows(root) {
-    return Array.from(root.querySelectorAll(".voter-row:not(.row-weighted-ranking), .overall-row"));
+    return Array.from(root.querySelectorAll(".voter-row:not(.row-weighted-ranking), .overall-row:not(.ranking-row)"));
 }
 
 function activeWeekBlock() {
@@ -1087,7 +1088,7 @@ window.addEventListener("resize", () => {
 // Tables carry only the Functions toggle; the menu itself is cloned from the
 // page's single <template id="picker-template"> on first use, then synced to
 // the current sort and Show states (later changes reach it via the page-wide
-// querySelectorAll updates in setGlobalSort, toggleOutliers and syncOverallMenu).
+// querySelectorAll updates in setGlobalSort, toggleOutliers and syncRankingsMenu).
 function createPicker(toggle) {
     const tpl = document.getElementById("picker-template");
     const picker = tpl?.content.firstElementChild?.cloneNode(true);
@@ -1096,7 +1097,7 @@ function createPicker(toggle) {
         o.classList.toggle("active", o.dataset.sort === currentSort);
     });
     picker.querySelectorAll("[data-action='toggleOutliers']").forEach(o => o.classList.toggle("active", _outliersMode));
-    picker.querySelectorAll("[data-action='toggleOverall']").forEach(o => o.classList.toggle("active", _showOverallRow));
+    syncRankingsMenu(picker);
     toggle.after(picker);
     return picker;
 }
@@ -1159,7 +1160,7 @@ document.addEventListener("mousedown", e => {
     // Credits and the Show toggles act in place and keep the picker open. The
     // row can reflow under the cursor, so swallow the click that follows this
     // mousedown — otherwise it can land outside the picker and close it.
-    const showToggles = ["toggleOverall", "toggleOutliers"];
+    const showToggles = ["toggleOutliers"];
     const inPlace = ["credits", ...showToggles].includes(action);
     if (inPlace) {
         const swallow = ev => ev.stopPropagation();
@@ -1212,11 +1213,11 @@ function handlePickerAction(action) {
             showVoterHistory(isAp ? "AP Overall" : "Official Overall");
             break;
         }
-        case "toggleOverall":
-            toggleOverallRow();
-            break;
         case "expandDeltas":
             showChangesModal();
+            break;
+        case "rankings":
+            showRankingsModal();
             break;
         case "toggleOutliers":
             toggleOutliers();
@@ -1257,7 +1258,7 @@ document.getElementById("settings-modal").addEventListener("click", e => {
 
 // Plain ↑/↓ move between items while the window is open (Enter/Space click the focused one).
 // Same in the Changes window.
-["settings-modal", "changes-modal"].forEach(id => document.getElementById(id).addEventListener("keydown", e => {
+["settings-modal", "changes-modal", "rankings-modal"].forEach(id => document.getElementById(id).addEventListener("keydown", e => {
     if (e.shiftKey || (e.key !== "ArrowDown" && e.key !== "ArrowUp")) return;
     const items = [...e.currentTarget.querySelectorAll(".settings-item:not(:disabled)")].filter(el => el.offsetParent);
     const i = items.indexOf(document.activeElement);
@@ -3014,59 +3015,173 @@ function rebuildWeekPicker() {
     }
 }
 
-// ── "Overall" row ────────────────────────────────────────────────────────────
-// A copy of the week's aggregate row (Official Overall / AP Overall) shown at
-// the top of the Official and Provisional tables, above pinned voters. It has
-// no .voter-row class so voter scans (stats, sorting, caches) ignore it.
-// Hidden by default; the viewer's choice is remembered in localStorage.
-let _showOverallRow = false;
-try { _showOverallRow = localStorage.getItem("showOverallRow") === "1"; } catch (e) {}
-document.body.classList.toggle("show-overall-row", _showOverallRow);
+// ── Rankings rows (Functions › Show › Rankings) ─────────────────────────────
+// Ranking rows the viewer picks to show at the top of the Official and
+// Provisional tables, above pinned voters, in RANKING_ROWS order. They have no
+// .voter-row class so voter scans (stats, sorting, caches) ignore them.
+// "Overall" is a copy of the week's aggregate row (Official Overall / AP
+// Overall) with computed deltas; the others are built like their Data Ballots
+// rows and keep those rows' own labels (.ranking-row). Only Overall exists on
+// AP tables; the others are Userpoll-only and 2025+ (hidden seasons get none).
+// The choice is remembered in localStorage; nothing is shown by default.
+const RANKING_ROWS = ["Overall", "AP 25", "BPI", "SOR", ">20 Ballots", "Veterans"];
+const RANKINGS_KEY = "shownRankings";
+const RANKING_TENURE = {
+    ">20 Ballots": { key: ">20 Ballots", label: ">20 Ballots", test: n => n > 20,   tip: "Voters with more than 20 career ballots" },
+    "Veterans":    { key: "Veterans",    label: "Veterans",    test: n => n >= 100, tip: "Voters with 100+ career ballots" },
+};
+let _shownRankings = new Set();
+try {
+    const saved = JSON.parse(localStorage.getItem(RANKINGS_KEY));
+    if (Array.isArray(saved)) {
+        _shownRankings = new Set(saved.filter(k => RANKING_ROWS.includes(k)));
+    } else if (localStorage.getItem("showOverallRow") === "1") {
+        // Carry over the old single Overall toggle
+        _shownRankings.add("Overall");
+        localStorage.setItem(RANKINGS_KEY, JSON.stringify([..._shownRankings]));
+    }
+    localStorage.removeItem("showOverallRow");
+} catch (e) {}
 
-function syncOverallMenu() {
-    document.querySelectorAll("[data-action='toggleOverall']").forEach(el => {
-        el.classList.toggle("active", _showOverallRow);
+// Rankings window (Functions › Show › Rankings; markup in build_full_html()): styled like
+// the Values window. Each item toggles one row in place and keeps the window open.
+function showRankingsModal() {
+    const modal = document.getElementById("rankings-modal");
+    if (!modal) return;
+    syncRankingsMenu();
+    modal.classList.add("open");
+    (modal.querySelector(".settings-item.active") || modal.querySelector(".settings-item"))?.focus();
+}
+
+document.getElementById("rankings-modal")?.addEventListener("click", e => {
+    const b = e.target.closest(".settings-item[data-ranking]");
+    if (b) toggleRanking(b.dataset.ranking);
+});
+
+function syncRankingsMenu(root = document) {
+    root.querySelectorAll("[data-ranking]").forEach(el => {
+        const on = _shownRankings.has(el.dataset.ranking);
+        el.classList.toggle("active", on);
+        el.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    root.querySelectorAll("[data-action='rankings']").forEach(el => {
+        el.classList.toggle("active", _shownRankings.size > 0);
     });
 }
 
-function toggleOverallRow() {
-    _showOverallRow = !_showOverallRow;
-    document.body.classList.toggle("show-overall-row", _showOverallRow);
-    syncOverallMenu();
-    try { localStorage.setItem("showOverallRow", _showOverallRow ? "1" : "0"); } catch (e) {}
+function toggleRanking(key) {
+    if (!RANKING_ROWS.includes(key)) return;
+    if (!_shownRankings.delete(key)) _shownRankings.add(key);
+    try { localStorage.setItem(RANKINGS_KEY, JSON.stringify(RANKING_ROWS.filter(k => _shownRankings.has(k)))); } catch (e) {}
+    syncRankingsMenu();
+    // Other weeks catch up when shown (showWeek / showApWeek call syncRankingRows)
+    syncRankingRows(activeWeekBlock());
 }
 
-function injectOverallRows(block) {
+// L keybind
+function toggleOverallRow() { toggleRanking("Overall"); }
+
+// After the last shown ranking row that comes before it in RANKING_ROWS, else first.
+function _placeRankingRow(tbody, row) {
+    const idx = RANKING_ROWS.indexOf(row.dataset.ranking);
+    const before = Array.from(tbody.querySelectorAll(":scope > .overall-row"))
+        .filter(r => RANKING_ROWS.indexOf(r.dataset.ranking) < idx);
+    const anchor = before[before.length - 1];
+    if (anchor) anchor.after(row); else tbody.prepend(row);
+}
+
+function _overallRankingRow(block, aggRow) {
+    const row = aggRow.cloneNode(true);
+    row.className = "overall-row";
+    row.dataset.ranking = "Overall";
+    row.dataset.voterAlias = getVoterName(aggRow);
+    row.querySelectorAll(".pin-btn, .history-btn, .similar-btn, .ballot-link-btn, .delta-label, .avg-label, .consensus-dist")
+        .forEach(el => el.remove());
+    row.querySelectorAll(".team-logo").forEach(img => { img.dataset.bound = ""; });
+    const nameEl = row.querySelector(".voter-name");
+    if (nameEl) nameEl.textContent = "Overall";
+    const cell = row.querySelector(".voter-cell");
+    if (cell) {
+        cell.dataset.bound = "1"; // skip bindVoterCells (no pin/history buttons)
+        cell.addEventListener("click", () => {
+            if (deltaMode !== "off") return;
+            if (row.classList.toggle("row-delta")) {
+                applyDeltaToRow(row, block.id, buildDeltaData(), getSortedTabs());
+            } else {
+                row.querySelectorAll(".delta-label, .avg-label").forEach(el => el.remove());
+            }
+        });
+    }
+    return row;
+}
+
+// A Data Ballots-style ranking row (tpl) turned into a top-of-table ranking row.
+function _sourceRankingRow(tpl, key) {
+    const row = tpl.cloneNode(true);
+    row.className = "overall-row ranking-row";
+    row.dataset.ranking = key;
+    delete row.dataset.group;
+    row.querySelectorAll(".team-logo").forEach(img => { img.dataset.bound = ""; });
+    const cell = row.querySelector(".voter-cell");
+    if (cell) {
+        cell.dataset.bound = "1";
+        // Labels are prebuilt: in Off, clicking the name opens the row's movement
+        cell.addEventListener("click", () => { if (deltaMode === "off") row.classList.toggle("row-delta"); });
+    }
+    return row;
+}
+
+// Template row for a non-Overall ranking (Promise<tr|null>), cached per block.
+function _rankingTemplate(block, key) {
+    const cache = block._rankingTpl || (block._rankingTpl = {});
+    if (cache[key]) return cache[key];
+    const weekId = block.id;
+    let p;
+    if (key === "AP 25") p = buildEspnApRow(weekId);
+    else if (key === "BPI" || key === "SOR") p = buildSnapshotRow(weekId, key);
+    else if (RANKING_TENURE[key]) {
+        const tabs = getSortedTabs();
+        const i = tabs.findIndex(t => t.dataset.week === weekId);
+        const prev = tabs[i + 1]?.dataset.year === tabs[i]?.dataset.year ? tabs[i + 1].dataset.week : null;
+        p = Promise.resolve(buildTenureRow(RANKING_TENURE[key], weekId, prev, buildDeltaData(true)));
+    } else p = Promise.resolve(null);
+    p = p.then(tr => {
+        if (!tr) { delete cache[key]; return null; } // retry on the next show
+        const name = tr.querySelector(".voter-name");
+        if (RANKING_TENURE[key]) name.title = RANKING_TENURE[key].tip; // label is already "key (N)"
+        else name.textContent = key;
+        return tr;
+    }, () => { delete cache[key]; return null; });
+    return cache[key] = p;
+}
+
+function syncRankingRows(block) {
     if (!block) return;
     const sections = block.querySelectorAll(".ballot-section");
-    const aggRow = sections[2]?.querySelector(".voter-row:not(.row-weighted-ranking):not(.row-pinned-agg)");
-    if (!aggRow) return;
-    const aggName = getVoterName(aggRow);
-    [sections[0], sections[1]].forEach(section => {
-        const tbody = section?.querySelector("tbody");
-        if (!tbody || tbody.querySelector(".overall-row")) return;
-        if (!tbody.querySelector(".voter-row")) return; // no ballots in this section
-        const row = aggRow.cloneNode(true);
-        row.className = "overall-row";
-        row.dataset.voterAlias = aggName;
-        row.querySelectorAll(".pin-btn, .history-btn, .similar-btn, .ballot-link-btn, .delta-label, .avg-label, .consensus-dist")
-            .forEach(el => el.remove());
-        row.querySelectorAll(".team-logo").forEach(img => { img.dataset.bound = ""; });
-        const nameEl = row.querySelector(".voter-name");
-        if (nameEl) nameEl.textContent = "Overall";
-        const cell = row.querySelector(".voter-cell");
-        if (cell) {
-            cell.dataset.bound = "1"; // skip bindVoterCells (no pin/history buttons)
-            cell.addEventListener("click", () => {
-                if (deltaMode !== "off") return;
-                if (row.classList.toggle("row-delta")) {
-                    applyDeltaToRow(row, block.id, buildDeltaData(), getSortedTabs());
-                } else {
-                    row.querySelectorAll(".delta-label, .avg-label").forEach(el => el.remove());
-                }
-            });
+    const tbodies = [sections[0], sections[1]].map(s => s?.querySelector("tbody"))
+        .filter(tb => tb && tb.querySelector(".voter-row")); // skip sections with no ballots
+    if (!tbodies.length) return;
+    tbodies.forEach(tb => tb.querySelectorAll(":scope > .overall-row").forEach(r => {
+        if (!_shownRankings.has(r.dataset.ranking)) r.remove();
+    }));
+    const isAp = ON_AP_PAGE || block.id.startsWith("week-ap-");
+    const year = getSortedTabs().find(t => t.dataset.week === block.id)?.dataset.year;
+    const userpollOnly = !isAp && year && !isHiddenYear(year);
+    const missing = key => tbodies.filter(tb => !tb.querySelector(`:scope > .overall-row[data-ranking="${CSS.escape(key)}"]`));
+
+    RANKING_ROWS.forEach(key => {
+        if (!_shownRankings.has(key) || !missing(key).length) return;
+        if (key === "Overall") {
+            const aggRow = sections[2]?.querySelector(".voter-row:not(.row-weighted-ranking):not(.row-pinned-agg)");
+            if (aggRow) missing(key).forEach(tb => _placeRankingRow(tb, _overallRankingRow(block, aggRow)));
+            return;
         }
-        tbody.prepend(row);
+        if (!userpollOnly) return;
+        _rankingTemplate(block, key).then(tpl => {
+            if (!tpl || !_shownRankings.has(key)) return;
+            missing(key).forEach(tb => _placeRankingRow(tb, _sourceRankingRow(tpl, key)));
+            bindTeamLogos(block);
+        });
     });
 }
 
@@ -3100,8 +3215,7 @@ async function showWeek(weekId) {
         else targetSection = sections[0];
         if (targetSection) targetSection.style.display = "block";
         else if (sections[0]) sections[0].style.display = "block";
-        injectOverallRows(block);
-        syncOverallMenu();
+        syncRankingRows(block);
         lazyLoadWeek(block);
         refreshBlockLogos(block);
         if (isAggregate) {
@@ -3155,8 +3269,7 @@ async function showApWeek(year, weekNum) {
         } else if (apSections[0]) {
             apSections[0].style.display = "block";
         }
-        injectOverallRows(apBlock);
-        syncOverallMenu();
+        syncRankingRows(apBlock);
         lazyLoadWeek(apBlock);
         refreshBlockLogos(apBlock);
         if (showApAggregate) injectApWeightedRankingRow(apBlock, `week-ap-${year}-${weekNum}`, year);
@@ -3427,24 +3540,30 @@ function _injectTenureRows(block, weekId, yearTabs, deltaData) {
     const rankRows = aggTbody.querySelectorAll(".row-weighted-ranking");
     let anchor = rankRows[rankRows.length - 1] || aggTbody.querySelector(".voter-row:not(.row-pinned-agg)");
     TENURE_GROUPS.forEach(group => {
-        const ballots = tenureBallots(deltaData[weekId], group.test);
-        const pts = weekBallotPoints(ballots);
-        if (!Object.keys(pts).length) return;
-        const voters = Object.values(ballots).filter(t => t && t.length).length;
-        const ranked = Object.keys(pts).sort((a, b) => pts[b] - pts[a]).slice(0, 25);
-        const prevPts = prevWeekId ? weekBallotPoints(tenureBallots(deltaData[prevWeekId], group.test)) : {};
-        const hasPrev = Object.keys(prevPts).length > 0;
-        const prevRankOf = {};
-        Object.keys(prevPts).sort((a, b) => prevPts[b] - prevPts[a]).slice(0, 25)
-            .forEach((t, i) => { prevRankOf[t] = i + 1; });
-
-        const tr = _buildPointsRankingRow(`${group.label} (${voters})`, ranked, pts, prevRankOf, hasPrev, group.key);
-        tr.classList.add("row-tenure-ranking");
+        const tr = buildTenureRow(group, weekId, prevWeekId, deltaData);
+        if (!tr) return;
         if (expanded.has(group.key)) tr.classList.add("row-delta");
         if (anchor) anchor.after(tr); else aggTbody.appendChild(tr);
         anchor = tr;
     });
     bindTeamLogos();
+}
+
+// One tenure-band row ({key, label, test}), or null when no ballot in the band that week.
+function buildTenureRow(group, weekId, prevWeekId, deltaData) {
+    const ballots = tenureBallots(deltaData[weekId], group.test);
+    const pts = weekBallotPoints(ballots);
+    if (!Object.keys(pts).length) return null;
+    const voters = Object.values(ballots).filter(t => t && t.length).length;
+    const ranked = Object.keys(pts).sort((a, b) => pts[b] - pts[a]).slice(0, 25);
+    const prevPts = prevWeekId ? weekBallotPoints(tenureBallots(deltaData[prevWeekId], group.test)) : {};
+    const hasPrev = Object.keys(prevPts).length > 0;
+    const prevRankOf = {};
+    Object.keys(prevPts).sort((a, b) => prevPts[b] - prevPts[a]).slice(0, 25)
+        .forEach((t, i) => { prevRankOf[t] = i + 1; });
+    const tr = _buildPointsRankingRow(`${group.label} (${voters})`, ranked, pts, prevRankOf, hasPrev, group.key);
+    tr.classList.add("row-tenure-ranking");
+    return tr;
 }
 
 // ── AP Top 25 row (Data Ballots, Userpoll only) ─────────────────────────────
@@ -3496,15 +3615,23 @@ async function espnApPollForWeek(weekId) {
 async function injectEspnApRow(block, weekId) {
     if (ON_AP_PAGE || !block || weekId.startsWith("week-ap-")) return;
     const token = block._espnApToken = {};
-    let poll;
-    try { poll = await espnApPollForWeek(weekId); } catch { poll = null; }
+    const tr = await buildEspnApRow(weekId);
     if (block._espnApToken !== token) return;
     const aggTbody = block.querySelectorAll(".ballot-section")[2]?.querySelector("tbody");
     if (!aggTbody) return;
     const old = aggTbody.querySelector(".row-espn-ap");
     const expanded = old?.classList.contains("row-delta");
     old?.remove();
-    if (!poll) return;
+    if (!tr) return;
+    if (expanded) tr.classList.add("row-delta");
+    _insertSourceRow(block, aggTbody, tr);
+}
+
+// The ESPN AP poll row for a userpoll week, or null when ESPN has no matching poll.
+async function buildEspnApRow(weekId) {
+    let poll;
+    try { poll = await espnApPollForWeek(weekId); } catch { poll = null; }
+    if (!poll) return null;
 
     // Teams missing from ESPN_IDS get a placeholder key, then ESPN's logo below.
     const keyOf = e => espnTeamKey(e.id) || `espn:${e.id}`;
@@ -3514,7 +3641,6 @@ async function injectEspnApRow(block, weekId) {
     const hasPrev = poll.ranks.some(e => e.prev);
     const tr = _buildPointsRankingRow(ESPN_AP_LABEL, ranked, pts, prevRankOf, hasPrev);
     tr.classList.add("row-espn-ap");
-    if (expanded) tr.classList.add("row-delta");
     const nameCell = tr.querySelector(".voter-name");
     nameCell.title = `AP poll via ESPN, ${new Date(poll.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`;
     tr.querySelectorAll("img.team-logo").forEach((img, i) => {
@@ -3527,8 +3653,7 @@ async function injectEspnApRow(block, weekId) {
             img.src = espnLogoUrl(e.id);
         }
     });
-
-    _insertSourceRow(block, aggTbody, tr);
+    return tr;
 }
 
 // Rows from outside sources (ESPN AP poll, BPI, SOR) go right after Overall, in this order,
@@ -3599,22 +3724,30 @@ async function _injectSnapshotRow(block, weekId, kind) {
     if (ON_AP_PAGE || !block || weekId.startsWith("week-ap-")) return;
     const cfg = SNAPSHOT_ROWS[kind];
     const token = block[cfg.tokenKey] = {};
-    const tabs0 = getSortedTabs();
-    const season = tabs0.find(t => t.dataset.week === weekId)?.dataset.year;
-    let snaps;
-    try { snaps = season ? await fetchBpiHistory(season) : []; } catch { snaps = []; }
+    const tr = await buildSnapshotRow(weekId, kind);
     if (block[cfg.tokenKey] !== token) return;
     const aggTbody = block.querySelectorAll(".ballot-section")[2]?.querySelector("tbody");
     if (!aggTbody) return;
     const old = aggTbody.querySelector("." + cfg.cls);
     const expanded = old?.classList.contains("row-delta");
     old?.remove();
+    if (!tr) return;
+    if (expanded) tr.classList.add("row-delta");
+    _insertSourceRow(block, aggTbody, tr);
+}
+
+// The BPI or SOR row ("BPI" | "SOR") for a userpoll week, or null when no snapshot fits it.
+async function buildSnapshotRow(weekId, kind) {
+    const cfg = SNAPSHOT_ROWS[kind];
+    const season = getSortedTabs().find(t => t.dataset.week === weekId)?.dataset.year;
+    let snaps;
+    try { snaps = season ? await fetchBpiHistory(season) : []; } catch { snaps = []; }
 
     const tabs = getSortedTabs().filter(t => t.dataset.year === season);
     const i = tabs.findIndex(t => t.dataset.week === weekId);
     const snap = bpiSnapshotForTab(snaps, tabs, i);
     const list = snap && cfg.list(snap);
-    if (!list?.length) return;
+    if (!list?.length) return null;
     const prevSnap = bpiSnapshotForTab(snaps, tabs, i + 1);
     const prevList = prevSnap && cfg.list(prevSnap);
     const top = list.slice(0, 25);
@@ -3624,7 +3757,6 @@ async function _injectSnapshotRow(block, weekId, kind) {
     (prevList || []).forEach(t => { prevRankOf[t[0]] = t[1]; });
     const tr = _buildPointsRankingRow(kind, ranked, pts, prevRankOf, !!prevList?.length);
     tr.classList.add(cfg.cls);
-    if (expanded) tr.classList.add("row-delta");
     const when = new Date(snap.at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
     tr.querySelector(".voter-name").title = `${cfg.title}${snap.final ? ", final" : ""}, as of ${when}`;
     tr.querySelectorAll("img.team-logo").forEach((img, j) => {
@@ -3637,7 +3769,7 @@ async function _injectSnapshotRow(block, weekId, kind) {
             img.src = espnLogoUrl(t[0].slice(5));
         }
     });
-    _insertSourceRow(block, aggTbody, tr);
+    return tr;
 }
 
 // ── Data Ballots row order (drag to reorder) ────────────────────────────────
@@ -7459,7 +7591,7 @@ document.getElementById("reports-list").addEventListener("keydown", e => {
     items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus();
 });
 
-["tenure-modal", "conference-modal", "reports-modal", "settings-modal", "changes-modal"].forEach(id => {
+["tenure-modal", "conference-modal", "reports-modal", "settings-modal", "changes-modal", "rankings-modal"].forEach(id => {
     document.getElementById(id).addEventListener("click", e => {
         if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
     });
@@ -7706,6 +7838,7 @@ document.addEventListener("keydown", e => {
         document.getElementById("reports-modal").classList.remove("open");
         document.getElementById("settings-modal").classList.remove("open");
         document.getElementById("changes-modal").classList.remove("open");
+        document.getElementById("rankings-modal").classList.remove("open");
     }
     // Chord: Shift+V then X → toggle veteran tags
     if (e.shiftKey && (e.key === "V" || e.key === "v")) {
