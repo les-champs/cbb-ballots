@@ -340,7 +340,7 @@ body.hide-veteran-tags .veteran-tag,
 }
 
 
-.pin-btn, .history-btn {
+.pin-btn, .history-btn, .similar-btn {
     display: none;
     cursor: pointer;
     font-size: 11px;
@@ -351,7 +351,7 @@ body.hide-veteran-tags .veteran-tag,
     transition: opacity 0.1s, filter 0.1s;
 }
 
-.pin-btn:hover, .history-btn:hover {
+.pin-btn:hover, .history-btn:hover, .similar-btn:hover {
     opacity: 0.6;
 }
 
@@ -361,8 +361,18 @@ body.hide-veteran-tags .veteran-tag,
 }
 
 .voter-row.voter-cell-hover .pin-btn,
-.voter-row.voter-cell-hover .history-btn {
+.voter-row.voter-cell-hover .history-btn,
+.voter-row.voter-cell-hover .similar-btn {
     display: inline;
+}
+
+.similar-btn {
+    font-weight: bold;
+}
+
+body.sort-similar .similar-btn.active {
+    display: inline;
+    opacity: 1;
 }
 
 .voter-row.row-pinned .pin-btn {
@@ -1632,7 +1642,7 @@ body.data-ballot-dragging, body.data-ballot-dragging * { cursor: grabbing !impor
 /* Clickable elements: don't select text on rapid/double clicks (or flash on mobile taps).
    Covers every cursor:pointer rule above plus JS/SVG elements given an inline pointer
    cursor or onclick. Add new clickable selectors here. */
-h1 span, .week-arrow, .picker-btn, .week-tab, .voter-name, .pin-btn, .history-btn,
+h1 span, .week-arrow, .picker-btn, .week-tab, .voter-name, .pin-btn, .history-btn, .similar-btn,
 .overall-row .voter-cell, .ballot-link-btn, .voters-toggle, .sort-option, .team-logo,
 .rank-header-num, .conf-stats-table .conf-teams img, .records-view, .records-switch,
 #season-stats-table.season-records tr.records-team-row, .records-retry, .spread-toggle,

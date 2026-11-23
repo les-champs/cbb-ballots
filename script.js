@@ -551,7 +551,7 @@ function syncPinnedToAggregate(username, isPinning) {
                 const clone = officialRow.cloneNode(true);
                 clone.dataset.pinnedUser = username;
                 clone.classList.add("row-pinned-agg");
-                clone.querySelectorAll(".pin-btn, .history-btn, .ballot-link-btn").forEach(el => el.remove());
+                clone.querySelectorAll(".pin-btn, .history-btn, .similar-btn, .ballot-link-btn").forEach(el => el.remove());
                 clone.querySelectorAll(".voter-cell").forEach(el => el.dataset.bound = "");
                 clone.querySelectorAll(".team-logo").forEach(el => el.dataset.bound = "");
                 aggTbody.appendChild(clone);
@@ -621,6 +621,11 @@ function pinRow(row, tbody) {
     // Hide the pin/calendar/ballot-link menu immediately on both pin and unpin.
     // The row is moved in the DOM, so mouseleave never fires to clear it.
     allRows.forEach(r => r.classList.remove("voter-cell-hover"));
+    // Unpinning the Similar sort's reference voter ends that sort.
+    if (isPinned && currentSort === "similar" && username === similarTo) {
+        applyTableSort(sortBeforeSimilar);
+        return;
+    }
     // Re-apply the active sort so an unpinned voter returns to their sorted
     // spot (e.g. consensus order) and pinned voters stay on top.
     applyTableSort(currentSort);
@@ -1225,17 +1230,27 @@ document.getElementById("settings-modal").addEventListener("click", e => {
 }));
 
 let currentSort = "alphabetic";
+// Similar sort: every ballot ordered by its distance to one voter's ballot (similarTo),
+// started from that voter's ≈ button. sortBeforeSimilar is restored when it ends.
+let similarTo = null;
+let sortBeforeSimilar = "alphabetic";
 
 const SORT_LABELS = { alphabetic: "Functions", zetabetique: "Zétabétique", consensus: "Consensus" };
 
 function setGlobalSort(sort) {
     currentSort = sort;
-    const label = SORT_LABELS[sort] || (sort.charAt(0).toUpperCase() + sort.slice(1));
+    if (sort !== "similar") similarTo = null;
+    const label = sort === "similar" ? `≈ ${similarTo}`
+        : SORT_LABELS[sort] || (sort.charAt(0).toUpperCase() + sort.slice(1));
     document.querySelectorAll(".voters-toggle").forEach(t => {
         if (t.style.display !== "none") t.textContent = label;
     });
     document.querySelectorAll(".sort-option[data-sort]").forEach(o => {
         o.classList.toggle("active", o.dataset.sort === sort);
+    });
+    document.body.classList.toggle("sort-similar", sort === "similar");
+    document.querySelectorAll(".similar-btn").forEach(b => {
+        b.classList.toggle("active", sort === "similar" && getVoterName(b.closest("tr")) === similarTo);
     });
     document.body.classList.toggle("hide-veteran-tags", (sort !== "alphabetic" && sort !== "zetabetique") || _hideVeteranTagsOverride);
 }
@@ -1377,6 +1392,45 @@ function applyTableSort(sort) {
         return;
     }
 
+    if (sort === "similar") {
+        // Distance to the reference voter's ballot, using consensusDistance() with their
+        // ballot as the target: half the summed rank gaps over both top 25s (unranked = #26).
+        const rowTeams = r => Array.from(r.querySelectorAll(".team-logo")).map(img => img.dataset.team);
+        const refRow = allRows.find(r => getVoterName(r) === similarTo && !r.classList.contains("row-pinned-agg"))
+            || allRows.find(r => getVoterName(r) === similarTo);
+        const ref = refRow ? rowTeams(refRow) : [];
+        if (!ref.length) {
+            // No ballot from this voter here: list alphabetically, keep the mode for other weeks.
+            rows.sort((a, b) => getVoterName(a).localeCompare(getVoterName(b)));
+            [...pinnedFirst, ...rows].forEach(r => tbody.appendChild(r));
+            return;
+        }
+        const teamsOf = {};
+        allRows.forEach(r => { teamsOf[getVoterName(r)] = rowTeams(r); });
+        const scores = {};
+        rows.forEach(r => { const u = getVoterName(r); scores[u] = consensusDistance(teamsOf[u], ref); });
+        rows.sort((a, b) => {
+            const ua = getVoterName(a), ub = getVoterName(b);
+            if (scores[ua] !== scores[ub]) return scores[ua] - scores[ub];
+            const ga = consensusGaps(teamsOf[ua], ref), gb = consensusGaps(teamsOf[ub], ref);
+            for (let i = 0; i < Math.min(ga.length, gb.length); i++) if (ga[i] !== gb[i]) return ga[i] - gb[i];
+            return ua.localeCompare(ub);
+        });
+        pinnedFirst.forEach(r => {
+            tbody.appendChild(r);
+            if (!userPinned.includes(r)) return;
+            const name = getVoterName(r);
+            if (name === similarTo) addVoterLabel(r, "ref");
+            else { const d = consensusDistance(teamsOf[name], ref); if (d !== Infinity) addVoterLabel(r, `${d}`); }
+        });
+        rows.forEach(r => {
+            tbody.appendChild(r);
+            const d = scores[getVoterName(r)];
+            if (d !== Infinity) addVoterLabel(r, `${d}`);
+        });
+        return;
+    }
+
 }
 
 function bindVoterCells(root) {
@@ -1410,6 +1464,32 @@ function bindVoterCells(root) {
                 if (username) showVoterHistory(username);
             });
             cell.appendChild(cal);
+        }
+
+        // Add similar-ballots button: sort everyone by closeness to this ballot (click again to undo)
+        const simRow = cell.closest("tr");
+        if (!cell.querySelector(".similar-btn") && simRow && !simRow.matches(".overall-row, .row-weighted-ranking") &&
+            !["Official Overall", "AP Overall", "Recency"].includes(getVoterName(simRow))) {
+            const sim = document.createElement("span");
+            sim.className = "similar-btn";
+            sim.textContent = "≈";
+            sim.title = "Sort by similarity to this ballot";
+            sim.addEventListener("click", e => {
+                e.stopPropagation();
+                const row = cell.closest("tr");
+                const username = getVoterName(row);
+                if (!username) return;
+                if (currentSort === "similar" && similarTo === username) {
+                    applyTableSort(sortBeforeSimilar);
+                    return;
+                }
+                if (currentSort !== "similar") sortBeforeSimilar = currentSort;
+                const tbody = row.closest("tbody");
+                if (!pinnedUsers.has(username) && tbody) pinRow(row, tbody);
+                similarTo = username;
+                applyTableSort("similar");
+            });
+            cell.appendChild(sim);
         }
 
         // Add ballot link button if not already present and URL exists
@@ -2922,7 +3002,7 @@ function injectOverallRows(block) {
         const row = aggRow.cloneNode(true);
         row.className = "overall-row";
         row.dataset.voterAlias = aggName;
-        row.querySelectorAll(".pin-btn, .history-btn, .ballot-link-btn, .delta-label, .avg-label, .consensus-dist")
+        row.querySelectorAll(".pin-btn, .history-btn, .similar-btn, .ballot-link-btn, .delta-label, .avg-label, .consensus-dist")
             .forEach(el => el.remove());
         row.querySelectorAll(".team-logo").forEach(img => { img.dataset.bound = ""; });
         const nameEl = row.querySelector(".voter-name");
@@ -4391,7 +4471,7 @@ function pngNameColumnWidth(table, rowIdx) {
     // Measure text and image boxes directly: veteran tags sit inside the name
     // span, and a range's box isn't clipped by the cell's overflow.
     // Consensus-sort distances are dropped from the image (preparePngClone).
-    const skip = ".veteran-tag, .pin-btn, .history-btn, .ballot-link-btn, .consensus-dist";
+    const skip = ".veteran-tag, .pin-btn, .history-btn, .similar-btn, .ballot-link-btn, .consensus-dist";
     const range = document.createRange();
     const measure = (cell, root) => {
         const left = cell.getBoundingClientRect().left + parseFloat(getComputedStyle(cell).paddingLeft);
