@@ -4368,7 +4368,9 @@ function backgroundLoad() {
 
 // Save as PNG lays a long table out as side-by-side panels so the image is
 // roughly screen-shaped (Reddit/Discord shrink tall images until logos are
-// unreadable). Each panel repeats the rank header and, if shown, the Overall row.
+// unreadable). Each panel repeats the rank header. The first panel shows the
+// Overall row (if shown); later panels repeat it only when that keeps every
+// panel the same height, otherwise they leave it out (see pngPanelSplit).
 const PNG_TARGET_ASPECT = 16 / 9;
 const PNG_MAX_PANELS = 4;
 const PNG_PANEL_GAP = 16;       // between panels, and as the image's right margin
@@ -4416,6 +4418,29 @@ function pngNameColumnWidth(table, rowIdx) {
     return { current, width: max ? Math.min(current, Math.ceil(max) + 2) : current };
 }
 
+// Split bodyLen ranking rows across n panels. The first panel holds the
+// repeated (Overall) rows. Later panels repeat them only if every panel then
+// has the same number of rows (bodyLen divisible by n); otherwise they drop
+// them and the rows are balanced counting the Overall row once, e.g. 25 voters
+// in 2 panels → Overall + 12 | 13, while 24 voters → Overall + 12 | Overall + 12.
+// Returns per-panel { count (ranking rows), repeat (show Overall rows) }.
+function pngPanelSplit(bodyLen, repeatLen, n) {
+    if (n < 2 || !repeatLen || bodyLen % n === 0) {
+        const per = Math.ceil(bodyLen / n);
+        return Array.from({ length: n }, (_, p) => ({
+            count: Math.max(0, Math.min(per, bodyLen - p * per)),
+            repeat: true,
+        }));
+    }
+    const per = Math.ceil((bodyLen + repeatLen) / n);
+    let left = bodyLen;
+    return Array.from({ length: n }, (_, p) => {
+        const count = Math.max(0, Math.min(p === 0 ? per - repeatLen : per, left));
+        left -= count;
+        return { count, repeat: p === 0 };
+    });
+}
+
 // Measure the live table and pick the panel count whose image aspect ratio is
 // closest to PNG_TARGET_ASPECT. Rows are given as tbody indices so the same
 // split can be applied to html2canvas's structurally identical clone.
@@ -4430,12 +4455,13 @@ function pngPanelPlan(table) {
     });
     const nameCol = rows.length ? pngNameColumnWidth(table, repeat.concat(body)) : { current: 0, width: 0 };
     const tableWidth = table.offsetWidth - (nameCol.current - nameCol.width);
-    const fixedHeight = (table.tHead?.offsetHeight || 0) +
-        repeat.reduce((h, i) => h + rows[i].offsetHeight, 0);
+    const headHeight = table.tHead?.offsetHeight || 0;
+    const repeatHeight = repeat.reduce((h, i) => h + rows[i].offsetHeight, 0);
     const rowHeight = body.length ? bodyHeight / body.length : 1;
     const size = n => ({
         w: n * tableWidth + n * PNG_PANEL_GAP, // gaps between panels + right margin
-        h: fixedHeight + Math.ceil(body.length / n) * rowHeight,
+        h: headHeight + Math.max(...pngPanelSplit(body.length, repeat.length, n)
+            .map(s => (s.repeat ? repeatHeight : 0) + s.count * rowHeight)),
     });
     let panels = 1, best = Infinity;
     for (let n = 1; n <= Math.min(PNG_MAX_PANELS, body.length); n++) {
@@ -4520,7 +4546,8 @@ function preparePngClone(doc, plan, logos) {
 function splitPngTable(doc, table, plan) {
     if (plan.panels < 2) return;
     const rows = Array.from(table.tBodies[0].rows);
-    const perPanel = Math.ceil(plan.body.length / plan.panels);
+    const split = pngPanelSplit(plan.body.length, plan.repeat.length, plan.panels);
+    let start = 0;
     const wrap = doc.createElement("div");
     wrap.style.cssText = `display:flex;align-items:flex-start;gap:${PNG_PANEL_GAP}px`;
     for (let p = 0; p < plan.panels; p++) {
@@ -4531,8 +4558,9 @@ function splitPngTable(doc, table, plan) {
         // Only the first panel keeps the Functions/sort label.
         if (p > 0) head.querySelectorAll(".voters-toggle").forEach(el => { el.style.visibility = "hidden"; });
         const tbody = doc.createElement("tbody");
-        plan.repeat.forEach(i => tbody.appendChild(rows[i].cloneNode(true)));
-        plan.body.slice(p * perPanel, (p + 1) * perPanel).forEach(i => tbody.appendChild(rows[i]));
+        if (split[p].repeat) plan.repeat.forEach(i => tbody.appendChild(rows[i].cloneNode(true)));
+        plan.body.slice(start, start + split[p].count).forEach(i => tbody.appendChild(rows[i]));
+        start += split[p].count;
         panel.append(head, tbody);
         wrap.appendChild(panel);
     }
