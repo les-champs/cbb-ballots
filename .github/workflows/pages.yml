@@ -19,13 +19,14 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+# Build and deploy run as separate jobs (GitHub's starter-workflow layout). With both in
+# one job, deploy-pages ran ~1 s after the upload and found no artifact ("No artifacts
+# named github-pages"), failing every deploy from 2026-11-23 ~22:00 UTC. A failed deploy
+# should be retried with a fresh run (workflow_dispatch), not "Re-run jobs".
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -47,6 +48,14 @@ jobs:
         with:
           path: _site
 
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v4
         with:
