@@ -864,12 +864,18 @@ function consensusDistance(teams, cons) {
 //
 // Weighted, tuned to what voters notice: (1) do we agree on the top teams, (2) do we
 // rank the same teams. r = where the higher of the two voters has the team.
-// Teams both rank: gap × 4·0.8^r (×4 at #1, ×1.6 at #5, ×0.5 at #10, ~0 by #20), so the
-// top order dominates and bubble shuffles are nearly free.
-// Teams only one ranks: gap × max(2·(25−r)/25, 1), never below ×1, so a different #25
-// team still costs 4 and leaving off a top team costs extra.
+// One weight curve, w(r) = 4·0.8^r + 0.5 (×4.5 at #1, ×2.1 at #5, ×1.0 at #10, ×0.7 at
+// #15, ×0.56 at #20): the top order dominates, but every place moved costs at least 0.5,
+// so #10–#20 shuffles still count.
+// Teams both rank: gap × w(r).
+// Teams only one ranks: (gap + SIMILAR_UNSHARED_PENALTY) × max(w(r), 1), so a different
+// #25 team costs 2 in total (about a #4/#5 swap). Their weight is never below the shared
+// weight and their gap is always larger, so leaving a team off always costs at least as
+// much as ranking it anywhere (with separate curves, ranking a #1 team #16 cost more
+// than omitting it).
 // Totals are fractional; labels round to whole numbers.
-const SIMILAR_UNSHARED_PENALTY = 3;
+const SIMILAR_UNSHARED_PENALTY = 1;
+function similarWeight(r) { return 4 * 0.8 ** r + 0.5; }
 function ballotGaps(a, b) {
     const ra = {}, rb = {};
     a.slice(0, 25).forEach((t, i) => { ra[t] = i; });
@@ -879,7 +885,7 @@ function ballotGaps(a, b) {
         const shared = t in ra && t in rb;
         const gap = Math.abs(pa - pb) + (shared ? 0 : SIMILAR_UNSHARED_PENALTY);
         const r = Math.min(pa, pb);
-        return gap * (shared ? 4 * 0.8 ** r : Math.max((25 - r) / 25 * 2, 1));
+        return gap * (shared ? similarWeight(r) : Math.max(similarWeight(r), 1));
     });
 }
 function ballotDistance(a, b) {

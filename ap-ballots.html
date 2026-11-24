@@ -2954,7 +2954,8 @@ function consensusDistance(teams,cons){
 if(!teams?.length)return Infinity;
 return consensusGaps(teams,cons).reduce((s,g)=>s + g,0)/ 2;
 }
-const SIMILAR_UNSHARED_PENALTY=3;
+const SIMILAR_UNSHARED_PENALTY=1;
+function similarWeight(r){return 4*0.8**r + 0.5;}
 function ballotGaps(a,b){
 const ra={},rb={};
 a.slice(0,25).forEach((t,i)=>{ra[t]=i;});
@@ -2964,7 +2965,7 @@ const pa=ra[t]??25,pb=rb[t]??25;
 const shared=t in ra&&t in rb;
 const gap=Math.abs(pa - pb)+(shared?0:SIMILAR_UNSHARED_PENALTY);
 const r=Math.min(pa,pb);
-return gap*(shared?4*0.8**r:Math.max((25 - r)/ 25*2,1));
+return gap*(shared?similarWeight(r):Math.max(similarWeight(r),1));
 });
 }
 function ballotDistance(a,b){
