@@ -1471,9 +1471,9 @@ body.dark .pin-btn.pinned {
 /* P. Rk: same gray as the totals, at the cell size. */
 #season-stats-table.season-mmp12 .mm-dim { opacity: 0.55; }
 
-/* Reports menu (Shift+R), Settings window (Functions › Settings), Changes window
-   (Functions › Show › Values) and Rankings window (Functions › Show › Rankings) share one look */
-#settings-modal, #changes-modal, #rankings-modal,
+/* Reports menu (Shift+R) and Settings window (Functions › Settings) share one look;
+   the voter menu and the Sort / Values / Rankings popovers (.menu-popover) reuse its box */
+#settings-modal,
 #reports-modal {
     display: none;
     position: fixed;
@@ -1483,8 +1483,8 @@ body.dark .pin-btn.pinned {
     justify-content: center;
     align-items: center;
 }
-#settings-modal.open, #changes-modal.open, #rankings-modal.open, #reports-modal.open { display: flex; }
-#settings-box, #changes-box, #rankings-box, #reports-box, #voter-menu {
+#settings-modal.open, #reports-modal.open { display: flex; }
+#settings-box, #reports-box, #voter-menu, .menu-popover {
     background: var(--color-bg-modal);
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.25);
@@ -1494,7 +1494,7 @@ body.dark .pin-btn.pinned {
     overflow: auto;
     padding: 14px 14px 12px;
 }
-#settings-title, #changes-title, #rankings-title, #reports-title, #voter-menu-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
+#settings-title, #reports-title, #voter-menu-title, .menu-popover-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
 .settings-list, #reports-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 .settings-item, .report-item {
     display: block;
@@ -1513,10 +1513,10 @@ body.dark .pin-btn.pinned {
 .report-item.placeholder { opacity: 0.45; cursor: default; }
 .report-lock { display: block; }
 .settings-group { margin: 10px 0 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.6; color: var(--color-heading); }
-#settings-title + .settings-group, #changes-title + .settings-group, #rankings-title + .settings-group { margin-top: 0; }
+#settings-title + .settings-group, .menu-popover-title + .settings-group { margin-top: 0; }
 .settings-group[hidden], .settings-list[hidden], .settings-select[hidden] { display: none; }
 .settings-group label { cursor: inherit; }
-/* Changes window: Compare With dropdown, sized and colored like a .settings-item */
+/* Values popover: Compare With dropdown, sized and colored like a .settings-item */
 .settings-select {
     display: block;
     width: 100%;
@@ -1531,15 +1531,16 @@ body.dark .pin-btn.pinned {
 }
 .settings-select:hover, .settings-select:focus-visible { background: var(--color-bg-tab-hover); outline: none; }
 .settings-select:disabled { opacity: 0.35; cursor: default; }
-/* Changes window: the chosen mode / comparison poll; Rankings window: the shown rows */
+/* Values popover: the chosen mode / comparison poll; Rankings popover: the shown rows */
 .settings-item.active, .settings-item.active:hover { background: var(--color-bg-tab-active); color: var(--color-tab-active); }
 .settings-item:disabled { cursor: default; }
 /* Dev stays dimmed until the PIN is entered (still clickable unless locked out) */
 .settings-item.dimmed, .settings-item.dimmed:hover { opacity: 0.35; }
 
-/* Voter menu (⋯ beside a voter's name): a popover with the Rankings window's box,
-   positioned under the ⋯ by toggleVoterMenu(); no backdrop */
-#voter-menu {
+/* Voter menu (⋯ beside a voter's name) and the Functions popovers (Table › Sort,
+   Show › Rankings / Values): no backdrop, positioned under what was clicked by
+   toggleVoterMenu() / openMenuPopover() */
+#voter-menu, .menu-popover {
     display: none;
     position: fixed;
     z-index: 1000;
@@ -1548,8 +1549,8 @@ body.dark .pin-btn.pinned {
     max-width: 240px;
     padding: 10px 10px 9px;
 }
-#voter-menu.open { display: block; }
-#voter-menu:focus { outline: none; }
+#voter-menu.open, .menu-popover.open { display: block; }
+#voter-menu:focus, .menu-popover:focus { outline: none; }
 #voter-menu-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Conference table (Shift+K) */
@@ -1704,3 +1705,16 @@ body.dark {
 .bt-type-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
 .bt-type-dot.bt-official { background: var(--color-bt-official); }
 .bt-type-dot.bt-provisional { background: var(--color-bt-provisional); }
+
+/* Functions › Table › Filter (markOutlierBallots() in script.js): hide outlier ballots,
+   or every checked ballot that isn't one. Unchecked rows (ranking rows, Data Ballots) stay. */
+body.filter-exclude-outliers .voter-row.ballot-outlier,
+body.filter-only-outliers .voter-row.ballot-checked:not(.ballot-outlier) { display: none; }
+/* Keep the zebra stripes alternating while a filter hides rows: stripe as if the hidden
+   rows weren't there (same trick as the Records game-list rows). */
+@supports selector(:nth-child(1 of a)) {
+    body.filter-exclude-outliers .ballot-section tbody > tr:nth-child(even),
+    body.filter-only-outliers .ballot-section tbody > tr:nth-child(even) { background-color: transparent; }
+    body.filter-exclude-outliers .ballot-section tbody > tr:nth-child(even of :not(.ballot-outlier)),
+    body.filter-only-outliers .ballot-section tbody > tr:nth-child(even of :not(.ballot-checked:not(.ballot-outlier))) { background-color: var(--color-bg-row-alt); }
+}

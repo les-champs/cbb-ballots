@@ -1270,10 +1270,9 @@ def build_overall_row(voters, label):
 # tables in each fragment carry only the toggle instead of a full menu copy.
 PICKER_HTML = (
     f"<span class='sort-picker'>"
-    f"<span class='picker-category'>Sort</span>"
-    f"<span class='sort-option active' data-sort='alphabetic'>Alphabetic</span>"
-    f"<span class='sort-option' data-sort='zetabetique' style='display:none'>Zétabétique</span>"
-    f"<span class='sort-option' data-sort='consensus'>Consensus</span>"
+    f"<span class='picker-category'>Table</span>"
+    f"<span class='sort-option' data-action='sortMenu'>Sort</span>"
+    f"<span class='sort-option' data-action='filter'>Filter</span>"
     f"<span class='picker-category'>Show</span>"
     f"<span class='sort-option' data-action='rankings'>Rankings</span>"
     f"<span class='sort-option' data-action='expandDeltas'>Values</span>"
@@ -1840,9 +1839,8 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
   </div>
 </div>
 
-<div id="changes-modal">
-  <div id="changes-box">
-    <h2 id="changes-title">Values</h2>
+<div id="values-menu" class="menu-popover" role="menu" tabindex="-1">
+    <h2 class="menu-popover-title">Values</h2>
     <h3 class="settings-group">Mode</h3>
     <ul class="settings-list">
       <li><button type="button" class="settings-item" data-delta-mode="off">Off</button></li>
@@ -1851,7 +1849,6 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
     </ul>
     <h3 class="settings-group" id="changes-since-group"><label for="changes-since-select">Compare With</label></h3>
     <select id="changes-since-select" class="settings-select"></select>
-  </div>
 </div>
 
 <div id="voter-menu" role="menu" tabindex="-1">
@@ -1859,9 +1856,24 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
   <ul class="settings-list"></ul>
 </div>
 
-<div id="rankings-modal">
-  <div id="rankings-box">
-    <h2 id="rankings-title">Rankings</h2>
+<div id="sort-menu" class="menu-popover" role="menu" tabindex="-1">
+    <h2 class="menu-popover-title">Sort</h2>
+    <ul class="settings-list">
+      <li><button type="button" class="settings-item" data-sort="alphabetic">Alphabetically</button></li>
+      <li><button type="button" class="settings-item" data-sort="consensus">Consensus</button></li>
+    </ul>
+</div>
+
+<div id="filter-menu" class="menu-popover" role="menu" tabindex="-1">
+    <h2 class="menu-popover-title">Filter</h2>
+    <ul class="settings-list">
+      <li><button type="button" class="settings-item" data-ballot-filter="exclude">Exclude Outliers</button></li>
+      <li><button type="button" class="settings-item" data-ballot-filter="only">Only Outliers</button></li>
+    </ul>
+</div>
+
+<div id="rankings-menu" class="menu-popover" role="menu" tabindex="-1">
+    <h2 class="menu-popover-title">Rankings</h2>
     <h3 class="settings-group">Show</h3>
     <ul class="settings-list">
       <li><button type="button" class="settings-item" data-ranking="Overall">Overall</button></li>
@@ -1871,7 +1883,6 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
       <li><button type="button" class="settings-item" data-ranking=">20 Ballots">&gt;20 Ballots</button></li>
       <li><button type="button" class="settings-item" data-ranking="Veterans">Veterans</button></li>
     </ul>
-  </div>
 </div>
 
 <div id="reports-modal">

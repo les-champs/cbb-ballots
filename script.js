@@ -26,7 +26,11 @@ const ON_AP_PAGE = typeof IS_AP_PAGE !== "undefined" && IS_AP_PAGE;
 const OUTLIER_OMISSION_TOP_N = 15;
 const OUTLIER_HIGH_MAX_RANK = 20;
 const OUTLIER_SD_THRESHOLD = 2.5;
+// A ballot is an outlier ballot (Table › Filter) at this many flags: outlier teams
+// (outlierKind()) plus consensus top-15 teams left off. ~6–7% of 2025–26 ballots.
+const OUTLIER_BALLOT_MIN_FLAGS = 4;
 let _outliersMode = false;
+let _ballotFilter = "all";  // "all" | "exclude" | "only" (Table › Filter)
 
 function svgColors() {
     const dark = isDarkMode();
@@ -636,7 +640,7 @@ function pinRow(row, tbody) {
     applyTableSort(currentSort);
 }
 // ── Changes (deltas) ─────────────────────────────────────────────────────────
-// One label under each logo, chosen in the Changes window (#changes-modal, Functions › Show › Values):
+// One label under each logo, chosen in the Values popover (#values-menu, Functions › Show › Values):
 //   off  — no labels, except rows opened one at a time by clicking a voter's name
 //   move — places moved since the comparison poll (deltaWeeksBack polls back); a team
 //          unranked in that poll counts as coming from #26
@@ -725,7 +729,7 @@ function setDeltaWeeksBack(n) {
     syncDeltaControls();
 }
 
-// [[polls back, label], …] for the Changes window's Compare With dropdown: earlier polls of the shown week's season.
+// [[polls back, label], …] for the Values popover's Compare With dropdown: earlier polls of the shown week's season.
 function deltaSinceOptions() {
     const isAp = _apCurrentYear !== null;
     const tabs = isAp ? getSortedApTabs() : getSortedTabs();
@@ -742,18 +746,16 @@ function deltaSinceOptions() {
     return opts;
 }
 
-// Changes window (Functions › Show › Values; markup in build_full_html()): styled like
-// Settings. Mode items and the Compare With dropdown act in place and keep it open. Compare
-// With shows only in Movement (Off and vs Consensus have no lookback) and lists earlier polls of this season.
+// Values popover (Functions › Show › Values; markup in build_full_html(); see openMenuPopover()).
+// Mode items and the Compare With dropdown act in place and keep it open. Compare With
+// shows only in Movement (Off and vs Consensus have no lookback) and lists earlier polls of this season.
 function showChangesModal() {
-    const modal = document.getElementById("changes-modal");
     syncDeltaControls();
-    modal.classList.add("open");
-    (modal.querySelector(".settings-item.active") || modal.querySelector(".settings-item"))?.focus();
+    openMenuPopover(document.getElementById("values-menu"));
 }
 
 function initChangesModal() {
-    const modal = document.getElementById("changes-modal");
+    const modal = document.getElementById("values-menu");
     if (!modal) return;
     modal.addEventListener("click", e => {
         const b = e.target.closest(".settings-item");
@@ -770,7 +772,7 @@ function initChangesModal() {
 }
 
 function syncDeltaControls() {
-    const modal = document.getElementById("changes-modal");
+    const modal = document.getElementById("values-menu");
     if (modal) {
         modal.querySelectorAll("[data-delta-mode]").forEach(b => {
             const on = b.dataset.deltaMode === deltaMode;
@@ -1026,6 +1028,75 @@ function applyOutliers(weekBlock) {
     });
 }
 
+// ── Outlier ballot filter (Functions › Table › Filter) ────────────────────────
+// Marks every real ballot row in a block's voter sections (Official / Provisional, or
+// the single AP section) with .ballot-checked, and outlier ballots with .ballot-outlier
+// too (OUTLIER_BALLOT_MIN_FLAGS). CSS hides rows per body class filter-exclude-outliers /
+// filter-only-outliers. Ranking rows, Data Ballots rows and the Aggregate section stay.
+// Ballots and consensus don't change, so each section is marked once.
+function markOutlierBallots(weekBlock) {
+    if (!weekBlock) return;
+    const consensus = getConsensusOrder(weekBlock);
+    if (!consensus || !consensus.length) return;
+    const cRank = {};
+    consensus.forEach((t, i) => { cRank[t] = i + 1; });
+    const sections = Array.from(weekBlock.querySelectorAll(".ballot-section"));
+    const voterSections = sections.length === 1 ? sections : sections.slice(0, 2);
+    voterSections.forEach(section => {
+        if (section._outlierBallotsMarked) return;
+        section._outlierBallotsMarked = true;
+        const stats = sectionTeamStats(section);
+        section.querySelectorAll(".voter-row").forEach(row => {
+            if (row.matches(".row-weighted-ranking, .row-pinned-agg")) return;
+            const name = getVoterName(row);
+            if (name === "Official Overall" || name === "AP Overall" || name === "Recency") return;
+            const teams = Array.from(row.querySelectorAll(".logo-cell .team-logo")).map(l => l.dataset.team);
+            if (!teams.length) return;
+            const onBallot = new Set(teams);
+            let flags = teams.filter((t, i) => outlierKind(i + 1, cRank[t] ?? 26, stats[t])).length;
+            flags += consensus.slice(0, OUTLIER_OMISSION_TOP_N).filter(t => !onBallot.has(t)).length;
+            row.classList.add("ballot-checked");
+            row.classList.toggle("ballot-outlier", flags >= OUTLIER_BALLOT_MIN_FLAGS);
+        });
+    });
+}
+
+function activeWeekBlock() {
+    if (_apCurrentYear && _apCurrentWeekNum) return document.getElementById(`week-ap-${_apCurrentYear}-${_apCurrentWeekNum}`);
+    const tab = document.querySelector(".week-tab.active");
+    return tab ? document.getElementById(tab.dataset.week) : null;
+}
+
+// Picking the active filter again turns it off.
+function setBallotFilter(mode) {
+    _ballotFilter = mode === _ballotFilter ? "all" : mode;
+    document.body.classList.toggle("filter-exclude-outliers", _ballotFilter === "exclude");
+    document.body.classList.toggle("filter-only-outliers", _ballotFilter === "only");
+    if (_ballotFilter !== "all") markOutlierBallots(activeWeekBlock());
+    syncFilterMenu();
+}
+
+function syncFilterMenu(root = document) {
+    root.querySelectorAll(".settings-item[data-ballot-filter]").forEach(el => {
+        const on = el.dataset.ballotFilter === _ballotFilter;
+        el.classList.toggle("active", on);
+        el.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    root.querySelectorAll("[data-action='filter']").forEach(el => el.classList.toggle("active", _ballotFilter !== "all"));
+}
+
+function showFilterModal() {
+    syncFilterMenu();
+    openMenuPopover(document.getElementById("filter-menu"));
+}
+
+document.getElementById("filter-menu")?.addEventListener("click", e => {
+    const b = e.target.closest(".settings-item[data-ballot-filter]");
+    if (!b) return;
+    closeMenuPopover();
+    setBallotFilter(b.dataset.ballotFilter);
+});
+
 function clearOutlierCell(cell) {
     if (!cell.classList.contains("outlier-high") && !cell.classList.contains("outlier-low")) return;
     cell.classList.remove("outlier-high", "outlier-low");
@@ -1090,15 +1161,14 @@ window.addEventListener("resize", () => {
 
 // Tables carry only the Functions toggle; the menu itself is cloned from the
 // page's single <template id="picker-template"> on first use, then synced to
-// the current sort and Show states (later changes reach it via the page-wide
+// the current sort and Table states (later changes reach it via the page-wide
 // querySelectorAll updates in setGlobalSort, toggleOutliers and syncRankingsMenu).
 function createPicker(toggle) {
     const tpl = document.getElementById("picker-template");
     const picker = tpl?.content.firstElementChild?.cloneNode(true);
     if (!picker) return null;
-    picker.querySelectorAll(".sort-option[data-sort]").forEach(o => {
-        o.classList.toggle("active", o.dataset.sort === currentSort);
-    });
+    syncSortMenu(picker);
+    syncFilterMenu(picker);
     picker.querySelectorAll("[data-action='toggleOutliers']").forEach(o => o.classList.toggle("active", _outliersMode));
     syncRankingsMenu(picker);
     toggle.after(picker);
@@ -1160,11 +1230,13 @@ document.addEventListener("mousedown", e => {
     const sort = opt.dataset.sort;
     const action = opt.dataset.action;
     const picker = opt.closest(".sort-picker");
-    // Credits and the Show toggles act in place and keep the picker open. The
-    // row can reflow under the cursor, so swallow the click that follows this
+    // Credits, Outliers, Filter and the popover items (Sort / Rankings / Values) keep the
+    // picker open until the viewer clicks outside it (or picks an item that opens a window).
+    // The row can reflow under the cursor, so swallow the click that follows this
     // mousedown — otherwise it can land outside the picker and close it.
     const showToggles = ["toggleOutliers"];
-    const inPlace = ["credits", ...showToggles].includes(action);
+    const popoverItems = { sortMenu: "sort-menu", filter: "filter-menu", rankings: "rankings-menu", expandDeltas: "values-menu" };
+    const inPlace = ["credits", ...showToggles, ...Object.keys(popoverItems)].includes(action);
     if (inPlace) {
         const swallow = ev => ev.stopPropagation();
         window.addEventListener("click", swallow, { capture: true, once: true });
@@ -1178,6 +1250,13 @@ document.addEventListener("mousedown", e => {
     if (showToggles.includes(action)) {
         handlePickerAction(action);
         syncDeltasMenu(picker);
+        return;
+    }
+    if (popoverItems[action]) {
+        // Clicking the item of the open popover again closes it
+        if (_openPopover?.id === popoverItems[action]) { closeMenuPopover(); return; }
+        _popoverAnchorRect = opt.getBoundingClientRect();
+        handlePickerAction(action);
         return;
     }
     // Show the toggle again
@@ -1222,6 +1301,12 @@ function handlePickerAction(action) {
         case "rankings":
             showRankingsModal();
             break;
+        case "sortMenu":
+            showSortModal();
+            break;
+        case "filter":
+            showFilterModal();
+            break;
         case "toggleOutliers":
             toggleOutliers();
             break;
@@ -1261,8 +1346,8 @@ document.getElementById("settings-modal").addEventListener("click", e => {
 });
 
 // Plain ↑/↓ move between items while the window is open (Enter/Space click the focused one).
-// Same in the Changes window.
-["settings-modal", "changes-modal", "rankings-modal"].forEach(id => document.getElementById(id).addEventListener("keydown", e => {
+// (The Functions popovers have their own handler, see openMenuPopover().)
+["settings-modal"].forEach(id => document.getElementById(id).addEventListener("keydown", e => {
     if (e.shiftKey || (e.key !== "ArrowDown" && e.key !== "ArrowUp")) return;
     const items = [...e.currentTarget.querySelectorAll(".settings-item:not(:disabled)")].filter(el => el.offsetParent);
     const i = items.indexOf(document.activeElement);
@@ -1289,12 +1374,9 @@ function setGlobalSort(sort) {
     const label = sort === "similar" ? `≈ ${similarTo}`
         : sort === "consensus" && _weightedConsensus ? "Consensus (W)"
         : SORT_LABELS[sort] || (sort.charAt(0).toUpperCase() + sort.slice(1));
-    document.querySelectorAll(".voters-toggle").forEach(t => {
-        if (t.style.display !== "none") t.textContent = label;
-    });
-    document.querySelectorAll(".sort-option[data-sort]").forEach(o => {
-        o.classList.toggle("active", o.dataset.sort === sort);
-    });
+    // Every toggle, incl. one hidden behind its open picker, so it reads right when that closes
+    document.querySelectorAll(".voters-toggle").forEach(t => { t.textContent = label; });
+    syncSortMenu();
     document.body.classList.toggle("sort-similar", sort === "similar");
     document.querySelectorAll(".similar-btn").forEach(b => {
         b.classList.toggle("active", sort === "similar" && getVoterName(b.closest("tr")) === similarTo);
@@ -1303,10 +1385,38 @@ function setGlobalSort(sort) {
 }
 
 
-function applyTableSort(sort) {
+// Sort popover (Functions › Table › Sort; markup in build_full_html(); see openMenuPopover()).
+// Picking a sort applies it and closes the popover. Zétabétique (Shift+Z) and Similar
+// (voter menu) have no item here; the Table › Sort entry is underlined whenever the
+// sort isn't the default alphabetic one.
+function showSortModal() {
+    syncSortMenu();
+    openMenuPopover(document.getElementById("sort-menu"));
+}
+
+document.getElementById("sort-menu")?.addEventListener("click", e => {
+    const b = e.target.closest(".settings-item[data-sort]");
+    if (!b) return;
+    closeMenuPopover();
+    applyTableSort(b.dataset.sort, true);
+});
+
+function syncSortMenu(root = document) {
+    root.querySelectorAll(".settings-item[data-sort]").forEach(el => {
+        const on = el.dataset.sort === currentSort;
+        el.classList.toggle("active", on);
+        el.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    root.querySelectorAll("[data-action='sortMenu']").forEach(el => {
+        el.classList.toggle("active", currentSort !== "alphabetic");
+    });
+}
+
+// keepPicker: leave the Functions menus open (a pick from the Sort popover).
+function applyTableSort(sort, keepPicker = false) {
     setGlobalSort(sort);
     // Close all sort pickers
-    document.querySelectorAll(".sort-picker.open").forEach(p => {
+    if (!keepPicker) document.querySelectorAll(".sort-picker.open").forEach(p => {
         if (p._toggle) p._toggle.style.display = "";
         showRankHeaders(p._sourceBlock || p.closest(".week-block"));
         p.classList.remove("open");
@@ -1318,6 +1428,7 @@ function applyTableSort(sort) {
         : activeTab.dataset.week;
     const block = document.getElementById(blockId);
     if (!block) return;
+    if (_ballotFilter !== "all") markOutlierBallots(block);
 
     // Show/hide rank number headers based on sort
     document.querySelectorAll(".ballot-section").forEach(section => {
@@ -1619,7 +1730,7 @@ function toggleSimilarTo(row) {
 
 // ── Voter menu (⋯ beside a voter's name) ─────────────────────────────────────
 // One #voter-menu popover (markup in build_full_html()), anchored under the clicked name or ⋯ and
-// styled like the Rankings window. Items are rebuilt on every open from VOTER_MENU_ITEMS;
+// styled like the Functions popovers. Items are rebuilt on every open from VOTER_MENU_ITEMS;
 // each closes the menu and runs. ↑/↓ move focus, Esc / outside click / scroll close it.
 const TOUCH_UI = window.matchMedia?.("(hover: none)").matches;
 let _voterMenuAnchor = null;
@@ -1673,6 +1784,7 @@ function toggleVoterMenu(anchor) {
     if (!menu) return;
     if (_voterMenuAnchor === anchor) { closeVoterMenu(); return; }
     closeVoterMenu();
+    closeMenuPopover();
     const row = anchor.closest("tr");
     const username = getVoterName(row);
     if (!row || !username) return;
@@ -1727,6 +1839,74 @@ document.getElementById("voter-menu")?.addEventListener("keydown", e => {
     const next = i < 0 ? (e.key === "ArrowDown" ? 0 : items.length - 1)
         : (i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length;
     items[next].focus();
+});
+
+// ── Functions popovers (Table › Sort / Filter, Show › Rankings / Values) ───────
+// Built like the voter menu: no backdrop, so the table stays visible while toggles act in
+// place. openMenuPopover() places one under the Functions menu item that was clicked
+// (_popoverAnchorRect, recorded by the picker's mousedown handler before the menu closes),
+// else under the visible Functions toggle; flipped above / pulled left to stay on screen.
+// ↑/↓ move focus; Esc, an outside click, resize, or a page scroll close it. Scrolls within
+// SCROLL_GRACE_MS of a click inside it are ignored: adding a Rankings row can make the
+// browser's scroll anchoring scroll the page.
+let _openPopover = null;
+let _popoverAnchorRect = null;
+let _popoverClickAt = 0;
+const SCROLL_GRACE_MS = 400;
+
+function closeMenuPopover() {
+    if (!_openPopover) return;
+    _openPopover.classList.remove("open");
+    _openPopover = null;
+}
+
+function openMenuPopover(menu) {
+    if (!menu) return;
+    closeMenuPopover();
+    closeVoterMenu();
+    let a = _popoverAnchorRect;
+    _popoverAnchorRect = null;
+    if (!a || !a.width) {
+        const toggle = [...document.querySelectorAll(".voters-toggle")].find(t => t.offsetParent);
+        a = toggle?.getBoundingClientRect() || { left: 16, top: 16, bottom: 16 };
+    }
+    menu.classList.add("open");
+    _openPopover = menu;
+    const m = menu.getBoundingClientRect();
+    const left = Math.min(a.left - 8, window.innerWidth - m.width - 8);
+    let top = a.bottom + 4;
+    if (top + m.height > window.innerHeight - 8) top = Math.max(8, a.top - m.height - 4);
+    menu.style.left = `${Math.max(8, left)}px`;
+    menu.style.top = `${top}px`;
+    // Focus the box, not an item: a focused item shows the hover gray until ↑/↓ is used
+    menu.focus({ preventScroll: true });
+}
+
+// The picker's own items are skipped: clicking Sort / Rankings / Values opens one.
+const _outsidePopover = t => _openPopover && !_openPopover.contains(t) && !t.closest?.(".sort-picker");
+document.addEventListener("mousedown", e => { if (_outsidePopover(e.target)) closeMenuPopover(); }, true);
+document.addEventListener("touchstart", e => { if (_outsidePopover(e.target)) closeMenuPopover(); }, { capture: true, passive: true });
+window.addEventListener("scroll", e => {
+    if (!_openPopover || _openPopover.contains(e.target)) return;
+    if (Date.now() - _popoverClickAt < SCROLL_GRACE_MS) return;
+    closeMenuPopover();
+}, true);
+window.addEventListener("resize", closeMenuPopover);
+document.querySelectorAll(".menu-popover").forEach(menu => {
+    menu.addEventListener("click", () => { _popoverClickAt = Date.now(); });
+    menu.addEventListener("change", () => { _popoverClickAt = Date.now(); });
+    menu.addEventListener("keydown", e => {
+        if (e.key === "Escape") { e.stopPropagation(); closeMenuPopover(); return; }
+        if (e.shiftKey || (e.key !== "ArrowDown" && e.key !== "ArrowUp")) return;
+        if (e.target.tagName === "SELECT") return;  // ↑/↓ change Compare With
+        const items = [...menu.querySelectorAll(".settings-item:not(:disabled)")].filter(el => el.offsetParent);
+        if (!items.length) return;
+        e.preventDefault();
+        const i = items.indexOf(document.activeElement);
+        const next = i < 0 ? (e.key === "ArrowDown" ? 0 : items.length - 1)
+            : (i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length;
+        items[next].focus();
+    });
 });
 
 // Compute the Recency top-25 teams for a given week.
@@ -3180,17 +3360,14 @@ try {
     localStorage.removeItem("showOverallRow");
 } catch (e) {}
 
-// Rankings window (Functions › Show › Rankings; markup in build_full_html()): styled like
-// the Values window. Each item toggles one row in place and keeps the window open.
+// Rankings popover (Functions › Show › Rankings; markup in build_full_html(); see
+// openMenuPopover()). Each item toggles one row in place and keeps the popover open.
 function showRankingsModal() {
-    const modal = document.getElementById("rankings-modal");
-    if (!modal) return;
     syncRankingsMenu();
-    modal.classList.add("open");
-    (modal.querySelector(".settings-item.active") || modal.querySelector(".settings-item"))?.focus();
+    openMenuPopover(document.getElementById("rankings-menu"));
 }
 
-document.getElementById("rankings-modal")?.addEventListener("click", e => {
+document.getElementById("rankings-menu")?.addEventListener("click", e => {
     const b = e.target.closest(".settings-item[data-ranking]");
     if (b) toggleRanking(b.dataset.ranking);
 });
@@ -4685,7 +4862,7 @@ document.addEventListener("click", e => {
         weekText.style.display = "none";
     }
     // Close any open sort pickers
-    if (!e.target.closest(".sort-picker") && !e.target.classList.contains("voters-toggle")) {
+    if (!e.target.closest(".sort-picker, .menu-popover") && !e.target.classList.contains("voters-toggle")) {
         document.querySelectorAll(".sort-picker.open").forEach(p => {
             p.classList.remove("open");
             if (p._toggle) p._toggle.style.display = "";
@@ -7728,7 +7905,7 @@ document.getElementById("reports-list").addEventListener("keydown", e => {
     items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus();
 });
 
-["tenure-modal", "conference-modal", "reports-modal", "settings-modal", "changes-modal", "rankings-modal"].forEach(id => {
+["tenure-modal", "conference-modal", "reports-modal", "settings-modal"].forEach(id => {
     document.getElementById(id).addEventListener("click", e => {
         if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
     });
@@ -7988,8 +8165,7 @@ document.addEventListener("keydown", e => {
         document.getElementById("heatmap-modal").classList.remove("open");
         document.getElementById("reports-modal").classList.remove("open");
         document.getElementById("settings-modal").classList.remove("open");
-        document.getElementById("changes-modal").classList.remove("open");
-        document.getElementById("rankings-modal").classList.remove("open");
+        closeMenuPopover();
         closeVoterMenu();
     }
     // Chord: Shift+V then X → toggle veteran tags
