@@ -429,7 +429,8 @@ body.sort-similar .similar-btn.active {
 
 /* Changes labels: one line under each logo. .delta-label = movement, .avg-label =
    vs consensus (points on Overall / Data Ballots rows). Body classes from deltaMode in
-   script.js pick which shows; .row-delta = a row opened on its own while Changes is Off. */
+   script.js pick which shows; .row-delta / .row-cons = a row whose movement / consensus
+   labels were opened on their own (voter menu) while Changes is Off. */
 .delta-label,
 .avg-label {
     display: none;
@@ -443,7 +444,8 @@ body.sort-similar .similar-btn.active {
 }
 .row-delta .delta-label,
 body.delta-move .delta-label { display: block; }
-body.delta-cons .avg-label { display: block; }
+body.delta-cons .avg-label,
+.row-cons .avg-label { display: block; }
 body.delta-cons .delta-label { display: none; }
 
 .delta-up { color: var(--color-win); }
@@ -2925,7 +2927,7 @@ rules.push(`td.logo-cell > .team-logo[data-team="${team}"] { box-shadow: none; }
 rules.push(`${cell} { position: relative; z-index: 1; }`);
 rules.push(`${cell}::before { content: ""; position: absolute; inset: 1px; border-radius: 3px; pointer-events: none; }`);
 rules.push(`body:not(.highlight-dim) ${cell}::before { box-shadow: inset 0 0 0 2px ${color}, 0 0 12px 2px ${color}; }`);
-rules.push(`body:not(.highlight-dim) .row-delta ${cell}::before, body.delta-move:not(.highlight-dim) ${cell}::before, body.delta-cons:not(.highlight-dim) ${cell}::before, body.highlight-dim ${cell}::before { box-shadow: inset 0 0 0 2px ${color}; }`);
+rules.push(`body:not(.highlight-dim) .row-delta ${cell}::before, body:not(.highlight-dim) .row-cons ${cell}::before, body.delta-move:not(.highlight-dim) ${cell}::before, body.delta-cons:not(.highlight-dim) ${cell}::before, body.highlight-dim ${cell}::before { box-shadow: inset 0 0 0 2px ${color}; }`);
 rules.push(`.chart-logo-ring[data-team="${team}"] { display: inline; stroke: ${color}; fill: ${color}; filter: url(#chart-glow-${cls}); }`);
 rules.push(`.chart-stroke[data-team="${team}"] { stroke: ${color}; filter: url(#chart-glow-${cls}); }`);
 rules.push(`.chart-fill[data-team="${team}"] { fill: ${color}; filter: url(#chart-glow-${cls}); }`);
@@ -3191,7 +3193,7 @@ function setDeltaMode(mode){
 deltaMode=mode;
 if(mode!=="off")_lastOnDeltaMode=mode;
 try{localStorage.setItem("deltaMode",mode);}catch(e){}
-document.querySelectorAll(".row-delta").forEach(r=>r.classList.remove("row-delta"));
+document.querySelectorAll(".row-delta, .row-cons").forEach(r=>r.classList.remove("row-delta","row-cons"));
 applyDeltaBodyClasses();
 ensureDeltaLabels();
 syncDeltaControls();
@@ -3202,7 +3204,7 @@ setDeltaMode(DELTA_MODES[(i + 1)%DELTA_MODES.length][0]);
 }
 function setDeltaWeeksBack(n){
 deltaWeeksBack=n;
-const open=deltaRows(document).filter(r=>r.classList.contains("row-delta"));
+const open=deltaRows(document).filter(r=>r.classList.contains("row-delta")||r.classList.contains("row-cons"));
 deltaRows(document).forEach(r=>{
 r._deltaBack=undefined;
 r.querySelectorAll(".delta-label, .avg-label").forEach(el=>el.remove());
@@ -3888,7 +3890,28 @@ r.querySelectorAll(".delta-label, .avg-label").forEach(el=>el.remove());
 const deltaData=buildDeltaData();
 const sortedTabs=getSortedTabs();
 allUserRows.forEach(r=>{
+r.classList.remove("row-cons");
 r.classList.add("row-delta");
+const weekId=r.closest(".week-block")?.id;
+if(weekId)applyDeltaToRow(r,weekId,deltaData,sortedTabs);
+});
+}
+}
+function isRowConsensusShown(row){return row.classList.contains("row-cons");}
+function toggleRowConsensus(row){
+if(deltaMode!=="off")return;
+const allUserRows=getRowsByUsername(getVoterName(row));
+if(isRowConsensusShown(row)){
+allUserRows.forEach(r=>{
+r.classList.remove("row-cons");
+r.querySelectorAll(".delta-label, .avg-label").forEach(el=>el.remove());
+});
+}else{
+const deltaData=buildDeltaData();
+const sortedTabs=getSortedTabs();
+allUserRows.forEach(r=>{
+r.classList.remove("row-delta");
+r.classList.add("row-cons");
 const weekId=r.closest(".week-block")?.id;
 if(weekId)applyDeltaToRow(r,weekId,deltaData,sortedTabs);
 });
@@ -3924,6 +3947,13 @@ id:"movement",show:()=>deltaMode==="off",
 label:row=>isRowMovementShown(row)?"Hide movement":"Show movement",
 active:isRowMovementShown,
 run:toggleRowMovement,
+},
+{
+id:"consensus",show:row=>deltaMode==="off"&&row.classList.contains("voter-row")
+&&!row.classList.contains("row-weighted-ranking")&&!row.closest(".ballot-section")?.id?.endsWith("-aggregate"),
+label:row=>isRowConsensusShown(row)?"Hide consensus":"Show consensus",
+active:isRowConsensusShown,
+run:toggleRowConsensus,
 },
 {
 id:"history",show:()=>true,label:()=>"History",

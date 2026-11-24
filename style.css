@@ -409,7 +409,8 @@ body.sort-similar .similar-btn.active {
 
 /* Changes labels: one line under each logo. .delta-label = movement, .avg-label =
    vs consensus (points on Overall / Data Ballots rows). Body classes from deltaMode in
-   script.js pick which shows; .row-delta = a row opened on its own while Changes is Off. */
+   script.js pick which shows; .row-delta / .row-cons = a row whose movement / consensus
+   labels were opened on their own (voter menu) while Changes is Off. */
 .delta-label,
 .avg-label {
     display: none;
@@ -423,7 +424,8 @@ body.sort-similar .similar-btn.active {
 }
 .row-delta .delta-label,
 body.delta-move .delta-label { display: block; }
-body.delta-cons .avg-label { display: block; }
+body.delta-cons .avg-label,
+.row-cons .avg-label { display: block; }
 body.delta-cons .delta-label { display: none; }
 
 .delta-up { color: var(--color-win); }

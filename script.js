@@ -361,7 +361,7 @@ function applyHighlightStyles() {
         rules.push(`${cell} { position: relative; z-index: 1; }`);
         rules.push(`${cell}::before { content: ""; position: absolute; inset: 1px; border-radius: 3px; pointer-events: none; }`);
         rules.push(`body:not(.highlight-dim) ${cell}::before { box-shadow: inset 0 0 0 2px ${color}, 0 0 12px 2px ${color}; }`);
-        rules.push(`body:not(.highlight-dim) .row-delta ${cell}::before, body.delta-move:not(.highlight-dim) ${cell}::before, body.delta-cons:not(.highlight-dim) ${cell}::before, body.highlight-dim ${cell}::before { box-shadow: inset 0 0 0 2px ${color}; }`);
+        rules.push(`body:not(.highlight-dim) .row-delta ${cell}::before, body:not(.highlight-dim) .row-cons ${cell}::before, body.delta-move:not(.highlight-dim) ${cell}::before, body.delta-cons:not(.highlight-dim) ${cell}::before, body.highlight-dim ${cell}::before { box-shadow: inset 0 0 0 2px ${color}; }`);
         rules.push(`.chart-logo-ring[data-team="${team}"] { display: inline; stroke: ${color}; fill: ${color}; filter: url(#chart-glow-${cls}); }`);
         rules.push(`.chart-stroke[data-team="${team}"] { stroke: ${color}; filter: url(#chart-glow-${cls}); }`);
         rules.push(`.chart-fill[data-team="${team}"] { fill: ${color}; filter: url(#chart-glow-${cls}); }`);
@@ -690,7 +690,7 @@ function setDeltaMode(mode) {
     if (mode !== "off") _lastOnDeltaMode = mode;
     try { localStorage.setItem("deltaMode", mode); } catch (e) {}
     // Rows opened one at a time belong to Off; any mode switch starts from a clean table.
-    document.querySelectorAll(".row-delta").forEach(r => r.classList.remove("row-delta"));
+    document.querySelectorAll(".row-delta, .row-cons").forEach(r => r.classList.remove("row-delta", "row-cons"));
     applyDeltaBodyClasses();
     ensureDeltaLabels();
     syncDeltaControls();
@@ -704,7 +704,7 @@ function cycleDeltaMode() {
 
 function setDeltaWeeksBack(n) {
     deltaWeeksBack = n;
-    const open = deltaRows(document).filter(r => r.classList.contains("row-delta"));
+    const open = deltaRows(document).filter(r => r.classList.contains("row-delta") || r.classList.contains("row-cons"));
     deltaRows(document).forEach(r => {
         r._deltaBack = undefined;
         r.querySelectorAll(".delta-label, .avg-label").forEach(el => el.remove());
@@ -1504,7 +1504,7 @@ function bindVoterCells(root) {
             cell.appendChild(sim);
         }
 
-        // ⋯ opens the voter menu (Show movement, History, Sort by similarity, Open ballot; Pin on touch screens)
+        // ⋯ opens the voter menu (Show movement, Show consensus, History, Sort by similarity, Open ballot; Pin on touch screens)
         if (!cell.querySelector(".voter-menu-btn")) {
             const more = document.createElement("span");
             more.className = "voter-menu-btn";
@@ -1550,7 +1550,31 @@ function toggleRowMovement(row) {
         const deltaData = buildDeltaData();
         const sortedTabs = getSortedTabs();
         allUserRows.forEach(r => {
+            r.classList.remove("row-cons");
             r.classList.add("row-delta");
+            const weekId = r.closest(".week-block")?.id;
+            if (weekId) applyDeltaToRow(r, weekId, deltaData, sortedTabs);
+        });
+    }
+}
+
+// Show / hide one voter's vs Consensus labels (all their rows), only while Changes is Off.
+// One label line per row: opening consensus closes that voter's movement, and vice versa.
+function isRowConsensusShown(row) { return row.classList.contains("row-cons"); }
+function toggleRowConsensus(row) {
+    if (deltaMode !== "off") return;
+    const allUserRows = getRowsByUsername(getVoterName(row));
+    if (isRowConsensusShown(row)) {
+        allUserRows.forEach(r => {
+            r.classList.remove("row-cons");
+            r.querySelectorAll(".delta-label, .avg-label").forEach(el => el.remove());
+        });
+    } else {
+        const deltaData = buildDeltaData();
+        const sortedTabs = getSortedTabs();
+        allUserRows.forEach(r => {
+            r.classList.remove("row-delta");
+            r.classList.add("row-cons");
             const weekId = r.closest(".week-block")?.id;
             if (weekId) applyDeltaToRow(r, weekId, deltaData, sortedTabs);
         });
@@ -1595,6 +1619,13 @@ const VOTER_MENU_ITEMS = [
         label: row => isRowMovementShown(row) ? "Hide movement" : "Show movement",
         active: isRowMovementShown,
         run: toggleRowMovement,
+    },
+    {   // Same, for the vs Consensus labels; only real ballots have them (not Overall / Data Ballots / ranking rows)
+        id: "consensus", show: row => deltaMode === "off" && row.classList.contains("voter-row")
+            && !row.classList.contains("row-weighted-ranking") && !row.closest(".ballot-section")?.id?.endsWith("-aggregate"),
+        label: row => isRowConsensusShown(row) ? "Hide consensus" : "Show consensus",
+        active: isRowConsensusShown,
+        run: toggleRowConsensus,
     },
     {
         id: "history", show: () => true, label: () => "History",
