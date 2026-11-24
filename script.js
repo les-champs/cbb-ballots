@@ -63,6 +63,10 @@ function refreshSettingsLabels(root = document) {
     root.querySelectorAll('.settings-item[data-action="avgLines"]').forEach(o => {
         o.textContent = avgLinesOn ? 'Avg Lines OFF' : 'Avg Lines ON';
     });
+    const weightedOn = document.body.classList.contains('weighted-consensus');
+    root.querySelectorAll('.settings-item[data-action="weightedConsensus"]').forEach(o => {
+        o.textContent = weightedOn ? 'Weighted Consensus OFF' : 'Weighted Consensus ON';
+    });
     // Dev is dimmed unless the locked keybinds are unlocked today. Reads storage directly
     // because this can run before the PIN-lock section (and its `let`s) near the end of the file.
     let devUnlocked = false;
@@ -1247,6 +1251,7 @@ document.getElementById("settings-modal").addEventListener("click", e => {
         case "highlightMode": setHighlightDim(!_highlightDim); break;
         case "avgLines": setAvgLinesVisible(!_showAvgLines); break;
         case "compactTable": setCompactTable(!_compactTable); break;
+        case "weightedConsensus": setWeightedConsensus(!_weightedConsensus); break;
         case "savePng": close(); saveTableAsPng(); break;
         case "legend": close(); toggleKeybindLegend(); break;
         case "devPin":
@@ -1267,6 +1272,10 @@ document.getElementById("settings-modal").addEventListener("click", e => {
 }));
 
 let currentSort = "alphabetic";
+// Weighted consensus setting (see setWeightedConsensus()); declared here because
+// setGlobalSort() reads it and can run before that section.
+let _weightedConsensus = false;
+try { _weightedConsensus = localStorage.getItem("weightedConsensus") === "1"; } catch (e) {}
 // Similar sort: every ballot ordered by its distance to one voter's ballot (similarTo),
 // started from that voter's ≈ button. sortBeforeSimilar is restored when it ends.
 let similarTo = null;
@@ -1278,6 +1287,7 @@ function setGlobalSort(sort) {
     currentSort = sort;
     if (sort !== "similar") similarTo = null;
     const label = sort === "similar" ? `≈ ${similarTo}`
+        : sort === "consensus" && _weightedConsensus ? "Consensus (W)"
         : SORT_LABELS[sort] || (sort.charAt(0).toUpperCase() + sort.slice(1));
     document.querySelectorAll(".voters-toggle").forEach(t => {
         if (t.style.display !== "none") t.textContent = label;
@@ -1382,15 +1392,20 @@ function applyTableSort(sort) {
             if (u && teams.length) officialBallots[u] = teams;
         });
         const consensusFor = makeLooConsensus(officialBallots, consensus);
-        const gapsFn = consensusGaps;
-        const scoreFn = (teams, name) => consensusDistance(teams, consensusFor(name));
+        // Weighted consensus (Settings): the Similar sort's ballotGaps()/ballotDistance(),
+        // with the leave-one-out consensus as the other ballot. Fractional, so labels round.
+        const weighted = _weightedConsensus;
+        const gapsFn = weighted ? ballotGaps : consensusGaps;
+        const scoreFn = (teams, name) => weighted
+            ? (teams?.length ? ballotDistance(teams, consensusFor(name)) : Infinity)
+            : consensusDistance(teams, consensusFor(name));
         // Get voter teams directly from visible rows
         const voterTeams = {};
         rows.forEach(r => { voterTeams[getVoterName(r)] = rowTeams(r); });
         const tiebreakFn = (ua, ub) => {
             const ta = voterTeams[ua], tb = voterTeams[ub];
             if (!ta?.length || !tb?.length) return 0;
-            const ga = gapsFn(ta, consensusFor(ua)), gb = gapsFn(tb, consensusFor(ub));
+            const ga = consensusGaps(ta, consensusFor(ua)), gb = consensusGaps(tb, consensusFor(ub));
             for (let i = 0; i < Math.min(ga.length, gb.length); i++) {
                 if (ga[i] !== gb[i]) return ga[i] - gb[i];
             }
@@ -1403,7 +1418,7 @@ function applyTableSort(sort) {
         const distLabel = (dist, teams, name) => {
             const gaps = gapsFn(teams, consensusFor(name)).sort((a, b) => b - a);
             const trimmed = gaps.slice(TRIM_TOP_GAPS).reduce((s, g) => s + g, 0) / 2 / 25;
-            return `${dist} (${trimmed.toFixed(2)})`;
+            return `${weighted ? Math.round(dist) : dist} (${trimmed.toFixed(2)})`;
         };
         const scores = {};
         rows.forEach(r => { const u = getVoterName(r); scores[u] = scoreFn(voterTeams[u], u); });
@@ -7853,6 +7868,20 @@ function setCompactTable(on) {
     updateAvgRankLines();  // columns move, so the avg-rank lines must be re-placed
 }
 setCompactTable(_compactTable);
+
+// ── Weighted consensus ──────────────────────────────────────────────────────
+// Off by default. When on, the Consensus sort scores each ballot with the Similar sort's
+// weighted ballotDistance() against its leave-one-out consensus, instead of the
+// unweighted consensusDistance(). The Year window's Cons Δ and the vs Consensus labels
+// stay unweighted. Toggled in Settings, remembered in localStorage.
+function setWeightedConsensus(on) {
+    _weightedConsensus = on;
+    document.body.classList.toggle("weighted-consensus", on);
+    refreshSettingsLabels();
+    try { localStorage.setItem("weightedConsensus", on ? "1" : "0"); } catch (e) {}
+    if (currentSort === "consensus") applyTableSort("consensus");
+}
+document.body.classList.toggle("weighted-consensus", _weightedConsensus);
 document.getElementById("week-arrow-prev").addEventListener("click", () => navigateWeek(-1));
 document.getElementById("week-arrow-next").addEventListener("click", () => navigateWeek(1));
 

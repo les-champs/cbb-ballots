@@ -1829,6 +1829,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
       <li><button class="settings-item" data-action="darkMode">Dark Mode</button></li>
       <li><button class="settings-item" data-action="highlightMode">Dim Highlights</button></li>
       <li><button class="settings-item" data-action="weekArrows">Nav Arrows ON</button></li>
+      <li><button class="settings-item" data-action="weightedConsensus">Weighted Consensus ON</button></li>
     </ul>
     <h3 class="settings-group">Other</h3>
     <ul class="settings-list">

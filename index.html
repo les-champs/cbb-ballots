@@ -2142,6 +2142,7 @@ body.dark {
       <li><button class="settings-item" data-action="darkMode">Dark Mode</button></li>
       <li><button class="settings-item" data-action="highlightMode">Dim Highlights</button></li>
       <li><button class="settings-item" data-action="weekArrows">Nav Arrows ON</button></li>
+      <li><button class="settings-item" data-action="weightedConsensus">Weighted Consensus ON</button></li>
     </ul>
     <h3 class="settings-group">Other</h3>
     <ul class="settings-list">
@@ -2686,6 +2687,10 @@ o.textContent=arrowsOn?'Nav Arrows OFF':'Nav Arrows ON';
 const avgLinesOn=document.body.classList.contains('show-avg-lines');
 root.querySelectorAll('.settings-item[data-action="avgLines"]').forEach(o=>{
 o.textContent=avgLinesOn?'Avg Lines OFF':'Avg Lines ON';
+});
+const weightedOn=document.body.classList.contains('weighted-consensus');
+root.querySelectorAll('.settings-item[data-action="weightedConsensus"]').forEach(o=>{
+o.textContent=weightedOn?'Weighted Consensus OFF':'Weighted Consensus ON';
 });
 let devUnlocked=false;
 try{
@@ -3638,6 +3643,7 @@ case "weekArrows":setWeekArrowsVisible(!_showWeekArrows);break;
 case "highlightMode":setHighlightDim(!_highlightDim);break;
 case "avgLines":setAvgLinesVisible(!_showAvgLines);break;
 case "compactTable":setCompactTable(!_compactTable);break;
+case "weightedConsensus":setWeightedConsensus(!_weightedConsensus);break;
 case "savePng":close();saveTableAsPng();break;
 case "legend":close();toggleKeybindLegend();break;
 case "devPin":
@@ -3654,6 +3660,8 @@ e.preventDefault();
 items[(i +(e.key==="ArrowDown"?1:items.length - 1))%items.length].focus();
 }));
 let currentSort="alphabetic";
+let _weightedConsensus=false;
+try{_weightedConsensus=localStorage.getItem("weightedConsensus")==="1";}catch(e){}
 let similarTo=null;
 let sortBeforeSimilar="alphabetic";
 const SORT_LABELS={alphabetic:"Functions",zetabetique:"Zétabétique",consensus:"Consensus"};
@@ -3661,6 +3669,7 @@ function setGlobalSort(sort){
 currentSort=sort;
 if(sort!=="similar")similarTo=null;
 const label=sort==="similar"?`≈ ${similarTo}`
+:sort==="consensus"&&_weightedConsensus?"Consensus (W)"
 :SORT_LABELS[sort]||(sort.charAt(0).toUpperCase()+ sort.slice(1));
 document.querySelectorAll(".voters-toggle").forEach(t=>{
 if(t.style.display!=="none")t.textContent=label;
@@ -3744,14 +3753,17 @@ const u=getVoterName(r);
 if(u&&teams.length)officialBallots[u]=teams;
 });
 const consensusFor=makeLooConsensus(officialBallots,consensus);
-const gapsFn=consensusGaps;
-const scoreFn=(teams,name)=>consensusDistance(teams,consensusFor(name));
+const weighted=_weightedConsensus;
+const gapsFn=weighted?ballotGaps:consensusGaps;
+const scoreFn=(teams,name)=>weighted
+?(teams?.length?ballotDistance(teams,consensusFor(name)):Infinity)
+:consensusDistance(teams,consensusFor(name));
 const voterTeams={};
 rows.forEach(r=>{voterTeams[getVoterName(r)]=rowTeams(r);});
 const tiebreakFn=(ua,ub)=>{
 const ta=voterTeams[ua],tb=voterTeams[ub];
 if(!ta?.length||!tb?.length)return 0;
-const ga=gapsFn(ta,consensusFor(ua)),gb=gapsFn(tb,consensusFor(ub));
+const ga=consensusGaps(ta,consensusFor(ua)),gb=consensusGaps(tb,consensusFor(ub));
 for(let i=0;i<Math.min(ga.length,gb.length);i++){
 if(ga[i]!==gb[i])return ga[i]- gb[i];
 }
@@ -3761,7 +3773,7 @@ const TRIM_TOP_GAPS=2;
 const distLabel=(dist,teams,name)=>{
 const gaps=gapsFn(teams,consensusFor(name)).sort((a,b)=>b - a);
 const trimmed=gaps.slice(TRIM_TOP_GAPS).reduce((s,g)=>s + g,0)/ 2 / 25;
-return `${dist} (${trimmed.toFixed(2)})`;
+return `${weighted?Math.round(dist):dist} (${trimmed.toFixed(2)})`;
 };
 const scores={};
 rows.forEach(r=>{const u=getVoterName(r);scores[u]=scoreFn(voterTeams[u],u);});
@@ -9100,6 +9112,14 @@ try{localStorage.setItem("compactTable",on?"1":"0");}catch(e){}
 updateAvgRankLines();
 }
 setCompactTable(_compactTable);
+function setWeightedConsensus(on){
+_weightedConsensus=on;
+document.body.classList.toggle("weighted-consensus",on);
+refreshSettingsLabels();
+try{localStorage.setItem("weightedConsensus",on?"1":"0");}catch(e){}
+if(currentSort==="consensus")applyTableSort("consensus");
+}
+document.body.classList.toggle("weighted-consensus",_weightedConsensus);
 document.getElementById("week-arrow-prev").addEventListener("click",()=>navigateWeek(-1));
 document.getElementById("week-arrow-next").addEventListener("click",()=>navigateWeek(1));
 const LOCKED_KEYS=new Set(["D","X","T","Y","G","U","W","H","K","P","S","?"]);
