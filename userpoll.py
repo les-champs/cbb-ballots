@@ -1853,6 +1853,11 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
   </div>
 </div>
 
+<div id="voter-menu" role="menu" tabindex="-1">
+  <h2 id="voter-menu-title"></h2>
+  <ul class="settings-list"></ul>
+</div>
+
 <div id="rankings-modal">
   <div id="rankings-box">
     <h2 id="rankings-title">Rankings</h2>

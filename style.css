@@ -325,12 +325,6 @@ body.hide-veteran-tags .veteran-tag,
     color: var(--color-consensus-dist);
 }
 
-.consensus-dist.similar-method {
-    cursor: pointer;
-    text-decoration: underline dotted;
-    text-underline-offset: 2px;
-}
-
 .veteran-tag.veteran-elite {
     color: rgba(235, 183, 33, 0.63);
 }
@@ -346,19 +340,19 @@ body.hide-veteran-tags .veteran-tag,
 }
 
 
-.pin-btn, .history-btn, .similar-btn {
+.pin-btn, .similar-btn, .voter-menu-btn {
     display: none;
     cursor: pointer;
     font-size: 11px;
     flex-shrink: 0;
-    opacity: 0.3;
+    opacity: 0.45;
     filter: grayscale(100%);
     user-select: none;
     transition: opacity 0.1s, filter 0.1s;
 }
 
-.pin-btn:hover, .history-btn:hover, .similar-btn:hover {
-    opacity: 0.6;
+.pin-btn:hover, .similar-btn:hover, .voter-menu-btn:hover {
+    opacity: 0.7;
 }
 
 .pin-btn.pinned {
@@ -366,12 +360,26 @@ body.hide-veteran-tags .veteran-tag,
     filter: grayscale(100%) brightness(0.2);
 }
 
+/* 📌 and ⋯ appear on hover; ⋯ stays while its menu is open, and always on touch screens */
 .voter-row.voter-cell-hover .pin-btn,
-.voter-row.voter-cell-hover .history-btn,
-.voter-row.voter-cell-hover .similar-btn {
+.voter-row.voter-cell-hover .voter-menu-btn,
+.voter-row.voter-menu-open .voter-menu-btn {
     display: inline;
 }
+@media (hover: none) {
+    .voter-row .voter-menu-btn { display: inline; }
+}
 
+.voter-menu-btn {
+    font-size: 13px;
+    font-weight: bold;
+    line-height: 1;
+    padding: 0 2px;
+    color: var(--color-heading);
+}
+.voter-row.voter-menu-open .voter-menu-btn { opacity: 0.85; }
+
+/* ≈ marks the reference voter of the Similar sort (started from the ⋯ menu) */
 .similar-btn {
     font-weight: bold;
 }
@@ -396,27 +404,6 @@ body.sort-similar .similar-btn.active {
 .overall-row .voter-cell {
     cursor: pointer;
     justify-content: center;
-}
-
-
-.ballot-link-btn {
-    display: none;
-    cursor: pointer;
-    flex-shrink: 0;
-    opacity: 0.3;
-    color: #888;
-    user-select: none;
-    transition: opacity 0.1s;
-    line-height: 1;
-}
-
-.ballot-link-btn:hover {
-    opacity: 0.7;
-}
-
-.voter-row.voter-cell-hover .ballot-link-btn {
-    display: inline-flex;
-    align-items: center;
 }
 
 
@@ -1495,7 +1482,7 @@ body.dark .pin-btn.pinned {
     align-items: center;
 }
 #settings-modal.open, #changes-modal.open, #rankings-modal.open, #reports-modal.open { display: flex; }
-#settings-box, #changes-box, #rankings-box, #reports-box {
+#settings-box, #changes-box, #rankings-box, #reports-box, #voter-menu {
     background: var(--color-bg-modal);
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.25);
@@ -1505,7 +1492,7 @@ body.dark .pin-btn.pinned {
     overflow: auto;
     padding: 14px 14px 12px;
 }
-#settings-title, #changes-title, #rankings-title, #reports-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
+#settings-title, #changes-title, #rankings-title, #reports-title, #voter-menu-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
 .settings-list, #reports-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 .settings-item, .report-item {
     display: block;
@@ -1547,6 +1534,21 @@ body.dark .pin-btn.pinned {
 .settings-item:disabled { cursor: default; }
 /* Dev stays dimmed until the PIN is entered (still clickable unless locked out) */
 .settings-item.dimmed, .settings-item.dimmed:hover { opacity: 0.35; }
+
+/* Voter menu (⋯ beside a voter's name): a popover with the Rankings window's box,
+   positioned under the ⋯ by toggleVoterMenu(); no backdrop */
+#voter-menu {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    width: auto;
+    min-width: 170px;
+    max-width: 240px;
+    padding: 10px 10px 9px;
+}
+#voter-menu.open { display: block; }
+#voter-menu:focus { outline: none; }
+#voter-menu-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Conference table (Shift+K) */
 #conference-modal {
@@ -1641,8 +1643,8 @@ body.data-ballot-dragging, body.data-ballot-dragging * { cursor: grabbing !impor
 /* Clickable elements: don't select text on rapid/double clicks (or flash on mobile taps).
    Covers every cursor:pointer rule above plus JS/SVG elements given an inline pointer
    cursor or onclick. Add new clickable selectors here. */
-h1 span, .week-arrow, .picker-btn, .week-tab, .voter-name, .pin-btn, .history-btn, .similar-btn,
-.overall-row .voter-cell, .ballot-link-btn, .voters-toggle, .sort-option, .team-logo,
+h1 span, .week-arrow, .picker-btn, .week-tab, .voter-name, .pin-btn, .similar-btn, .voter-menu-btn,
+.overall-row .voter-cell, .voters-toggle, .sort-option, .team-logo,
 .rank-header-num, .conf-stats-table .conf-teams img, .records-view, .records-switch,
 #season-stats-table.season-records tr.records-team-row, .records-retry, .spread-toggle,
 .modal-mode-tab, .week-chart-kind, #voter-history-table .week-stats-table tr[data-team],

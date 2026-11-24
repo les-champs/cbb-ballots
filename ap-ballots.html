@@ -345,12 +345,6 @@ body.hide-veteran-tags .veteran-tag,
     color: var(--color-consensus-dist);
 }
 
-.consensus-dist.similar-method {
-    cursor: pointer;
-    text-decoration: underline dotted;
-    text-underline-offset: 2px;
-}
-
 .veteran-tag.veteran-elite {
     color: rgba(235, 183, 33, 0.63);
 }
@@ -366,19 +360,19 @@ body.hide-veteran-tags .veteran-tag,
 }
 
 
-.pin-btn, .history-btn, .similar-btn {
+.pin-btn, .similar-btn, .voter-menu-btn {
     display: none;
     cursor: pointer;
     font-size: 11px;
     flex-shrink: 0;
-    opacity: 0.3;
+    opacity: 0.45;
     filter: grayscale(100%);
     user-select: none;
     transition: opacity 0.1s, filter 0.1s;
 }
 
-.pin-btn:hover, .history-btn:hover, .similar-btn:hover {
-    opacity: 0.6;
+.pin-btn:hover, .similar-btn:hover, .voter-menu-btn:hover {
+    opacity: 0.7;
 }
 
 .pin-btn.pinned {
@@ -386,12 +380,26 @@ body.hide-veteran-tags .veteran-tag,
     filter: grayscale(100%) brightness(0.2);
 }
 
+/* 📌 and ⋯ appear on hover; ⋯ stays while its menu is open, and always on touch screens */
 .voter-row.voter-cell-hover .pin-btn,
-.voter-row.voter-cell-hover .history-btn,
-.voter-row.voter-cell-hover .similar-btn {
+.voter-row.voter-cell-hover .voter-menu-btn,
+.voter-row.voter-menu-open .voter-menu-btn {
     display: inline;
 }
+@media (hover: none) {
+    .voter-row .voter-menu-btn { display: inline; }
+}
 
+.voter-menu-btn {
+    font-size: 13px;
+    font-weight: bold;
+    line-height: 1;
+    padding: 0 2px;
+    color: var(--color-heading);
+}
+.voter-row.voter-menu-open .voter-menu-btn { opacity: 0.85; }
+
+/* ≈ marks the reference voter of the Similar sort (started from the ⋯ menu) */
 .similar-btn {
     font-weight: bold;
 }
@@ -416,27 +424,6 @@ body.sort-similar .similar-btn.active {
 .overall-row .voter-cell {
     cursor: pointer;
     justify-content: center;
-}
-
-
-.ballot-link-btn {
-    display: none;
-    cursor: pointer;
-    flex-shrink: 0;
-    opacity: 0.3;
-    color: #888;
-    user-select: none;
-    transition: opacity 0.1s;
-    line-height: 1;
-}
-
-.ballot-link-btn:hover {
-    opacity: 0.7;
-}
-
-.voter-row.voter-cell-hover .ballot-link-btn {
-    display: inline-flex;
-    align-items: center;
 }
 
 
@@ -1515,7 +1502,7 @@ body.dark .pin-btn.pinned {
     align-items: center;
 }
 #settings-modal.open, #changes-modal.open, #rankings-modal.open, #reports-modal.open { display: flex; }
-#settings-box, #changes-box, #rankings-box, #reports-box {
+#settings-box, #changes-box, #rankings-box, #reports-box, #voter-menu {
     background: var(--color-bg-modal);
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.25);
@@ -1525,7 +1512,7 @@ body.dark .pin-btn.pinned {
     overflow: auto;
     padding: 14px 14px 12px;
 }
-#settings-title, #changes-title, #rankings-title, #reports-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
+#settings-title, #changes-title, #rankings-title, #reports-title, #voter-menu-title { margin: 0 0 8px; font-size: 0.9rem; color: var(--color-modal-h2); }
 .settings-list, #reports-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 .settings-item, .report-item {
     display: block;
@@ -1567,6 +1554,21 @@ body.dark .pin-btn.pinned {
 .settings-item:disabled { cursor: default; }
 /* Dev stays dimmed until the PIN is entered (still clickable unless locked out) */
 .settings-item.dimmed, .settings-item.dimmed:hover { opacity: 0.35; }
+
+/* Voter menu (⋯ beside a voter's name): a popover with the Rankings window's box,
+   positioned under the ⋯ by toggleVoterMenu(); no backdrop */
+#voter-menu {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    width: auto;
+    min-width: 170px;
+    max-width: 240px;
+    padding: 10px 10px 9px;
+}
+#voter-menu.open { display: block; }
+#voter-menu:focus { outline: none; }
+#voter-menu-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Conference table (Shift+K) */
 #conference-modal {
@@ -1661,8 +1663,8 @@ body.data-ballot-dragging, body.data-ballot-dragging * { cursor: grabbing !impor
 /* Clickable elements: don't select text on rapid/double clicks (or flash on mobile taps).
    Covers every cursor:pointer rule above plus JS/SVG elements given an inline pointer
    cursor or onclick. Add new clickable selectors here. */
-h1 span, .week-arrow, .picker-btn, .week-tab, .voter-name, .pin-btn, .history-btn, .similar-btn,
-.overall-row .voter-cell, .ballot-link-btn, .voters-toggle, .sort-option, .team-logo,
+h1 span, .week-arrow, .picker-btn, .week-tab, .voter-name, .pin-btn, .similar-btn, .voter-menu-btn,
+.overall-row .voter-cell, .voters-toggle, .sort-option, .team-logo,
 .rank-header-num, .conf-stats-table .conf-teams img, .records-view, .records-switch,
 #season-stats-table.season-records tr.records-team-row, .records-retry, .spread-toggle,
 .modal-mode-tab, .week-chart-kind, #voter-history-table .week-stats-table tr[data-team],
@@ -1956,6 +1958,11 @@ body.dark {
     <h3 class="settings-group" id="changes-since-group"><label for="changes-since-select">Compare With</label></h3>
     <select id="changes-since-select" class="settings-select"></select>
   </div>
+</div>
+
+<div id="voter-menu" role="menu" tabindex="-1">
+  <h2 id="voter-menu-title"></h2>
+  <ul class="settings-list"></ul>
 </div>
 
 <div id="rankings-modal">
@@ -2717,7 +2724,7 @@ if(!officialRow)continue;
 const clone=officialRow.cloneNode(true);
 clone.dataset.pinnedUser=username;
 clone.classList.add("row-pinned-agg");
-clone.querySelectorAll(".pin-btn, .history-btn, .similar-btn, .ballot-link-btn").forEach(el=>el.remove());
+clone.querySelectorAll(".pin-btn, .similar-btn, .voter-menu-btn").forEach(el=>el.remove());
 clone.querySelectorAll(".voter-cell").forEach(el=>el.dataset.bound="");
 clone.querySelectorAll(".team-logo").forEach(el=>el.dataset.bound="");
 aggTbody.appendChild(clone);
@@ -2948,9 +2955,6 @@ if(!teams?.length)return Infinity;
 return consensusGaps(teams,cons).reduce((s,g)=>s + g,0)/ 2;
 }
 const SIMILAR_UNSHARED_PENALTY=3;
-const SIMILAR_METHODS={flat:"Flat",weighted:"Weighted"};
-let similarMethod="weighted";
-try{if(SIMILAR_METHODS[localStorage.getItem("similarMethod")])similarMethod=localStorage.getItem("similarMethod");}catch(e){}
 function ballotGaps(a,b){
 const ra={},rb={};
 a.slice(0,25).forEach((t,i)=>{ra[t]=i;});
@@ -2959,7 +2963,6 @@ return[...new Set([...Object.keys(ra),...Object.keys(rb)])].map(t=>{
 const pa=ra[t]??25,pb=rb[t]??25;
 const shared=t in ra&&t in rb;
 const gap=Math.abs(pa - pb)+(shared?0:SIMILAR_UNSHARED_PENALTY);
-if(similarMethod!=="weighted")return gap;
 const r=Math.min(pa,pb);
 return gap*(shared?4*0.8**r:Math.max((25 - r)/ 25*2,1));
 });
@@ -3441,16 +3444,7 @@ tbody.appendChild(r);
 if(!userPinned.includes(r))return;
 const name=getVoterName(r);
 if(name===similarTo){
-addVoterLabel(r,`ref · ${SIMILAR_METHODS[similarMethod]}`);
-const lbl=r.querySelector(".consensus-dist");
-lbl.classList.add("similar-method");
-lbl.title="Switch between Weighted (top ranks count more) and Flat (every place equal)";
-lbl.addEventListener("click",e=>{
-e.stopPropagation();
-similarMethod=similarMethod==="weighted"?"flat":"weighted";
-try{localStorage.setItem("similarMethod",similarMethod);}catch(err){}
-applyTableSort("similar");
-});
+addVoterLabel(r,"ref");
 }else{const d=ballotDistance(teamsOf[name],ref);if(d!==Infinity)addVoterLabel(r,`${Math.round(d)}`);}
 });
 rows.forEach(r=>{
@@ -3477,53 +3471,28 @@ if(row&&tbody)pinRow(row,tbody);
 });
 cell.appendChild(pin);
 }
-if(!cell.querySelector(".history-btn")){
-const cal=document.createElement("span");
-cal.className="history-btn";
-cal.textContent="📅";
-cal.addEventListener("click",e=>{
-e.stopPropagation();
-const row=cell.closest("tr");
-const username=getVoterName(row);
-if(username)showVoterHistory(username);
-});
-cell.appendChild(cal);
-}
 const simRow=cell.closest("tr");
-if(!cell.querySelector(".similar-btn")&&simRow&&!simRow.matches(".overall-row, .row-weighted-ranking")&&
-!["Official Overall","AP Overall","Recency"].includes(getVoterName(simRow))){
+if(!cell.querySelector(".similar-btn")&&voterMenuCanSimilar(simRow)){
 const sim=document.createElement("span");
 sim.className="similar-btn";
 sim.textContent="≈";
-sim.title="Sort by similarity to this ballot";
+sim.title="Stop sorting by similarity";
 sim.addEventListener("click",e=>{
 e.stopPropagation();
-const row=cell.closest("tr");
-const username=getVoterName(row);
-if(!username)return;
-if(currentSort==="similar"&&similarTo===username){
-applyTableSort(sortBeforeSimilar);
-return;
-}
-if(currentSort!=="similar")sortBeforeSimilar=currentSort;
-const tbody=row.closest("tbody");
-if(!pinnedUsers.has(username)&&tbody)pinRow(row,tbody);
-similarTo=username;
-applyTableSort("similar");
+toggleSimilarTo(cell.closest("tr"));
 });
 cell.appendChild(sim);
 }
-if(!cell.querySelector(".ballot-link-btn")&&cell.dataset.ballotUrl){
-const lnk=document.createElement("span");
-lnk.className="ballot-link-btn";
-lnk.title="Open ballot";
-lnk.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
-lnk.addEventListener("click",e=>{
+if(!cell.querySelector(".voter-menu-btn")){
+const more=document.createElement("span");
+more.className="voter-menu-btn";
+more.textContent="⋯";
+more.title="Voter options";
+more.addEventListener("click",e=>{
 e.stopPropagation();
-const url=cell.dataset.ballotUrl;
-if(url)window.open(url,"_blank","noopener,noreferrer");
+toggleVoterMenu(more);
 });
-cell.appendChild(lnk);
+cell.appendChild(more);
 }
 cell.addEventListener("mouseenter",()=>{
 cell.closest("tr")?.classList.add("voter-cell-hover");
@@ -3531,17 +3500,20 @@ cell.closest("tr")?.classList.add("voter-cell-hover");
 cell.addEventListener("mouseleave",()=>{
 cell.closest("tr")?.classList.remove("voter-cell-hover");
 });
-cell.addEventListener("click",e=>{
-const row=cell.closest("tr");
+cell.addEventListener("click",()=>{
+toggleVoterMenu(cell.querySelector(".voter-name")||cell);
+});
+});
+}
+function isRowMovementShown(row){return row.classList.contains("row-delta");}
+function toggleRowMovement(row){
 if(deltaMode!=="off")return;
 if(row.classList.contains("row-weighted-ranking")){
 row.classList.toggle("row-delta");
 return;
 }
-const username=getVoterName(row);
-const isActive=row.classList.contains("row-delta");
-const allUserRows=getRowsByUsername(username);
-if(isActive){
+const allUserRows=getRowsByUsername(getVoterName(row));
+if(isRowMovementShown(row)){
 allUserRows.forEach(r=>{
 r.classList.remove("row-delta");
 r.querySelectorAll(".delta-label, .avg-label").forEach(el=>el.remove());
@@ -3555,9 +3527,118 @@ const weekId=r.closest(".week-block")?.id;
 if(weekId)applyDeltaToRow(r,weekId,deltaData,sortedTabs);
 });
 }
-});
-});
 }
+function voterMenuCanSimilar(row){
+return!!row&&!row.matches(".overall-row, .row-weighted-ranking")&&
+!["Official Overall","AP Overall","Recency"].includes(getVoterName(row));
+}
+function toggleSimilarTo(row){
+const username=getVoterName(row);
+if(!username)return;
+if(currentSort==="similar"&&similarTo===username){
+applyTableSort(sortBeforeSimilar);
+return;
+}
+if(currentSort!=="similar")sortBeforeSimilar=currentSort;
+const tbody=row.closest("tbody");
+if(!pinnedUsers.has(username)&&tbody)pinRow(row,tbody);
+similarTo=username;
+applyTableSort("similar");
+}
+const TOUCH_UI=window.matchMedia?.("(hover: none)").matches;
+let _voterMenuAnchor=null;
+const VOTER_MENU_ITEMS=[
+{
+id:"pin",show:row=>TOUCH_UI&&!!row.closest("tbody")&&!row.classList.contains("row-pinned-agg"),
+label:row=>pinnedUsers.has(getVoterName(row))?"Unpin":"Pin",
+run:row=>pinRow(row,row.closest("tbody")),
+},
+{
+id:"movement",show:()=>deltaMode==="off",
+label:row=>isRowMovementShown(row)?"Hide movement":"Show movement",
+active:isRowMovementShown,
+run:toggleRowMovement,
+},
+{
+id:"history",show:()=>true,label:()=>"History",
+run:row=>showVoterHistory(getVoterName(row)),
+},
+{
+id:"similar",show:voterMenuCanSimilar,
+label:row=>currentSort==="similar"&&similarTo===getVoterName(row)
+?"Stop sorting by similarity":"Sort by similarity",
+active:row=>currentSort==="similar"&&similarTo===getVoterName(row),
+run:toggleSimilarTo,
+},
+{
+id:"ballot",show:row=>!!row.querySelector(".voter-cell")?.dataset.ballotUrl,
+label:()=>"Open ballot ↗",
+run:row=>window.open(row.querySelector(".voter-cell").dataset.ballotUrl,"_blank","noopener,noreferrer"),
+},
+];
+function closeVoterMenu(){
+const menu=document.getElementById("voter-menu");
+if(!menu?.classList.contains("open"))return;
+menu.classList.remove("open");
+_voterMenuAnchor?.closest("tr")?.classList.remove("voter-menu-open");
+_voterMenuAnchor=null;
+}
+function toggleVoterMenu(anchor){
+const menu=document.getElementById("voter-menu");
+if(!menu)return;
+if(_voterMenuAnchor===anchor){closeVoterMenu();return;}
+closeVoterMenu();
+const row=anchor.closest("tr");
+const username=getVoterName(row);
+if(!row||!username)return;
+menu.querySelector("#voter-menu-title").textContent=username;
+const list=menu.querySelector(".settings-list");
+list.textContent="";
+VOTER_MENU_ITEMS.filter(it=>it.show(row)).forEach(it=>{
+const li=document.createElement("li");
+const b=document.createElement("button");
+b.type="button";
+b.className="settings-item";
+b.dataset.voterAction=it.id;
+b.textContent=it.label(row);
+if(it.active?.(row))b.classList.add("active");
+b.addEventListener("click",()=>{closeVoterMenu();it.run(row);});
+li.appendChild(b);
+list.appendChild(li);
+});
+_voterMenuAnchor=anchor;
+row.classList.add("voter-menu-open");
+menu.classList.add("open");
+const a=anchor.getBoundingClientRect();
+const m=menu.getBoundingClientRect();
+let left=Math.min(a.left - 8,window.innerWidth - m.width - 8);
+let top=a.bottom + 4;
+if(top + m.height>window.innerHeight - 8)top=Math.max(8,a.top - m.height - 4);
+menu.style.left=`${Math.max(8,left)}px`;
+menu.style.top=`${top}px`;
+menu.focus({preventScroll:true});
+}
+document.addEventListener("mousedown",e=>{
+if(!_voterMenuAnchor)return;
+if(e.target.closest("#voter-menu")||_voterMenuAnchor.contains(e.target))return;
+closeVoterMenu();
+},true);
+document.addEventListener("touchstart",e=>{
+if(_voterMenuAnchor&&!e.target.closest("#voter-menu")&&!_voterMenuAnchor.contains(e.target))closeVoterMenu();
+},{capture:true,passive:true});
+window.addEventListener("scroll",closeVoterMenu,true);
+window.addEventListener("resize",closeVoterMenu);
+document.getElementById("voter-menu")?.addEventListener("keydown",e=>{
+if(e.key==="Escape"){e.stopPropagation();closeVoterMenu();return;}
+if(e.shiftKey||(e.key!=="ArrowDown"&&e.key!=="ArrowUp"))return;
+const items=[...e.currentTarget.querySelectorAll(".settings-item")];
+if(!items.length)return;
+e.preventDefault();
+const i=items.indexOf(document.activeElement);
+const next=i<0?(e.key==="ArrowDown"?0:items.length - 1)
+:(i +(e.key==="ArrowDown"?1:items.length - 1))%items.length;
+items[next].focus();
+});
 function compute5WeekWeighted(weekId,deltaData,yearTabs){
 const currIdx=yearTabs.findIndex(t=>t.dataset.week===weekId);
 if(currIdx===-1)return null;
@@ -4791,7 +4872,7 @@ const row=aggRow.cloneNode(true);
 row.className="overall-row";
 row.dataset.ranking="Overall";
 row.dataset.voterAlias=getVoterName(aggRow);
-row.querySelectorAll(".pin-btn, .history-btn, .similar-btn, .ballot-link-btn, .delta-label, .avg-label, .consensus-dist")
+row.querySelectorAll(".pin-btn, .similar-btn, .voter-menu-btn, .delta-label, .avg-label, .consensus-dist")
 .forEach(el=>el.remove());
 row.querySelectorAll(".team-logo").forEach(img=>{img.dataset.bound="";});
 const nameEl=row.querySelector(".voter-name");
@@ -6085,7 +6166,7 @@ const rows=table.tBodies[0].rows;
 const firstTh=table.tHead?.rows[0]?.cells[0];
 const current=parseFloat(getComputedStyle(firstTh||rows[0].cells[0]).width);
 let max=0;
-const skip=".veteran-tag, .pin-btn, .history-btn, .similar-btn, .ballot-link-btn, .consensus-dist";
+const skip=".veteran-tag, .pin-btn, .similar-btn, .voter-menu-btn, .consensus-dist";
 const range=document.createRange();
 const measure=(cell,root)=>{
 const left=cell.getBoundingClientRect().left + parseFloat(getComputedStyle(cell).paddingLeft);
@@ -8713,6 +8794,7 @@ document.getElementById("reports-modal").classList.remove("open");
 document.getElementById("settings-modal").classList.remove("open");
 document.getElementById("changes-modal").classList.remove("open");
 document.getElementById("rankings-modal").classList.remove("open");
+closeVoterMenu();
 }
 if(e.shiftKey&&(e.key==="V"||e.key==="v")){
 e.preventDefault();

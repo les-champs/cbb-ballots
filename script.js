@@ -551,7 +551,7 @@ function syncPinnedToAggregate(username, isPinning) {
                 const clone = officialRow.cloneNode(true);
                 clone.dataset.pinnedUser = username;
                 clone.classList.add("row-pinned-agg");
-                clone.querySelectorAll(".pin-btn, .history-btn, .similar-btn, .ballot-link-btn").forEach(el => el.remove());
+                clone.querySelectorAll(".pin-btn, .similar-btn, .voter-menu-btn").forEach(el => el.remove());
                 clone.querySelectorAll(".voter-cell").forEach(el => el.dataset.bound = "");
                 clone.querySelectorAll(".team-logo").forEach(el => el.dataset.bound = "");
                 aggTbody.appendChild(clone);
@@ -860,22 +860,16 @@ function consensusDistance(teams, cons) {
 // ── Ballot-to-ballot distance (Similar sort) ──────────────────────────────────
 // Like consensusDistance() but between two voters, and ranking a team the other voter
 // leaves unranked costs an extra SIMILAR_UNSHARED_PENALTY places: "would rank them" vs
-// "wouldn't" counts for more than a shuffle inside the top 25. Both top 25s hold the
-// same number of unshared teams, so the Flat halved total stays a whole number.
+// "wouldn't" counts for more than a shuffle inside the top 25.
 //
-// Two methods (similarMethod, toggled by clicking the reference row's label):
-//   flat     — every place counts the same.
-//   weighted — tuned to what voters notice: (1) do we agree on the top teams, (2) do we
-//              rank the same teams. r = where the higher of the two voters has the team.
-//              Teams both rank: gap × 4·0.8^r (×4 at #1, ×1.6 at #5, ×0.5 at #10, ~0 by
-//              #20), so the top order dominates and bubble shuffles are nearly free.
-//              Teams only one ranks: gap × max(2·(25−r)/25, 1), never below ×1, so a
-//              different #25 team still costs 4 and leaving off a top team costs extra.
-//              Totals are fractional; labels round to whole numbers.
+// Weighted, tuned to what voters notice: (1) do we agree on the top teams, (2) do we
+// rank the same teams. r = where the higher of the two voters has the team.
+// Teams both rank: gap × 4·0.8^r (×4 at #1, ×1.6 at #5, ×0.5 at #10, ~0 by #20), so the
+// top order dominates and bubble shuffles are nearly free.
+// Teams only one ranks: gap × max(2·(25−r)/25, 1), never below ×1, so a different #25
+// team still costs 4 and leaving off a top team costs extra.
+// Totals are fractional; labels round to whole numbers.
 const SIMILAR_UNSHARED_PENALTY = 3;
-const SIMILAR_METHODS = { flat: "Flat", weighted: "Weighted" };
-let similarMethod = "weighted";
-try { if (SIMILAR_METHODS[localStorage.getItem("similarMethod")]) similarMethod = localStorage.getItem("similarMethod"); } catch (e) {}
 function ballotGaps(a, b) {
     const ra = {}, rb = {};
     a.slice(0, 25).forEach((t, i) => { ra[t] = i; });
@@ -884,7 +878,6 @@ function ballotGaps(a, b) {
         const pa = ra[t] ?? 25, pb = rb[t] ?? 25;
         const shared = t in ra && t in rb;
         const gap = Math.abs(pa - pb) + (shared ? 0 : SIMILAR_UNSHARED_PENALTY);
-        if (similarMethod !== "weighted") return gap;
         const r = Math.min(pa, pb);
         return gap * (shared ? 4 * 0.8 ** r : Math.max((25 - r) / 25 * 2, 1));
     });
@@ -1458,17 +1451,7 @@ function applyTableSort(sort) {
             if (!userPinned.includes(r)) return;
             const name = getVoterName(r);
             if (name === similarTo) {
-                // Clickable method switch on the reference row: "ref · Weighted" ⇄ "ref · Flat"
-                addVoterLabel(r, `ref · ${SIMILAR_METHODS[similarMethod]}`);
-                const lbl = r.querySelector(".consensus-dist");
-                lbl.classList.add("similar-method");
-                lbl.title = "Switch between Weighted (top ranks count more) and Flat (every place equal)";
-                lbl.addEventListener("click", e => {
-                    e.stopPropagation();
-                    similarMethod = similarMethod === "weighted" ? "flat" : "weighted";
-                    try { localStorage.setItem("similarMethod", similarMethod); } catch (err) {}
-                    applyTableSort("similar");
-                });
+                addVoterLabel(r, "ref");
             } else { const d = ballotDistance(teamsOf[name], ref); if (d !== Infinity) addVoterLabel(r, `${Math.round(d)}`); }
         });
         rows.forEach(r => {
@@ -1500,58 +1483,32 @@ function bindVoterCells(root) {
             cell.appendChild(pin);
         }
 
-        // Add history button if not already present
-        if (!cell.querySelector(".history-btn")) {
-            const cal = document.createElement("span");
-            cal.className = "history-btn";
-            cal.textContent = "📅";
-            cal.addEventListener("click", e => {
-                e.stopPropagation();
-                const row = cell.closest("tr");
-                const username = getVoterName(row);
-                if (username) showVoterHistory(username);
-            });
-            cell.appendChild(cal);
-        }
-
-        // Add similar-ballots button: sort everyone by closeness to this ballot (click again to undo)
+        // Similarity marker: shown only on the reference voter while the Similar sort is on
+        // (setGlobalSort toggles .active); clicking it ends the sort. Started from the ⋯ menu.
         const simRow = cell.closest("tr");
-        if (!cell.querySelector(".similar-btn") && simRow && !simRow.matches(".overall-row, .row-weighted-ranking") &&
-            !["Official Overall", "AP Overall", "Recency"].includes(getVoterName(simRow))) {
+        if (!cell.querySelector(".similar-btn") && voterMenuCanSimilar(simRow)) {
             const sim = document.createElement("span");
             sim.className = "similar-btn";
             sim.textContent = "≈";
-            sim.title = "Sort by similarity to this ballot";
+            sim.title = "Stop sorting by similarity";
             sim.addEventListener("click", e => {
                 e.stopPropagation();
-                const row = cell.closest("tr");
-                const username = getVoterName(row);
-                if (!username) return;
-                if (currentSort === "similar" && similarTo === username) {
-                    applyTableSort(sortBeforeSimilar);
-                    return;
-                }
-                if (currentSort !== "similar") sortBeforeSimilar = currentSort;
-                const tbody = row.closest("tbody");
-                if (!pinnedUsers.has(username) && tbody) pinRow(row, tbody);
-                similarTo = username;
-                applyTableSort("similar");
+                toggleSimilarTo(cell.closest("tr"));
             });
             cell.appendChild(sim);
         }
 
-        // Add ballot link button if not already present and URL exists
-        if (!cell.querySelector(".ballot-link-btn") && cell.dataset.ballotUrl) {
-            const lnk = document.createElement("span");
-            lnk.className = "ballot-link-btn";
-            lnk.title = "Open ballot";
-            lnk.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
-            lnk.addEventListener("click", e => {
+        // ⋯ opens the voter menu (Show movement, History, Sort by similarity, Open ballot; Pin on touch screens)
+        if (!cell.querySelector(".voter-menu-btn")) {
+            const more = document.createElement("span");
+            more.className = "voter-menu-btn";
+            more.textContent = "⋯";
+            more.title = "Voter options";
+            more.addEventListener("click", e => {
                 e.stopPropagation();
-                const url = cell.dataset.ballotUrl;
-                if (url) window.open(url, "_blank", "noopener,noreferrer");
+                toggleVoterMenu(more);
             });
-            cell.appendChild(lnk);
+            cell.appendChild(more);
         }
 
         cell.addEventListener("mouseenter", () => {
@@ -1561,36 +1518,164 @@ function bindVoterCells(root) {
             cell.closest("tr")?.classList.remove("voter-cell-hover");
         });
 
-        cell.addEventListener("click", e => {
-            const row = cell.closest("tr");
-            if (deltaMode !== "off") return;
-
-            // Special handling for the Recency aggregate row
-            if (row.classList.contains("row-weighted-ranking")) {
-                row.classList.toggle("row-delta");
-                return;
-            }
-
-            const username = getVoterName(row);
-            const isActive = row.classList.contains("row-delta");
-            const allUserRows = getRowsByUsername(username);
-            if (isActive) {
-                allUserRows.forEach(r => {
-                    r.classList.remove("row-delta");
-                    r.querySelectorAll(".delta-label, .avg-label").forEach(el => el.remove());
-                });
-            } else {
-                const deltaData = buildDeltaData();
-                const sortedTabs = getSortedTabs();
-                allUserRows.forEach(r => {
-                    r.classList.add("row-delta");
-                    const weekId = r.closest(".week-block")?.id;
-                    if (weekId) applyDeltaToRow(r, weekId, deltaData, sortedTabs);
-                });
-            }
+        // Clicking anywhere in the name cell opens the voter menu, anchored to the name
+        cell.addEventListener("click", () => {
+            toggleVoterMenu(cell.querySelector(".voter-name") || cell);
         });
     });
 }
+
+// Show / hide one voter's movement labels (all their rows), only while Changes is Off.
+// Ranking rows (Recency etc.) toggle just that row.
+function isRowMovementShown(row) { return row.classList.contains("row-delta"); }
+function toggleRowMovement(row) {
+    if (deltaMode !== "off") return;
+    if (row.classList.contains("row-weighted-ranking")) {
+        row.classList.toggle("row-delta");
+        return;
+    }
+    const allUserRows = getRowsByUsername(getVoterName(row));
+    if (isRowMovementShown(row)) {
+        allUserRows.forEach(r => {
+            r.classList.remove("row-delta");
+            r.querySelectorAll(".delta-label, .avg-label").forEach(el => el.remove());
+        });
+    } else {
+        const deltaData = buildDeltaData();
+        const sortedTabs = getSortedTabs();
+        allUserRows.forEach(r => {
+            r.classList.add("row-delta");
+            const weekId = r.closest(".week-block")?.id;
+            if (weekId) applyDeltaToRow(r, weekId, deltaData, sortedTabs);
+        });
+    }
+}
+
+// Similar sort is offered for real ballots only (not Overall / ranking / aggregate rows)
+function voterMenuCanSimilar(row) {
+    return !!row && !row.matches(".overall-row, .row-weighted-ranking") &&
+        !["Official Overall", "AP Overall", "Recency"].includes(getVoterName(row));
+}
+
+// Sort everyone by closeness to this row's ballot; again on the same voter undoes it
+function toggleSimilarTo(row) {
+    const username = getVoterName(row);
+    if (!username) return;
+    if (currentSort === "similar" && similarTo === username) {
+        applyTableSort(sortBeforeSimilar);
+        return;
+    }
+    if (currentSort !== "similar") sortBeforeSimilar = currentSort;
+    const tbody = row.closest("tbody");
+    if (!pinnedUsers.has(username) && tbody) pinRow(row, tbody);
+    similarTo = username;
+    applyTableSort("similar");
+}
+
+// ── Voter menu (⋯ beside a voter's name) ─────────────────────────────────────
+// One #voter-menu popover (markup in build_full_html()), anchored under the clicked name or ⋯ and
+// styled like the Rankings window. Items are rebuilt on every open from VOTER_MENU_ITEMS;
+// each closes the menu and runs. ↑/↓ move focus, Esc / outside click / scroll close it.
+const TOUCH_UI = window.matchMedia?.("(hover: none)").matches;
+let _voterMenuAnchor = null;
+const VOTER_MENU_ITEMS = [
+    {   // Touch screens can't reach the hover-only 📌, so Pin is offered here too
+        id: "pin", show: row => TOUCH_UI && !!row.closest("tbody") && !row.classList.contains("row-pinned-agg"),
+        label: row => pinnedUsers.has(getVoterName(row)) ? "Unpin" : "Pin",
+        run: row => pinRow(row, row.closest("tbody")),
+    },
+    {   // Movement labels are already on every row while Changes is on
+        id: "movement", show: () => deltaMode === "off",
+        label: row => isRowMovementShown(row) ? "Hide movement" : "Show movement",
+        active: isRowMovementShown,
+        run: toggleRowMovement,
+    },
+    {
+        id: "history", show: () => true, label: () => "History",
+        run: row => showVoterHistory(getVoterName(row)),
+    },
+    {
+        id: "similar", show: voterMenuCanSimilar,
+        label: row => currentSort === "similar" && similarTo === getVoterName(row)
+            ? "Stop sorting by similarity" : "Sort by similarity",
+        active: row => currentSort === "similar" && similarTo === getVoterName(row),
+        run: toggleSimilarTo,
+    },
+    {
+        id: "ballot", show: row => !!row.querySelector(".voter-cell")?.dataset.ballotUrl,
+        label: () => "Open ballot ↗",
+        run: row => window.open(row.querySelector(".voter-cell").dataset.ballotUrl, "_blank", "noopener,noreferrer"),
+    },
+];
+
+function closeVoterMenu() {
+    const menu = document.getElementById("voter-menu");
+    if (!menu?.classList.contains("open")) return;
+    menu.classList.remove("open");
+    _voterMenuAnchor?.closest("tr")?.classList.remove("voter-menu-open");
+    _voterMenuAnchor = null;
+}
+
+function toggleVoterMenu(anchor) {
+    const menu = document.getElementById("voter-menu");
+    if (!menu) return;
+    if (_voterMenuAnchor === anchor) { closeVoterMenu(); return; }
+    closeVoterMenu();
+    const row = anchor.closest("tr");
+    const username = getVoterName(row);
+    if (!row || !username) return;
+    menu.querySelector("#voter-menu-title").textContent = username;
+    const list = menu.querySelector(".settings-list");
+    list.textContent = "";
+    VOTER_MENU_ITEMS.filter(it => it.show(row)).forEach(it => {
+        const li = document.createElement("li");
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "settings-item";
+        b.dataset.voterAction = it.id;
+        b.textContent = it.label(row);
+        if (it.active?.(row)) b.classList.add("active");
+        b.addEventListener("click", () => { closeVoterMenu(); it.run(row); });
+        li.appendChild(b);
+        list.appendChild(li);
+    });
+    _voterMenuAnchor = anchor;
+    row.classList.add("voter-menu-open");   // keeps the ⋯ visible while the menu is open
+    menu.classList.add("open");
+    // Under the name / ⋯, left-aligned with it; flipped above / pulled left to stay on screen
+    const a = anchor.getBoundingClientRect();
+    const m = menu.getBoundingClientRect();
+    let left = Math.min(a.left - 8, window.innerWidth - m.width - 8);
+    let top = a.bottom + 4;
+    if (top + m.height > window.innerHeight - 8) top = Math.max(8, a.top - m.height - 4);
+    menu.style.left = `${Math.max(8, left)}px`;
+    menu.style.top = `${top}px`;
+    // Focus the box, not an item: a focused item shows the hover gray until ↑/↓ is used
+    menu.focus({ preventScroll: true });
+}
+
+document.addEventListener("mousedown", e => {
+    if (!_voterMenuAnchor) return;
+    if (e.target.closest("#voter-menu") || _voterMenuAnchor.contains(e.target)) return;
+    closeVoterMenu();
+}, true);
+document.addEventListener("touchstart", e => {
+    if (_voterMenuAnchor && !e.target.closest("#voter-menu") && !_voterMenuAnchor.contains(e.target)) closeVoterMenu();
+}, { capture: true, passive: true });
+window.addEventListener("scroll", closeVoterMenu, true);
+window.addEventListener("resize", closeVoterMenu);
+document.getElementById("voter-menu")?.addEventListener("keydown", e => {
+    if (e.key === "Escape") { e.stopPropagation(); closeVoterMenu(); return; }
+    if (e.shiftKey || (e.key !== "ArrowDown" && e.key !== "ArrowUp")) return;
+    const items = [...e.currentTarget.querySelectorAll(".settings-item")];
+    if (!items.length) return;
+    e.preventDefault();
+    const i = items.indexOf(document.activeElement);
+    // Nothing focused yet (just opened): ↓ goes to the first item, ↑ to the last
+    const next = i < 0 ? (e.key === "ArrowDown" ? 0 : items.length - 1)
+        : (i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length;
+    items[next].focus();
+});
 
 // Compute the Recency top-25 teams for a given week.
 // Accepts pre-built deltaData and the year's tabs (sorted oldest-last, i.e. getSortedTabs() order).
@@ -3095,7 +3180,7 @@ function _overallRankingRow(block, aggRow) {
     row.className = "overall-row";
     row.dataset.ranking = "Overall";
     row.dataset.voterAlias = getVoterName(aggRow);
-    row.querySelectorAll(".pin-btn, .history-btn, .similar-btn, .ballot-link-btn, .delta-label, .avg-label, .consensus-dist")
+    row.querySelectorAll(".pin-btn, .similar-btn, .voter-menu-btn, .delta-label, .avg-label, .consensus-dist")
         .forEach(el => el.remove());
     row.querySelectorAll(".team-logo").forEach(img => { img.dataset.bound = ""; });
     const nameEl = row.querySelector(".voter-name");
@@ -4650,7 +4735,7 @@ function pngNameColumnWidth(table, rowIdx) {
     // Measure text and image boxes directly: veteran tags sit inside the name
     // span, and a range's box isn't clipped by the cell's overflow.
     // Consensus-sort distances are dropped from the image (preparePngClone).
-    const skip = ".veteran-tag, .pin-btn, .history-btn, .similar-btn, .ballot-link-btn, .consensus-dist";
+    const skip = ".veteran-tag, .pin-btn, .similar-btn, .voter-menu-btn, .consensus-dist";
     const range = document.createRange();
     const measure = (cell, root) => {
         const left = cell.getBoundingClientRect().left + parseFloat(getComputedStyle(cell).paddingLeft);
@@ -7839,6 +7924,7 @@ document.addEventListener("keydown", e => {
         document.getElementById("settings-modal").classList.remove("open");
         document.getElementById("changes-modal").classList.remove("open");
         document.getElementById("rankings-modal").classList.remove("open");
+        closeVoterMenu();
     }
     // Chord: Shift+V then X → toggle veteran tags
     if (e.shiftKey && (e.key === "V" || e.key === "v")) {
