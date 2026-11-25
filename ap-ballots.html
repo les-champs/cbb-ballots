@@ -2399,6 +2399,8 @@ const OUTLIER_OMISSION_TOP_N=15;
 const OUTLIER_HIGH_MAX_RANK=20;
 const OUTLIER_SD_THRESHOLD=2.5;
 const OUTLIER_BALLOT_MIN_FLAGS=4;
+const OUTLIER_FRINGE_FROM_RANK=16;
+const OUTLIER_FRINGE_WEIGHT=0.5;
 let _outliersMode=false;
 let _ballotFilter="all";
 function svgColors(){
@@ -3208,7 +3210,12 @@ if(name==="Official Overall"||name==="AP Overall"||name==="Recency")return;
 const teams=Array.from(row.querySelectorAll(".logo-cell .team-logo")).map(l=>l.dataset.team);
 if(!teams.length)return;
 const onBallot=new Set(teams);
-let flags=teams.filter((t,i)=>outlierKind(i + 1,cRank[t]??26,stats[t])).length;
+let flags=0;
+teams.forEach((t,i)=>{
+const cr=cRank[t]??26;
+if(!outlierKind(i + 1,cr,stats[t]))return;
+flags +=cr===26&&i + 1>=OUTLIER_FRINGE_FROM_RANK?OUTLIER_FRINGE_WEIGHT:1;
+});
 flags +=consensus.slice(0,OUTLIER_OMISSION_TOP_N).filter(t=>!onBallot.has(t)).length;
 row.classList.add("ballot-checked");
 row.classList.toggle("ballot-outlier",flags>=OUTLIER_BALLOT_MIN_FLAGS);
@@ -3525,9 +3532,12 @@ const blockId=_apCurrentYear!==null
 const block=document.getElementById(blockId);
 if(!block)return;
 if(_ballotFilter!=="all")markOutlierBallots(block);
+const pickerBlocks=new Set([...document.querySelectorAll(".sort-picker.open")]
+.map(p=>p._sourceBlock||p.closest(".week-block")));
 document.querySelectorAll(".ballot-section").forEach(section=>{
 if(section.style.display==="none")return;
-showRankHeaders(section.closest(".week-block"));
+const wb=section.closest(".week-block");
+if(!pickerBlocks.has(wb))showRankHeaders(wb);
 });
 const sections=block.querySelectorAll(".ballot-section");
 const visibleSection=Array.from(sections).find(s=>s.style.display!=="none")||sections[0];

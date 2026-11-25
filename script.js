@@ -27,8 +27,15 @@ const OUTLIER_OMISSION_TOP_N = 15;
 const OUTLIER_HIGH_MAX_RANK = 20;
 const OUTLIER_SD_THRESHOLD = 2.5;
 // A ballot is an outlier ballot (Table › Filter) at this many flags: outlier teams
-// (outlierKind()) plus consensus top-15 teams left off. ~6–7% of 2025–26 ballots.
+// (outlierKind()) plus consensus top-15 teams left off. A team outside the consensus
+// top 25 that the voter has at #OUTLIER_FRINGE_FROM_RANK or lower counts
+// OUTLIER_FRINGE_WEIGHT of a flag: it's only a few spots from unranked, and at full
+// weight four such picks alone made an outlier ballot that the Consensus sort scored
+// as ordinary (68th–80th percentile distance). ~5% of 2025–27 official ballots
+// (2026-11-25 tuning; was ~7%). Cell highlighting (applyOutliers()) is unchanged.
 const OUTLIER_BALLOT_MIN_FLAGS = 4;
+const OUTLIER_FRINGE_FROM_RANK = 16;
+const OUTLIER_FRINGE_WEIGHT = 0.5;
 let _outliersMode = false;
 let _ballotFilter = "all";  // "all" | "exclude" | "only" (Table › Filter)
 
@@ -1053,7 +1060,12 @@ function markOutlierBallots(weekBlock) {
             const teams = Array.from(row.querySelectorAll(".logo-cell .team-logo")).map(l => l.dataset.team);
             if (!teams.length) return;
             const onBallot = new Set(teams);
-            let flags = teams.filter((t, i) => outlierKind(i + 1, cRank[t] ?? 26, stats[t])).length;
+            let flags = 0;
+            teams.forEach((t, i) => {
+                const cr = cRank[t] ?? 26;
+                if (!outlierKind(i + 1, cr, stats[t])) return;
+                flags += cr === 26 && i + 1 >= OUTLIER_FRINGE_FROM_RANK ? OUTLIER_FRINGE_WEIGHT : 1;
+            });
             flags += consensus.slice(0, OUTLIER_OMISSION_TOP_N).filter(t => !onBallot.has(t)).length;
             row.classList.add("ballot-checked");
             row.classList.toggle("ballot-outlier", flags >= OUTLIER_BALLOT_MIN_FLAGS);
@@ -1430,10 +1442,14 @@ function applyTableSort(sort, keepPicker = false) {
     if (!block) return;
     if (_ballotFilter !== "all") markOutlierBallots(block);
 
-    // Show/hide rank number headers based on sort
+    // Show/hide rank number headers based on sort. A block whose Functions picker is
+    // still open (keepPicker) keeps them hidden; they return when the picker closes.
+    const pickerBlocks = new Set([...document.querySelectorAll(".sort-picker.open")]
+        .map(p => p._sourceBlock || p.closest(".week-block")));
     document.querySelectorAll(".ballot-section").forEach(section => {
         if (section.style.display === "none") return;
-        showRankHeaders(section.closest(".week-block"));
+        const wb = section.closest(".week-block");
+        if (!pickerBlocks.has(wb)) showRankHeaders(wb);
     });
 
     const sections = block.querySelectorAll(".ballot-section");
