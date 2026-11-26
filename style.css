@@ -873,9 +873,9 @@ kbd {
 #season-stats-table td.team-col { text-align: left; font-size: 12px; color: var(--color-table-team-col); white-space: normal; min-width: 80px; }
 #season-stats-table td:first-child { font-size: 11px; }
 #season-stats-table .logo-sm { height: 20px; width: 20px; object-fit: contain; vertical-align: middle; }
-#season-stats-table:not(.season-voters):not(.season-records) th:nth-child(5), #season-stats-table:not(.season-voters):not(.season-records) td:nth-child(5) { border-right: none; }
-#season-stats-table:not(.season-voters):not(.season-records) th:nth-child(8), #season-stats-table:not(.season-voters):not(.season-records) td:nth-child(8) { border-right: none; }
-#season-stats-table:not(.season-voters):not(.season-records) th:nth-child(7), #season-stats-table:not(.season-voters):not(.season-records) td:nth-child(7) { border-right: 1px solid var(--color-border-nth); }
+#season-stats-table:not(.season-voters):not(.season-records):not(.season-vp) th:nth-child(5), #season-stats-table:not(.season-voters):not(.season-records):not(.season-vp) td:nth-child(5) { border-right: none; }
+#season-stats-table:not(.season-voters):not(.season-records):not(.season-vp) th:nth-child(8), #season-stats-table:not(.season-voters):not(.season-records):not(.season-vp) td:nth-child(8) { border-right: none; }
+#season-stats-table:not(.season-voters):not(.season-records):not(.season-vp) th:nth-child(7), #season-stats-table:not(.season-voters):not(.season-records):not(.season-vp) td:nth-child(7) { border-right: 1px solid var(--color-border-nth); }
 #season-stats-table.season-voters th:nth-child(5), #season-stats-table.season-voters td:nth-child(5) { border-right: 1px solid var(--color-border-nth); }
 #season-stats-table td.fan-col { text-align: left; font-size: 12px; padding-left: 10px; }
 #season-stats-table th.fan-col { text-align: left; padding-left: 10px; }
@@ -1737,8 +1737,7 @@ body.dark {
 .pf-view { width: min(920px, 88vw); display: flex; flex-direction: column; gap: 12px; font-size: 13px; color: var(--color-heading); }
 .pf-empty { padding: 40px 0; text-align: center; color: var(--color-section-title); font-size: 14px; }
 .pf-note { padding: 8px 10px; border-radius: 6px; background: var(--color-pf-band); color: var(--color-avg-label); }
-.pf-cap, .pf-foot { font-size: 12px; color: var(--color-avg-label); line-height: 1.45; }
-.pf-foot { border-top: 1px solid var(--color-pf-grid); padding-top: 8px; }
+.pf-cap { font-size: 12px; color: var(--color-avg-label); line-height: 1.45; }
 .pf-sub { font-weight: 600; font-size: 14px; margin-top: 6px; }
 .pf-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 20px; }
 .pf-traits { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -1830,8 +1829,10 @@ body.dark {
 .pf-table-wrap { overflow: auto; max-height: 420px; border-top: 1px solid var(--color-pf-grid); }
 .pf-table { border-collapse: collapse; width: max-content; min-width: 100%; table-layout: auto; font-size: 12px; font-variant-numeric: tabular-nums; }
 .pf-table thead th { position: sticky; top: 0; background: var(--color-bg-modal); z-index: 1; }
-#voter-history-table .pf-table th, #voter-history-table .pf-table td { padding: 4px 8px; text-align: right; border: 0; border-bottom: 1px solid var(--color-pf-grid); white-space: nowrap; }
-#voter-history-table .pf-table th:first-child, #voter-history-table .pf-table td:first-child { text-align: left; }
+#voter-history-table .pf-table th, #voter-history-table .pf-table td,
+#season-stats-table .pf-table th, #season-stats-table .pf-table td { padding: 4px 8px; text-align: right; border: 0; border-bottom: 1px solid var(--color-pf-grid); white-space: nowrap; font-size: 12px; color: inherit; }
+#voter-history-table .pf-table th:first-child, #voter-history-table .pf-table td:first-child,
+#season-stats-table .pf-table th:first-child, #season-stats-table .pf-table td:first-child { text-align: left; }
 .pf-table th button { font: inherit; font-weight: 600; font-size: 11px; color: var(--color-avg-label); background: none; border: 0; padding: 0; cursor: pointer; }
 .pf-table th button[data-dir]::after { content: " ↓"; color: var(--color-heading); }
 .pf-table th button[data-dir="asc"]::after { content: " ↑"; }
@@ -1840,7 +1841,47 @@ body.dark {
 .pf-table tbody tr.pf-on { font-weight: 600; background: var(--color-pf-band); }
 .pf-table td.pf-na { color: var(--color-section-title); }
 
+/* Voters page (Year window › Voters) */
+#season-stats-table.season-vp { display: block; white-space: normal; width: 100%; }
+.vp-view { width: min(1080px, 90vw); }
+/* A profile opened from the Voters page sits above the Year window */
+#voter-history-modal[data-chart-type="profile"] { z-index: 1001; }
+.vp-name { text-decoration: none; text-align: left; }
+.vp-name:hover { text-decoration: underline; }
+.vp-boards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.vp-board { border: 1px solid var(--color-pf-grid); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.vp-board-title { font-weight: 600; cursor: help; }
+.vp-board-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.vp-board-col { min-width: 0; }
+.vp-board-trait { font-size: 11px; color: var(--color-avg-label); margin-bottom: 2px; }
+.vp-board ol { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 1px; font-size: 12px; }
+.vp-board li { display: flex; justify-content: space-between; gap: 6px; min-width: 0; }
+.vp-board li .vp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.vp-board li span { color: var(--color-avg-label); font-variant-numeric: tabular-nums; flex: none; }
+.vp-board li.pf-on .vp-name { font-weight: 600; }
+.pf-view .vp-map-bg { fill: none; stroke: var(--color-pf-grid); }
+.pf-view .vp-band-outer { fill: var(--color-pf-field); fill-opacity: 0.18; }
+.pf-view .vp-band-inner { fill: var(--color-pf-field); fill-opacity: 0.38; }
+.pf-view .vp-med-line { fill: none; stroke: var(--color-avg-label); stroke-width: 2; stroke-dasharray: 5 4; }
+.vp-sw-med { width: 18px; border-top: 2px dashed var(--color-avg-label); vertical-align: 3px; }
+.vp-sw-band { width: 14px; height: 9px; border-radius: 2px; background: color-mix(in srgb, var(--color-pf-field) 38%, transparent); }
+.vp-sw-band.vp-sw-outer { background: color-mix(in srgb, var(--color-pf-field) 18%, transparent); }
+.vp-corr-wrap { overflow-x: auto; }
+#season-stats-table .vp-corr { width: auto; min-width: 0; table-layout: auto; border-collapse: separate; border-spacing: 3px; font-size: 12px; font-variant-numeric: tabular-nums; }
+#season-stats-table .vp-corr tr { background: transparent; }
+#season-stats-table .vp-corr th, #season-stats-table .vp-corr td { border: 0; padding: 5px 8px; font-size: 12px; white-space: nowrap; }
+#season-stats-table .vp-corr th { font-weight: 600; color: var(--color-avg-label); font-size: 11px; }
+#season-stats-table .vp-corr tbody th { text-align: right; }
+#season-stats-table .vp-corr td { text-align: center; border-radius: 4px; min-width: 52px; cursor: help; color: var(--color-heading); }
+#season-stats-table .vp-corr td.vp-corr-blank { cursor: default; }
+#season-stats-table .pf-table td.vp-voter, #season-stats-table .pf-table td.vp-team { text-align: left; }
+#season-stats-table .pf-table th.vp-team { text-align: left; }
+.vp-table .records-logo { width: 18px; height: 18px; object-fit: contain; vertical-align: middle; margin-right: 6px; }
+.vp-table .vp-nologo { display: inline-block; width: 18px; margin-right: 6px; }
+.vp-table .fan-dev { font-size: 11px; opacity: 0.6; }
+
 @media (max-width: 700px) {
+    .vp-boards { grid-template-columns: minmax(0, 1fr); }
     .pf-strip { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
     .pf-plot { grid-column: 1 / -1; grid-row: 2; }
     .pf-bd-row { grid-template-columns: 112px minmax(0, 1fr) 48px; gap: 5px; }

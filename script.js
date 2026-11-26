@@ -2085,8 +2085,8 @@ document.getElementById("voter-history-modal").addEventListener("click", e => {
 // ── Voter profile (voter menu › Profile; PIN-locked) ─────────────────────────
 // How one official voter tends to vote over a season: six measures with the field's spread,
 // a compass (BPI↔SOR lean × distance from consensus), distance by week, the active week's
-// ballot team by team next to the consensus / BPI / SOR, and a sortable table of every
-// profiled voter. Numbers come from profiles-YEAR.json (profiles.py, written by every
+// ballot team by team next to the consensus / BPI / SOR. The field-wide view (every profiled
+// voter at once) is the Year window's Voters tab (showVotersPage()). Numbers come from profiles-YEAR.json (profiles.py, written by every
 // --rebuild; PROFILE_FILES lists the seasons); the team-by-team part reads the active week's
 // ballots from the DOM and its BPI/SOR snapshot via bpiSnapshotForTab(). Opens in
 // #voter-history-modal (chartType "profile"); week/year navigation re-renders it.
@@ -2096,7 +2096,7 @@ const PROFILE_TRAIT_PCT = 80;        // percentile at/above (or 100 - it at/belo
 const PROFILE_SPLIT_GAP = 5;         // BPI and SOR ranks (capped at 26) this far apart = a "split" team
 const _profileFiles = {};            // season → Promise<profiles payload>
 // compare = a voter clicked on the strips / compass, tagged beside the profile voter (cleared on voter change)
-const _profile = { name: null, compare: null, sort: "dist", dir: "desc", filter: "split", token: 0,
+const _profile = { name: null, compare: null, filter: "split", token: 0,
     hideOutliers: localStorage.getItem("pfHideOutliers") === "1" };
 
 const _pfEsc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -2247,7 +2247,7 @@ function renderVoterProfile(table, data, snaps, activeTab) {
             : `<span class="pf-trait">Middle of the field on every measure</span>`}</div>
             <div class="pf-facts"><span><b>${me.ballots}</b> ballots</span>${outlierToggle}</div></div>`;
     } else {
-        html += `<div class="pf-note">${esc(_profile.name)} has no ${year} profile: profiles cover official voters with ${data.minBallots}+ ballots this season. Pick a voter from the table below.</div>
+        html += `<div class="pf-note">${esc(_profile.name)} has no ${year} profile: profiles cover official voters with ${data.minBallots}+ ballots this season. Year › Voters lists every profiled voter.</div>
             <div class="pf-head"><div></div><div class="pf-facts">${outlierToggle}</div></div>`;
     }
 
@@ -2262,33 +2262,13 @@ function renderVoterProfile(table, data, snaps, activeTab) {
     }).join("")}</div>`;
 
     html += `<div class="pf-charts">${hasLean ? `<div class="pf-chart"><div class="pf-sub">Voter compass</div>
-        <div class="pf-cap">Across: which ESPN ranking the ballots sit closer to. Up: distance from the rest of the poll.</div><div class="pf-compass"></div></div>` : ""}
+        <div class="pf-compass"></div></div>` : ""}
         <div class="pf-chart"><div class="pf-sub">Distance from consensus by week</div>
         <div class="pf-legend"><span><i class="pf-sw-line"></i>${esc(me ? me.name : "Selected voter")}</span><span><i class="pf-sw-dash"></i>Field median</span></div><div class="pf-weekly"></div></div></div>`;
 
     const weekName = weekTextLabel(activeTab) || `Week ${displayWeekNum(activeTab)}`;
     html += `<div class="pf-bd-head"><div class="pf-sub">Team by team — ${esc(weekName)}</div><div class="pf-bd-controls"></div></div>
         <div class="pf-bd-legend pf-legend"></div><div class="pf-bd"></div>`;
-
-    const cols = [{ k: "name", label: "Voter" }, { k: "ballots", label: "Ballots", fmt: v => v }, ...metrics.map(m => ({ k: m.k, label: m.short, fmt: m.fmt }))];
-    if (!cols.some(c => c.k === _profile.sort)) { _profile.sort = "dist"; _profile.dir = "desc"; }
-    const sorted = [...voters].sort((a, b) => {
-        const A = a[_profile.sort], B = b[_profile.sort];
-        if (A == null && B == null) return 0; if (A == null) return 1; if (B == null) return -1;
-        const c = typeof A === "string" ? A.localeCompare(B, undefined, { sensitivity: "base" }) : A - B;
-        return _profile.dir === "asc" ? c : -c;
-    });
-    html += `<div class="pf-sub">All profiled voters</div><div class="pf-table-wrap"><table class="pf-table"><thead><tr>${cols.map(c =>
-        `<th><button type="button" data-pf-sort="${c.k}"${c.k === _profile.sort ? ` data-dir="${_profile.dir}"` : ""}>${esc(c.label)}</button></th>`).join("")}</tr></thead><tbody>${sorted.map(v =>
-        `<tr data-pf-voter="${esc(v.name)}"${me && v.name === me.name ? ` class="pf-on"` : ""}>${cols.map(c =>
-            c.k === "name" ? `<td>${esc(v.name)}</td>` : v[c.k] == null ? `<td class="pf-na">—</td>` : `<td>${c.fmt(v[c.k])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
-
-    html += `<div class="pf-foot">Official ballots only. Consensus = points from every other official ballot that week; unranked = #26. `
-        + `Distance from consensus is the homepage Consensus sort's number${data._weighted ? " (Weighted consensus is on)" : ""}, averaged over the season. `
-        + (hasLean ? `Lean uses the BPI/SOR snapshot taken at each poll's deadline (weeks ${data.leanWeeks.map(w => _pfWeekLabel(year, w)).join(", ")}); early-season SOR rests on few games. `
-                   : `No lean for ${year}: weekly BPI/SOR snapshots start with 2027. `)
-        + (data.hasGames ? `Loss penalty uses ESPN results between poll deadlines.` : `No game results for ${year}, so no loss penalty.`)
-        + `</div>`;
 
     const view = document.createElement("div");
     view.className = "pf-view";
@@ -2318,14 +2298,6 @@ function renderVoterProfile(table, data, snaps, activeTab) {
             renderVoterProfile(table, data, snaps, activeTab);
             return;
         }
-        const sortBtn = e.target.closest("[data-pf-sort]");
-        if (sortBtn) {
-            const k = sortBtn.dataset.pfSort;
-            if (k === _profile.sort) _profile.dir = _profile.dir === "asc" ? "desc" : "asc";
-            else { _profile.sort = k; _profile.dir = k === "name" ? "asc" : "desc"; }
-            renderVoterProfile(table, data, snaps, activeTab);
-            return;
-        }
         // Strip / compass dots compare instead of switching voter; a tag or the halo clears it
         const cmp = e.target.closest("[data-pf-compare]");
         if (cmp) {
@@ -2335,12 +2307,7 @@ function renderVoterProfile(table, data, snaps, activeTab) {
             return;
         }
         const f = e.target.closest("[data-pf-filter]");
-        if (f) { _profile.filter = f.dataset.pfFilter; _pfRenderBreakdown(view, activeTab, snaps); return; }
-        const v = e.target.closest("[data-pf-voter]");
-        if (v && v.dataset.pfVoter !== me?.name) {
-            showVoterProfile(v.dataset.pfVoter);
-            document.getElementById("voter-history-box").scrollTop = 0;
-        }
+        if (f) { _profile.filter = f.dataset.pfFilter; _pfRenderBreakdown(view, activeTab, snaps); }
     });
 }
 
@@ -2419,7 +2386,6 @@ function _pfCompassSvg(data, me, W, other) {
     s += `<line class="pf-axis" x1="${mg.l}" x2="${W - mg.r}" y1="${H - mg.b}" y2="${H - mg.b}"/>`;
     s += `<text class="pf-end pf-end-bpi" x="${mg.l}" y="${H - 5}">← Closer to BPI</text>`;
     s += `<text class="pf-end pf-end-sor" x="${W - mg.r}" y="${H - 5}" text-anchor="end">Closer to SOR →</text>`;
-    s += `<text class="pf-tick" x="${mg.l - 6}" y="${mg.t - 10}">Spots from consensus</text>`;
     if (data.consLean != null) {
         const cx = X(data.consLean);
         s += `<line class="pf-refline" x1="${cx}" x2="${cx}" y1="${mg.t}" y2="${H - mg.b}"/>`;
@@ -2554,6 +2520,380 @@ function _pfRenderBreakdown(view, activeTab, snaps) {
     });
     initRecordsLogos(host);
 }
+
+// ── Voters page (Year window › Voters, Shift+W; PIN-locked) ──────────────────
+// The voter profile's measures for every profiled voter at once: trait leaderboards, one
+// strip per measure, a voter map (Similarity: classical MDS of season-average ballot-to-ballot
+// distances; Compass: lean × distance, 2027+), the field's distance from consensus by week
+// (median line + 25–75% / 10–90% bands), Spearman correlations between the measures, and a
+// sortable table (profile measures + #1 Pick / Favorite / Least Fav. from seasonVoterExtras()).
+// Clicking a dot (strips, map) or a leaderboard / table voter's dot tags that voter on every
+// chart (_votersPage.focus); a table row or leaderboard name opens their profile on top
+// (#voter-history-modal sits above the Year window while chartType is "profile").
+// Userpoll 2025+ with profiles-YEAR.json; elsewhere Shift+W keeps the old table.
+const _votersPage = { ctx: null, token: 0, focus: null, sort: "dist", dir: "asc", map: "sim" };
+const _vpLayoutCache = {};   // `${year}:${weeks}` → { pos: {name: [x, y]}, cons: [x, y] | null }
+
+async function showVotersPage(year, weekBallots, voterWeeksVoted, totalWeeks) {
+    const modal = document.getElementById("season-stats-modal");
+    const table = document.getElementById("season-stats-table");
+    const token = ++_votersPage.token;
+    if (_votersPage.ctx?.year !== year) _votersPage.focus = null;
+    table.classList.add("season-vp");
+    if (!table.querySelector(".pf-view")) table.innerHTML = `<div class="pf-view vp-view"><div class="pf-empty">Loading…</div></div>`;
+    modal.classList.add("open");
+    let data;
+    try { data = await fetchProfiles(year); }
+    catch (e) {
+        if (token === _votersPage.token) table.innerHTML = `<div class="pf-view vp-view"><div class="pf-empty">Couldn't load the ${year} profiles (${_pfEsc(e.message)}).</div></div>`;
+        return;
+    }
+    if (token !== _votersPage.token || !table.classList.contains("season-vp") || !modal.classList.contains("open")) return;
+    if (!data) { table.innerHTML = `<div class="pf-view vp-view"><div class="pf-empty">No profiles for ${year}.</div></div>`; return; }
+    _votersPage.ctx = { year, data, weekBallots, voterWeeksVoted, totalWeeks,
+        extras: seasonVoterExtras(weekBallots, voterWeeksVoted) };
+    renderVotersPage();
+}
+
+function _vpOpen() {
+    const modal = document.getElementById("season-stats-modal");
+    const table = document.getElementById("season-stats-table");
+    return modal.classList.contains("open") && table.classList.contains("season-vp") && _votersPage.ctx ? table : null;
+}
+
+// Season-average ballotDistance() between every pair of profiled voters (and the Official
+// Overall row, as "consensus"), over the weeks both voted, laid out in 2D by classical MDS.
+function _vpSimilarityLayout(ctx, names) {
+    const key = `${ctx.year}:${ctx.weekBallots.length}:${names.length}`;
+    if (_vpLayoutCache[key]) return _vpLayoutCache[key];
+    const ids = [...names, null];   // null = consensus
+    const n = ids.length, sum = new Float64Array(n * n), cnt = new Uint16Array(n * n);
+    const lower = names.map(x => x.toLowerCase());
+    ctx.weekBallots.forEach(({ ballots, consensusOrder }) => {
+        const byName = {};
+        ballots.forEach(b => { if (b.teams.length) byName[b.voter.toLowerCase()] = b.teams.slice(0, 25); });
+        const rows = ids.map((id, i) => id === null ? (consensusOrder?.length ? consensusOrder.slice(0, 25) : null) : byName[lower[i]] || null);
+        for (let i = 0; i < n; i++) {
+            if (!rows[i]) continue;
+            for (let j = i + 1; j < n; j++) {
+                if (!rows[j]) continue;
+                sum[i * n + j] += ballotDistance(rows[i], rows[j]);
+                cnt[i * n + j]++;
+            }
+        }
+    });
+    const D = new Float64Array(n * n);
+    let tot = 0, k = 0;
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (cnt[i * n + j]) { tot += sum[i * n + j] / cnt[i * n + j]; k++; }
+    const mean = k ? tot / k : 1;
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+        const d = cnt[i * n + j] ? sum[i * n + j] / cnt[i * n + j] : mean;
+        D[i * n + j] = D[j * n + i] = d * d;
+    }
+    // Double centring: B = −½ J D² J
+    const rm = new Float64Array(n);
+    let gm = 0;
+    for (let i = 0; i < n; i++) { let r = 0; for (let j = 0; j < n; j++) r += D[i * n + j]; rm[i] = r / n; gm += r; }
+    gm /= n * n;
+    const B = new Float64Array(n * n);
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) B[i * n + j] = -0.5 * (D[i * n + j] - rm[i] - rm[j] + gm);
+    // Top two eigenvectors by power iteration with deflation (deterministic start)
+    const axes = [];
+    for (let a = 0; a < 2; a++) {
+        let v = Array.from({ length: n }, (_, i) => Math.sin(i * 1.7 + a + 1));
+        let lambda = 0;
+        for (let it = 0; it < 200; it++) {
+            const w = new Float64Array(n);
+            for (let i = 0; i < n; i++) { let t = 0; for (let j = 0; j < n; j++) t += B[i * n + j] * v[j]; w[i] = t; }
+            for (const [u, l] of axes) { let dot = 0; for (let i = 0; i < n; i++) dot += u[i] * v[i]; for (let i = 0; i < n; i++) w[i] -= l * dot * u[i]; }
+            const norm = Math.hypot(...w) || 1;
+            lambda = norm;
+            v = Array.from(w, x => x / norm);
+        }
+        axes.push([v, lambda]);
+    }
+    const coords = ids.map((_, i) => axes.map(([v, l]) => v[i] * Math.sqrt(Math.max(0, l))));
+    // Orientation is arbitrary: put consensus left of and below the field's centre
+    const ci = n - 1;
+    if (coords[ci][0] > 0) coords.forEach(c => { c[0] = -c[0]; });
+    if (coords[ci][1] > 0) coords.forEach(c => { c[1] = -c[1]; });
+    const hasCons = ctx.weekBallots.some(w => w.consensusOrder?.length);
+    const out = { pos: Object.fromEntries(names.map((nm, i) => [nm, coords[i]])), cons: hasCons ? coords[ci] : null };
+    return (_vpLayoutCache[key] = out);
+}
+
+function _vpMapSvg(layout, voters, focus, W) {
+    const esc = _pfEsc, H = Math.round(Math.min(360, Math.max(260, W * 0.75))), pad = 16;
+    const placed = voters.filter(v => layout.pos[v.name]).map(v => [v, layout.pos[v.name]]);
+    if (placed.length < 3) return `<div class="pf-empty">Not enough ballots yet.</div>`;
+    // Hide Outliers: drop voters unusually far from the field's centre (same SD test as the strips)
+    const cx0 = placed.reduce((a, p) => a + p[1][0], 0) / placed.length, cy0 = placed.reduce((a, p) => a + p[1][1], 0) / placed.length;
+    const far = p => Math.hypot(p[0] - cx0, p[1] - cy0);
+    const keep = _pfFence(placed.map(p => far(p[1])));
+    const pts = placed.filter(p => keep(far(p[1])));
+    const all = [...pts.map(p => p[1]), ...(layout.cons ? [layout.cons] : [])];
+    const xs = all.map(p => p[0]), ys = all.map(p => p[1]);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    // Same scale on both axes: distances on the map are what mean something
+    const sc = Math.min((W - 2 * pad) / ((x1 - x0) || 1), (H - 2 * pad) / ((y1 - y0) || 1));
+    const ox = (W - (x1 - x0) * sc) / 2, oy = (H - (y1 - y0) * sc) / 2;
+    const X = x => ox + (x - x0) * sc, Y = y => H - (oy + (y - y0) * sc);
+    let s = `<svg class="pf-compass-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+    s += `<rect class="vp-map-bg" x="0.5" y="0.5" width="${W - 1}" height="${H - 1}" rx="6"/>`;
+    for (const [v, p] of pts) {
+        if (v === focus) continue;
+        s += `<circle class="pf-dot pf-dot-lg" data-pf-compare="${esc(v.name)}" cx="${X(p[0]).toFixed(1)}" cy="${Y(p[1]).toFixed(1)}" r="5"><title>${esc(v.name)}: ${_pfDistFmt(v.dist)} spots from consensus (click to tag)</title></circle>`;
+    }
+    if (layout.cons) {
+        const cx = X(layout.cons[0]), cy = Y(layout.cons[1]);
+        s += `<path class="pf-ref" d="M${cx} ${cy - 7}L${cx + 7} ${cy}L${cx} ${cy + 7}L${cx - 7} ${cy}Z"><title>Official Overall (the poll's consensus ballot)</title></path>`;
+        s += `<text class="pf-tick pf-halo" x="${cx + 10}" y="${cy + 4}">Consensus</text>`;
+    }
+    if (focus && layout.pos[focus.name]) {
+        const p = layout.pos[focus.name], off = !keep(far(p));
+        s += _pfTagSvg(Math.min(W - pad, Math.max(pad, X(p[0]))), Math.min(H - pad, Math.max(pad, Y(p[1]))), W, focus.name,
+            `${esc(focus.name)}: ${_pfDistFmt(focus.dist)} spots from consensus${off ? " (outlier, off the map)" : ""} (click to clear)`, off);
+    }
+    return s + `</svg>`;
+}
+
+const _vpQuantile = (sorted, q) => {
+    if (!sorted.length) return null;
+    const i = (sorted.length - 1) * q, lo = Math.floor(i), hi = Math.ceil(i);
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+};
+
+// Field's distance from consensus by week: median (data.fieldDist, as on the profile) with
+// the profiled voters' 25–75% and 10–90% bands; the tagged voter as a line.
+function _vpFieldSvg(data, focus, W) {
+    const esc = _pfEsc, H = 240, mg = { l: 32, r: 12, t: 12, b: 28 };
+    const weeks = data.weeks;
+    const q = weeks.map(w => {
+        const xs = data.voters.map(v => v.weekly.find(r => r[0] === w)?.[1]).filter(x => x != null).sort((a, b) => a - b);
+        return { n: xs.length, p10: _vpQuantile(xs, 0.1), p25: _vpQuantile(xs, 0.25), p75: _vpQuantile(xs, 0.75), p90: _vpQuantile(xs, 0.9) };
+    });
+    const mine = Object.fromEntries((focus?.weekly || []).map(r => [r[0], r[1]]));
+    const vals = [...q.map(r => r.p90), ...Object.values(data.fieldDist), ...Object.values(mine)].filter(x => x != null);
+    if (!vals.length) return "";
+    const ymax = Math.max(...vals) * 1.1;
+    const X = _pfScale(0, Math.max(1, weeks.length - 1), mg.l, W - mg.r), Y = _pfScale(0, ymax, H - mg.b, mg.t);
+    let s = `<svg class="pf-weekly-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+    for (const t of _pfTicks(0, ymax, 4)) s += `<line class="pf-grid" x1="${mg.l}" x2="${W - mg.r}" y1="${Y(t)}" y2="${Y(t)}"/><text class="pf-tick" x="${mg.l - 6}" y="${Y(t) + 4}" text-anchor="end">${t}</text>`;
+    const every = Math.max(1, Math.ceil(weeks.length / Math.max(2, Math.floor((W - mg.l - mg.r) / 34))));
+    weeks.forEach((w, i) => {
+        if (i % every === 0 || i === weeks.length - 1) s += `<text class="pf-tick" x="${X(i)}" y="${H - mg.b + 15}" text-anchor="middle">${_pfWeekLabel(data.season, w)}</text>`;
+    });
+    s += `<line class="pf-axis" x1="${mg.l}" x2="${W - mg.r}" y1="${H - mg.b}" y2="${H - mg.b}"/>`;
+    const band = (a, b, cls) => {
+        const idx = q.map((r, i) => r[a] != null ? i : null).filter(i => i != null);
+        if (!idx.length) return "";
+        const top = idx.map(i => `${X(i).toFixed(1)} ${Y(q[i][b]).toFixed(1)}`);
+        const bot = idx.reverse().map(i => `${X(i).toFixed(1)} ${Y(q[i][a]).toFixed(1)}`);
+        return `<path class="${cls}" d="M${[...top, ...bot].join("L")}Z"/>`;
+    };
+    s += band("p10", "p90", "vp-band-outer") + band("p25", "p75", "vp-band-inner");
+    const med = weeks.map((w, i) => data.fieldDist[w] != null ? `${X(i).toFixed(1)} ${Y(data.fieldDist[w]).toFixed(1)}` : null).filter(Boolean);
+    if (med.length) s += `<path class="vp-med-line" d="M${med.join("L")}"/>`;
+    let d = "", prev = false;
+    weeks.forEach((w, i) => {
+        if (mine[w] != null) { d += (prev ? "L" : "M") + X(i).toFixed(1) + " " + Y(mine[w]).toFixed(1); prev = true; }
+        else prev = false;
+    });
+    if (d) s += `<path class="pf-me-line" d="${d}"/>`;
+    const half = (W - mg.l - mg.r) / Math.max(1, weeks.length - 1) / 2;
+    weeks.forEach((w, i) => {
+        const r = q[i], f = v => v == null ? "—" : _pfDistFmt(+v.toFixed(1));
+        const label = `Week ${_pfWeekLabel(data.season, w)}: median ${f(data.fieldDist[w])}, middle half ${f(r.p25)}–${f(r.p75)}, 10th–90th ${f(r.p10)}–${f(r.p90)} (${r.n} profiled voters)`
+            + (focus ? `; ${esc(focus.name)} ${mine[w] != null ? _pfDistFmt(mine[w]) : "no ballot"}` : "");
+        if (mine[w] != null) s += `<circle class="pf-me-pt" cx="${X(i).toFixed(1)}" cy="${Y(mine[w]).toFixed(1)}" r="4"/>`;
+        s += `<rect class="pf-hit" x="${(X(i) - half).toFixed(1)}" y="${mg.t}" width="${(2 * half).toFixed(1)}" height="${H - mg.t - mg.b}"><title>${label}</title></rect>`;
+    });
+    return s + `</svg>`;
+}
+
+// Spearman rank correlation (average ranks for ties)
+function _vpSpearman(pairs) {
+    const rank = xs => {
+        const idx = xs.map((x, i) => [x, i]).sort((a, b) => a[0] - b[0]), r = new Array(xs.length);
+        for (let i = 0; i < idx.length;) {
+            let j = i; while (j + 1 < idx.length && idx[j + 1][0] === idx[i][0]) j++;
+            for (let k = i; k <= j; k++) r[idx[k][1]] = (i + j) / 2;
+            i = j + 1;
+        }
+        return r;
+    };
+    const a = rank(pairs.map(p => p[0])), b = rank(pairs.map(p => p[1])), n = pairs.length;
+    const ma = a.reduce((s, x) => s + x, 0) / n, mb = b.reduce((s, x) => s + x, 0) / n;
+    let num = 0, da = 0, db = 0;
+    for (let i = 0; i < n; i++) { num += (a[i] - ma) * (b[i] - mb); da += (a[i] - ma) ** 2; db += (b[i] - mb) ** 2; }
+    return da && db ? num / Math.sqrt(da * db) : null;
+}
+
+function _vpCorrHtml(metrics, voters) {
+    const esc = _pfEsc;
+    let h = `<table class="vp-corr"><thead><tr><th></th>${metrics.slice(0, -1).map(m => `<th>${esc(m.short)}</th>`).join("")}</tr></thead><tbody>`;
+    metrics.slice(1).forEach((row, ri) => {
+        h += `<tr><th>${esc(row.short)}</th>`;
+        metrics.slice(0, -1).forEach((col, ci) => {
+            if (ci > ri) { h += `<td class="vp-corr-blank"></td>`; return; }
+            const pairs = voters.filter(v => v[row.k] != null && v[col.k] != null).map(v => [v[row.k], v[col.k]]);
+            const r = pairs.length >= 5 ? _vpSpearman(pairs) : null;
+            if (r == null) { h += `<td class="pf-na">—</td>`; return; }
+            const tone = r > 0 ? "var(--color-pf-sor)" : "var(--color-pf-bpi)";
+            const pct = Math.round(Math.min(1, Math.abs(r)) * 70);
+            const both = `${row.label} and ${col.label.toLowerCase()}`;
+            const word = Math.abs(r) < 0.1 ? "no real link" : `${Math.abs(r) < 0.3 ? "weak" : Math.abs(r) < 0.5 ? "moderate" : "strong"} ${r > 0 ? "positive" : "negative"} link`;
+            h += `<td style="background: color-mix(in srgb, ${tone} ${pct}%, transparent)" title="${esc(both)}: ${word} (Spearman ${_pfSigned(r, 2)}, ${pairs.length} voters)">${_pfSigned(r, 2)}</td>`;
+        });
+        h += `</tr>`;
+    });
+    return h + `</tbody></table>`;
+}
+
+function renderVotersPage() {
+    const table = _vpOpen();
+    if (!table) return;
+    const ctx = _votersPage.ctx, esc = _pfEsc;
+    const data = _pfDistView(ctx.data);
+    const year = data.season, voters = data.voters;
+    const hasLean = data.leanWeeks.length > 0;
+    const metrics = PROFILE_METRICS.filter(m => m.k !== "lean" || hasLean);
+    if (!hasLean && _votersPage.map === "compass") _votersPage.map = "sim";
+    const focus = _votersPage.focus ? voters.find(v => v.name === _votersPage.focus) || null : null;
+    const extra = name => ctx.extras[name] || ctx.extras[Object.keys(ctx.extras).find(k => k.toLowerCase() === name.toLowerCase())] || {};
+    const logo = team => team ? `<img class="records-logo" data-team="${esc(team)}" alt="">` : "";
+    const nameBtn = (v, txt) => `<button type="button" class="pf-link vp-name" data-vp-open="${esc(v.name)}" title="Open ${esc(v.name)}'s profile">${esc(txt ?? v.name)}</button>`;
+
+    const official = Object.keys(ctx.voterWeeksVoted).length;
+    const outlierToggle = `<button type="button" class="pf-link" data-pf-outliers aria-pressed="${_profile.hideOutliers}" title="${_profile.hideOutliers
+        ? "Put voters back on the charts"
+        : `Leave values ${OUTLIER_SD_THRESHOLD}+ standard deviations from the field average off the strips and voter map`}">${_profile.hideOutliers ? "Show Outliers" : "Hide Outliers"}</button>`;
+    let html = `<div class="pf-head"><div class="pf-facts"><span><b>${voters.length}</b> profiled voters</span><span title="Official voters with ${data.minBallots}+ of the season's ballots are profiled">${official} official voters · ${data.minBallots}+ ballots to qualify</span></div>
+        <div class="pf-facts">${focus ? `<span>Tagged: ${nameBtn(focus)} <button type="button" class="pf-link" data-pf-compare="" title="Clear the tag">✕</button></span>` : ""}${outlierToggle}</div></div>`;
+
+    // Trait leaderboards: top / bottom 3 per measure
+    html += `<div class="vp-boards">${metrics.map(m => {
+        const xs = voters.filter(v => v[m.k] != null).sort((a, b) => b[m.k] - a[m.k]);
+        if (xs.length < 6) return "";
+        const list = (vs, trait) => `<div class="vp-board-col"><div class="vp-board-trait">${esc(trait)}</div><ol>${vs.map(v =>
+            `<li class="${v === focus ? "pf-on" : ""}">${nameBtn(v)}<span>${m.fmt(v[m.k])}</span></li>`).join("")}</ol></div>`;
+        return `<div class="vp-board"><div class="vp-board-title" title="${esc(m.desc)}">${esc(m.label)}</div>
+            <div class="vp-board-cols">${list(xs.slice(0, 3), m.trait[1])}${list(xs.slice(-3).reverse(), m.trait[0])}</div></div>`;
+    }).join("")}</div>`;
+
+    html += `<div class="pf-strips">${metrics.map(m => {
+        const xs = voters.map(v => v[m.k]).filter(x => x != null).sort((a, b) => a - b);
+        const val = xs.length
+            ? `<span class="pf-num">${m.fmt(_vpQuantile(xs, 0.5))}${m.unit ? ` <small>${esc(m.unit)}</small>` : ""}</span><span class="pf-pct" title="Middle half of profiled voters">${m.fmt(_vpQuantile(xs, 0.25))} to ${m.fmt(_vpQuantile(xs, 0.75))}</span>`
+            : `<span class="pf-num">—</span>`;
+        return `<div class="pf-strip" data-k="${m.k}"><div class="pf-lbl"><b>${esc(m.label)}</b><span>${esc(m.desc)}</span></div>
+            <div class="pf-plot"><div class="pf-svg"></div><div class="pf-ends"><span>← ${esc(m.lo)}</span><span>${esc(m.hi)} →</span></div></div>
+            <div class="pf-val">${val}</div></div>`;
+    }).join("")}</div>`;
+
+    const mapSeg = hasLean ? `<div class="pf-seg">${[["sim", "Similarity"], ["compass", "Compass"]].map(([k, l]) =>
+        `<button type="button" data-vp-map="${k}" aria-pressed="${_votersPage.map === k}">${l}</button>`).join("")}</div>` : "";
+    html += `<div class="pf-charts"><div class="pf-chart"><div class="pf-bd-head"><div class="pf-sub" title="${_votersPage.map === "sim"
+            ? "Voters placed so that the closer two dots are, the more alike their ballots were this season (Similar sort distance, averaged over the weeks both voted)"
+            : "Across: which ESPN ranking the ballots sit closer to. Up: distance from the rest of the poll."}">Voter map</div>${mapSeg}</div><div class="vp-map"></div></div>
+        <div class="pf-chart"><div class="pf-sub">Field distance from consensus by week</div>
+        <div class="pf-legend"><span><i class="vp-sw-med"></i>Field median</span><span><i class="vp-sw-band"></i>Middle 50%</span><span><i class="vp-sw-band vp-sw-outer"></i>10th–90th</span>${focus ? `<span><i class="pf-sw-line"></i>${esc(focus.name)}</span>` : ""}</div><div class="vp-field"></div></div></div>`;
+
+    html += `<div class="pf-sub" title="Spearman rank correlation across profiled voters: orange = voters high on one tend to be high on the other, blue = high on one, low on the other">How the measures relate</div><div class="vp-corr-wrap">${_vpCorrHtml(metrics, voters)}</div>`;
+
+    // All profiled voters
+    const rows = voters.map(v => {
+        const x = extra(v.name);
+        return { ...v, flair: x.flair || null, onePick: x.onePick || null, oneCount: x.oneCount || 0, fav: x.fav || null, hate: x.hate || null };
+    });
+    const cols = [{ k: "name", label: "Voter" }, { k: "ballots", label: "Ballots", fmt: v => v },
+        ...metrics.map(m => ({ k: m.k, label: m.short, fmt: m.fmt, title: m.desc })),
+        { k: "one", label: "#1 Pick", team: true, title: "Team the voter ranked #1 most often (× ballots)" },
+        { k: "fav", label: "Favorite", team: true, title: "Team the voter ranked furthest above consensus, on average (spots)" },
+        { k: "hate", label: "Least Fav.", team: true, title: "Team the voter ranked furthest below consensus, on average (spots)" }];
+    const sortVal = (r, k) => k === "one" ? (r.onePick ? r.oneCount : null) : k === "fav" ? r.fav?.d ?? null : k === "hate" ? (r.hate ? -r.hate.d : null) : r[k];
+    if (!cols.some(c => c.k === _votersPage.sort)) { _votersPage.sort = "dist"; _votersPage.dir = "asc"; }
+    const sk = _votersPage.sort;
+    rows.sort((a, b) => {
+        const A = sortVal(a, sk), B = sortVal(b, sk);
+        if (A == null && B == null) return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+        if (A == null) return 1; if (B == null) return -1;
+        const c = typeof A === "string" ? A.localeCompare(B, undefined, { sensitivity: "base" }) : A - B;
+        return (_votersPage.dir === "asc" ? c : -c) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    });
+    const dev = d => `<span class="fan-dev">${d > 0 ? "+" : "−"}${Math.abs(d).toFixed(1)}</span>`;
+    const cell = (r, c) => {
+        if (c.k === "name") return `<td class="vp-voter">${r.flair ? logo(r.flair) : `<i class="vp-nologo"></i>`}${esc(r.name)}</td>`;
+        if (c.k === "one") return r.onePick ? `<td class="vp-team">${logo(r.onePick)}${esc(formatTeamName(r.onePick))} <span class="fan-dev">×${r.oneCount}</span></td>` : `<td class="pf-na vp-team">—</td>`;
+        if (c.k === "fav" || c.k === "hate") { const t = r[c.k]; return t ? `<td class="vp-team">${logo(t.team)}${esc(formatTeamName(t.team))} ${dev(t.d)}</td>` : `<td class="pf-na vp-team">—</td>`; }
+        return r[c.k] == null ? `<td class="pf-na">—</td>` : `<td>${c.fmt(r[c.k])}</td>`;
+    };
+    html += `<div class="pf-sub">All profiled voters</div><div class="pf-table-wrap"><table class="pf-table vp-table"><thead><tr>${cols.map(c =>
+        `<th${c.team ? ` class="vp-team"` : ""}><button type="button" data-vp-sort="${c.k}"${c.k === sk ? ` data-dir="${_votersPage.dir}"` : ""}${c.title ? ` title="${esc(c.title)}"` : ""}>${esc(c.label)}</button></th>`).join("")}</tr></thead><tbody>${rows.map(r =>
+        `<tr data-vp-open="${esc(r.name)}"${focus && r.name === focus.name ? ` class="pf-on"` : ""} title="Open ${esc(r.name)}'s profile">${cols.map(c => cell(r, c)).join("")}</tr>`).join("")}</tbody></table></div>`;
+
+    const box = document.getElementById("season-stats-box"), scroll = box.scrollTop;
+    const tableScroll = table.querySelector(".pf-table-wrap")?.scrollTop || 0;
+    const view = document.createElement("div");
+    view.className = "pf-view vp-view";
+    view.innerHTML = html;
+    table.innerHTML = "";
+    table.appendChild(view);
+    box.scrollTop = scroll;
+    view.querySelector(".pf-table-wrap").scrollTop = tableScroll;
+
+    view.querySelectorAll(".pf-strip").forEach(row => {
+        const m = metrics.find(x => x.k === row.dataset.k);
+        const host = row.querySelector(".pf-svg");
+        host.innerHTML = _pfStripSvg(m, voters, null, hasLean && m.k === "lean" ? data.consLean : null, Math.max(180, host.clientWidth), focus);
+    });
+    const map = view.querySelector(".vp-map");
+    const mw = Math.max(260, map.clientWidth);
+    map.innerHTML = _votersPage.map === "compass"
+        ? _pfCompassSvg(data, null, mw, focus)
+        : _vpMapSvg(_vpSimilarityLayout(ctx, ctx.data.voters.map(v => v.name)), voters, focus, mw);
+    const field = view.querySelector(".vp-field");
+    field.innerHTML = _vpFieldSvg(data, focus, Math.max(260, field.clientWidth));
+    initRecordsLogos(view);
+
+    view.addEventListener("click", e => {
+        if (e.target.closest("[data-pf-outliers]")) {
+            _profile.hideOutliers = !_profile.hideOutliers;
+            localStorage.setItem("pfHideOutliers", _profile.hideOutliers ? "1" : "0");
+            renderVotersPage();
+            return;
+        }
+        const sortBtn = e.target.closest("[data-vp-sort]");
+        if (sortBtn) {
+            const k = sortBtn.dataset.vpSort;
+            if (k === _votersPage.sort) _votersPage.dir = _votersPage.dir === "asc" ? "desc" : "asc";
+            else { _votersPage.sort = k; _votersPage.dir = k === "name" || k === "dist" ? "asc" : "desc"; }
+            renderVotersPage();
+            return;
+        }
+        const mapBtn = e.target.closest("[data-vp-map]");
+        if (mapBtn) { _votersPage.map = mapBtn.dataset.vpMap; renderVotersPage(); return; }
+        const cmp = e.target.closest("[data-pf-compare]");
+        if (cmp) {
+            const n = cmp.dataset.pfCompare;
+            _votersPage.focus = n && n !== _votersPage.focus ? n : null;
+            renderVotersPage();
+            return;
+        }
+        const open = e.target.closest("[data-vp-open]");
+        if (open) {
+            showVoterProfile(open.dataset.vpOpen);
+            document.getElementById("voter-history-box").scrollTop = 0;
+        }
+    });
+}
+
+let _vpResizeRaf = 0;
+window.addEventListener("resize", () => {
+    if (!_vpOpen()) return;
+    cancelAnimationFrame(_vpResizeRaf);
+    _vpResizeRaf = requestAnimationFrame(renderVotersPage);
+});
 
 let _pfResizeRaf = 0;
 window.addEventListener("resize", () => {
@@ -6094,9 +6434,13 @@ function showSeasonStatsModal(mode = "records") {
     const table = document.getElementById("season-stats-table");
 
     title.innerHTML = seasonModalTitleHtml(currentYear, isApMode, mode);
+    if (mode === "voters" && !isApMode && profileSeasonAvailable(currentYear)) {
+        table.classList.remove("season-voters", "season-records", "season-mmp12");
+        showVotersPage(currentYear, weekBallots, voterWeeksVoted, totalWeeks);
+        return;
+    }
     table.classList.toggle("season-voters", mode === "voters");
-    table.classList.remove("season-records");
-    table.classList.remove("season-mmp12");
+    table.classList.remove("season-records", "season-mmp12", "season-vp");
 
     if (mode === "voters") {
         table.innerHTML = buildSeasonVotersTableHtml(weekBallots, voterWeeksVoted, minWeeksVoted, totalWeeks, esc);
@@ -6624,7 +6968,7 @@ function showSeasonRecords(currentYear, isApMode, activeTab) {
         _recordsView = el.dataset.view;
         showSeasonRecords(currentYear, isApMode, activeTab);
     }));
-    table.classList.remove("season-voters", "season-mmp12");
+    table.classList.remove("season-voters", "season-mmp12", "season-vp");
     table.classList.add("season-records");
 
     const weekId = isApMode && _apCurrentWeekNum !== null
@@ -7408,7 +7752,10 @@ function initPickerDrag(tbody, season, onDrop) {
 //              (consensus rank − voter rank, from consensusTeamGaps()), divided by the weeks
 //              the voter voted, so season-long bias beats a one-week outlier.
 // Voters below the participation minimum sort after the rest, in italics.
-function buildSeasonVotersTableHtml(weekBallots, voterWeeksVoted, minWeeksVoted, totalWeeks, esc) {
+// Per-voter season extras from the official ballots in the DOM: flair, Cons Δ (delta),
+// #1 Pick (onePick × oneCount, ties → the latest), Favorite / Least Fav. (fav / hate:
+// {team, d}, the largest average signed gap vs the leave-one-out consensus). Keyed by voter.
+function seasonVoterExtras(weekBallots, voterWeeksVoted) {
     const voters = {};
     weekBallots.forEach(({ ballots, consensusOrder }) => {
         if (ballots.length === 0) return;
@@ -7449,11 +7796,20 @@ function buildSeasonVotersTableHtml(weekBallots, voterWeeksVoted, minWeeksVoted,
             if (d > 0 && (!v.fav || d > v.fav.d)) v.fav = { team, d };
             if (d < 0 && (!v.hate || d < v.hate.d)) v.hate = { team, d };
         });
+        v.delta = v.ballots ? v.deltaSum / v.ballots : Infinity;
+        v.onePick = null; v.oneCount = 0;
+        Object.entries(v.ones).forEach(([t, c]) => {
+            if (c > v.oneCount || (c === v.oneCount && t === v.lastOne)) { v.onePick = t; v.oneCount = c; }
+        });
     });
+    return voters;
+}
 
+// Year › Voters for seasons without profiles (AP mode, ap-ballots.html, before 2025)
+function buildSeasonVotersTableHtml(weekBallots, voterWeeksVoted, minWeeksVoted, totalWeeks, esc) {
+    const voters = seasonVoterExtras(weekBallots, voterWeeksVoted);
     const rows = Object.values(voters).map(v => ({
         ...v,
-        delta: v.ballots ? v.deltaSum / v.ballots : Infinity,
         qualified: voterWeeksVoted[v.name] >= minWeeksVoted,
     })).sort((a, b) => (b.qualified - a.qualified) || (a.delta - b.delta)
         || a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
@@ -7482,10 +7838,7 @@ function buildSeasonVotersTableHtml(weekBallots, voterWeeksVoted, minWeeksVoted,
         <th class="fan-col">Least Fav.</th>
     </tr></thead><tbody>`;
     rows.forEach((v, i) => {
-        let onePick = null, oneCount = 0;
-        Object.entries(v.ones).forEach(([t, c]) => {
-            if (c > oneCount || (c === oneCount && t === v.lastOne)) { onePick = t; oneCount = c; }
-        });
+        const { onePick, oneCount } = v;
         html += `<tr${v.qualified ? "" : ` class="fan-low-sample" title="Fewer than ${minWeeksVoted} ballots"`}>
             <td>${i + 1}</td>
             <td>${v.flair ? `<img class="logo-sm" src="${logoSrc(v.flair)}">` : ""}</td>
@@ -8148,7 +8501,7 @@ function showMmP12Report() {
 
     _recordsRenderToken++;          // drop any Records render still in flight
     const token = ++_mmToken;
-    table.className = "season-records season-mmp12";
+    table.className = "season-records season-mmp12";  // also drops season-vp / season-voters
     let last = [null, null];
     const render = (data, error) => {
         if (token !== _mmToken || !table.classList.contains("season-mmp12")) return;
