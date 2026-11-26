@@ -1774,6 +1774,10 @@ const VOTER_MENU_ITEMS = [
         run: row => showVoterHistory(getVoterName(row)),
     },
     {
+        id: "profile", show: voterMenuCanProfile, label: () => "Profile",
+        run: row => showVoterProfile(getVoterName(row)),
+    },
+    {
         id: "similar", show: voterMenuCanSimilar,
         label: row => currentSort === "similar" && similarTo === getVoterName(row)
             ? "Stop sorting by similarity" : "Sort by similarity",
@@ -2069,12 +2073,438 @@ function showVoterHistory(username) {
     title.textContent = username + " \u2013 " + currentYear + " Ballots";
 
     renderVoterHistoryTable(mergedData, yearTabs, table);
+    modal.dataset.chartType = "history";
     modal.classList.add("open");
     bindTeamLogos();
 }
 
 document.getElementById("voter-history-modal").addEventListener("click", e => {
     if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
+});
+
+// ── Voter profile (voter menu › Profile; PIN-locked) ─────────────────────────
+// How one official voter tends to vote over a season: six measures with the field's spread,
+// a compass (BPI↔SOR lean × distance from consensus), distance by week, the active week's
+// ballot team by team next to the consensus / BPI / SOR, and a sortable table of every
+// profiled voter. Numbers come from profiles-YEAR.json (profiles.py, written by every
+// --rebuild; PROFILE_FILES lists the seasons); the team-by-team part reads the active week's
+// ballots from the DOM and its BPI/SOR snapshot via bpiSnapshotForTab(). Opens in
+// #voter-history-modal (chartType "profile"); week/year navigation re-renders it.
+// Userpoll only (not AP mode or ap-ballots.html), seasons >= PROFILE_FIRST_YEAR.
+const PROFILE_FIRST_YEAR = 2025;
+const PROFILE_TRAIT_PCT = 80;        // percentile at/above (or 100 - it at/below) that earns a trait chip
+const PROFILE_SPLIT_GAP = 5;         // BPI and SOR ranks (capped at 26) this far apart = a "split" team
+const _profileFiles = {};            // season → Promise<profiles payload>
+const _profile = { name: null, sort: "dist", dir: "desc", filter: "split", token: 0,
+    hideOutliers: localStorage.getItem("pfHideOutliers") === "1" };
+
+const _pfEsc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// Fixed decimals without a "−0.00": values that round to zero print unsigned
+const _pfFixed = (v, d) => (Math.abs(v) < 0.5 * 10 ** -d ? 0 : v).toFixed(d).replace("-", "−");
+const _pfSigned = (v, d) => (Math.abs(v) < 0.5 * 10 ** -d ? "" : v > 0 ? "+" : "−") + Math.abs(Math.abs(v) < 0.5 * 10 ** -d ? 0 : v).toFixed(d);
+
+const PROFILE_METRICS = [
+    { k: "lean", label: "Résumé vs predictive", short: "Lean", lo: "Closer to BPI", hi: "Closer to SOR",
+      desc: "On teams where BPI and SOR disagree, which one the ballot sits closer to (−1 BPI, +1 SOR).",
+      fmt: v => _pfSigned(v, 2), trait: ["Predictive voter", "Résumé voter"] },
+    { k: "dist", label: "Distance from consensus", short: "Cons. dist", lo: "With the crowd", hi: "Contrarian",
+      desc: "Average rank gap from the rest of the poll, weighted toward the top spots.",
+      fmt: v => _pfFixed(v, 2), unit: "spots", trait: ["Votes with the crowd", "Contrarian"] },
+    { k: "lead", label: "Ahead of the poll", short: "Ahead", lo: "Follows", hi: "Leads",
+      desc: "How well this week's disagreements predict next week's poll movement.",
+      fmt: v => _pfFixed(v, 2), unit: "correlation", trait: ["Follows the poll", "Ahead of the poll"] },
+    { k: "loss", label: "Loss penalty", short: "Loss pen.", lo: "Patient", hi: "Punishing",
+      desc: "Extra spots a team drops after a loss, compared with teams that didn't lose.",
+      fmt: v => _pfFixed(v, 1), unit: "spots", trait: ["Patient after losses", "Punishes losses"] },
+    { k: "vol", label: "Weekly movement", short: "Movement", lo: "Steady", hi: "Restless",
+      desc: "Average spots each ballot slot moves from the previous ballot.",
+      fmt: v => _pfFixed(v, 1), unit: "spots per slot", trait: ["Steady ballot", "Moves teams a lot"] },
+    { k: "mid", label: "Mid-major lean", short: "Mid-major", lo: "Fewer", hi: "More",
+      desc: "Mid-major teams per ballot compared with the consensus top 25.",
+      fmt: v => _pfSigned(v, 1), unit: "teams", trait: ["Power-conference lean", "Mid-major friendly"] },
+];
+
+function fetchProfiles(season) {
+    if (typeof PROFILE_FILES === "undefined" || !PROFILE_FILES.includes(Number(season))) return Promise.resolve(null);
+    if (!_profileFiles[season]) {
+        _profileFiles[season] = fetch(`profiles-${season}.json`)
+            .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+            .catch(e => { delete _profileFiles[season]; throw e; });
+    }
+    return _profileFiles[season];
+}
+
+function profileSeasonAvailable(year) {
+    return !ON_AP_PAGE && _apCurrentYear === null && Number(year) >= PROFILE_FIRST_YEAR
+        && typeof PROFILE_FILES !== "undefined" && PROFILE_FILES.includes(Number(year));
+}
+
+// Voter menu: real ballots only (not Overall / Data Ballots / ranking rows), while unlocked
+function voterMenuCanProfile(row) {
+    if (!isKeybindsUnlocked() || !voterMenuCanSimilar(row) || !row.classList.contains("voter-row")
+        || row.classList.contains("row-weighted-ranking")
+        || row.closest(".ballot-section")?.id?.endsWith("-aggregate")) return false;
+    return profileSeasonAvailable(document.querySelector(".week-tab.active")?.dataset.year);
+}
+
+// name = voter to show; omitted = re-render the current one (week/year navigation, resize)
+async function showVoterProfile(name) {
+    if (!isKeybindsUnlocked()) return;
+    const activeTab = document.querySelector(".week-tab.active");
+    if (!activeTab || !profileSeasonAvailable(activeTab.dataset.year)) return;
+    if (name) _profile.name = name;
+    if (!_profile.name) return;
+    const year = activeTab.dataset.year;
+    const token = ++_profile.token;
+    const modal = document.getElementById("voter-history-modal");
+    const title = document.getElementById("voter-history-title");
+    const table = document.getElementById("voter-history-table");
+    const wasOpen = modal.classList.contains("open") && modal.dataset.chartType === "profile";
+    table.classList.remove("week-stats-table");
+    table.style.cssText = "display:block; white-space:normal; width:100%;";
+    modal.dataset.chartType = "profile";
+    title.innerHTML = `${modalWeekArrowsHtml()}${year} Profile — ${_pfEsc(_profile.name)}`;
+    if (!wasOpen || !table.querySelector(".pf-view")) table.innerHTML = `<div class="pf-view"><div class="pf-empty">Loading…</div></div>`;
+    modal.classList.add("open");
+
+    let data, snaps;
+    try { data = await fetchProfiles(year); }
+    catch (e) {
+        if (token === _profile.token) table.innerHTML = `<div class="pf-view"><div class="pf-empty">Couldn't load the ${year} profiles (${_pfEsc(e.message)}).</div></div>`;
+        return;
+    }
+    try { snaps = await fetchBpiHistory(year); } catch { snaps = []; }
+    if (token !== _profile.token || modal.dataset.chartType !== "profile" || !modal.classList.contains("open")) return;
+    if (!data) { table.innerHTML = `<div class="pf-view"><div class="pf-empty">No profiles for ${year}.</div></div>`; return; }
+    renderVoterProfile(table, data, snaps, activeTab);
+}
+
+function _pfPct(values, v) {
+    const below = values.filter(x => x < v).length;
+    return Math.round(100 * below / Math.max(1, values.length - 1));
+}
+const _pfOrdinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th");
+const _pfScale = (d0, d1, r0, r1) => v => r0 + (v - d0) / ((d1 - d0) || 1) * (r1 - r0);
+const _pfMedian = xs => { const s = [...xs].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+// Deterministic vertical jitter for strip dots
+const _pfJitter = s => { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return ((h >>> 0) % 1000) / 1000 - 0.5; };
+// "Hide outliers": the same test as outlierKind(), a value OUTLIER_SD_THRESHOLD (2.5)
+// population SDs or more from the field mean is an outlier. Off = keep everything.
+function _pfFence(xs) {
+    if (!_profile.hideOutliers || xs.length < 8) return () => true;
+    const avg = xs.reduce((a, b) => a + b, 0) / xs.length;
+    const sd = Math.sqrt(xs.reduce((a, x) => a + (x - avg) ** 2, 0) / xs.length);
+    return v => !(sd > 0) || Math.abs(v - avg) / sd < OUTLIER_SD_THRESHOLD;
+}
+function _pfTicks(a, b, n) {
+    const step0 = (b - a) / n || 1, mag = 10 ** Math.floor(Math.log10(step0));
+    const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= step0);
+    const out = [];
+    for (let t = Math.ceil(a / step) * step; t <= b + 1e-9; t += step) out.push(+t.toFixed(6));
+    return out;
+}
+function _pfWeekLabel(year, week) {
+    const tab = getSortedTabs().find(t => t.dataset.week === `week-${year}-${week}`);
+    return tab ? String(displayWeekNum(tab)) : String(week);
+}
+
+function renderVoterProfile(table, data, snaps, activeTab) {
+    const esc = _pfEsc;
+    const year = data.season;
+    const voters = data.voters;
+    const me = voters.find(v => v.name === _profile.name)
+        || voters.find(v => v.name.toLowerCase() === _profile.name.toLowerCase());
+    const hasLean = data.leanWeeks.length > 0;
+    const metrics = PROFILE_METRICS.filter(m => m.k !== "lean" || hasLean);
+    const values = Object.fromEntries(metrics.map(m => [m.k, voters.map(v => v[m.k]).filter(x => x != null)]));
+
+    const outlierToggle = `<button type="button" class="pf-link" data-pf-outliers aria-pressed="${_profile.hideOutliers}" title="${_profile.hideOutliers
+        ? "Put voters back on the charts"
+        : `Leave values ${OUTLIER_SD_THRESHOLD}+ standard deviations from the field average off the charts`}">${_profile.hideOutliers ? "Show Outliers" : "Hide Outliers"}</button>`;
+    let html = "";
+    if (me) {
+        const traits = [];
+        if (voters.length >= 10) for (const m of metrics) {
+            if (me[m.k] == null) continue;
+            const p = _pfPct(values[m.k], me[m.k]);
+            if (p >= PROFILE_TRAIT_PCT) traits.push([m.trait[1], p]);
+            else if (p <= 100 - PROFILE_TRAIT_PCT) traits.push([m.trait[0], 100 - p]);
+        }
+        traits.sort((a, b) => b[1] - a[1]);
+        html += `<div class="pf-head"><div class="pf-traits">${traits.length
+            ? traits.map(t => `<span class="pf-trait">${esc(t[0])}</span>`).join("")
+            : `<span class="pf-trait">Middle of the field on every measure</span>`}</div>
+            <div class="pf-facts"><span><b>${me.ballots}</b> ballots</span>${outlierToggle}</div></div>`;
+    } else {
+        html += `<div class="pf-note">${esc(_profile.name)} has no ${year} profile: profiles cover official voters with ${data.minBallots}+ ballots this season. Pick a voter from the table below.</div>
+            <div class="pf-head"><div></div><div class="pf-facts">${outlierToggle}</div></div>`;
+    }
+
+    html += `<div class="pf-strips">${metrics.map(m => {
+        const v = me?.[m.k];
+        const val = v == null
+            ? `<span class="pf-num">—</span><span class="pf-pct">${me ? (m.k === "loss" ? "Too few losses yet" : "Not enough data") : ""}</span>`
+            : `<span class="pf-num">${m.fmt(v)}${m.unit ? ` <small>${esc(m.unit)}</small>` : ""}</span><span class="pf-pct">${_pfOrdinal(_pfPct(values[m.k], v))} percentile${m.k === "lean" ? ` · ${me.leanBallots} ballot${me.leanBallots === 1 ? "" : "s"}` : ""}</span>`;
+        return `<div class="pf-strip" data-k="${m.k}"><div class="pf-lbl"><b>${esc(m.label)}</b><span>${esc(m.desc)}</span></div>
+            <div class="pf-plot"><div class="pf-svg"></div><div class="pf-ends"><span>← ${esc(m.lo)}</span><span>${esc(m.hi)} →</span></div></div>
+            <div class="pf-val">${val}</div></div>`;
+    }).join("")}</div>
+    <div class="pf-legend"><span><i class="pf-sw-sq"></i>${esc(me ? me.name : "Selected voter")}</span><span><i class="pf-sw-dot"></i>Other voters</span><span><i class="pf-sw-tick"></i>Field median</span>${hasLean ? `<span><i class="pf-sw-dia"></i>Poll consensus</span>` : ""}</div>`;
+
+    html += `<div class="pf-charts">${hasLean ? `<div class="pf-chart"><div class="pf-sub">Voter compass</div>
+        <div class="pf-cap">Across: which ESPN ranking the ballots sit closer to. Up: distance from the rest of the poll.</div><div class="pf-compass"></div></div>` : ""}
+        <div class="pf-chart"><div class="pf-sub">Distance from consensus by week</div>
+        <div class="pf-legend"><span><i class="pf-sw-line"></i>${esc(me ? me.name : "Selected voter")}</span><span><i class="pf-sw-dash"></i>Field median</span></div><div class="pf-weekly"></div></div></div>`;
+
+    const weekName = weekTextLabel(activeTab) || `Week ${displayWeekNum(activeTab)}`;
+    html += `<div class="pf-bd-head"><div class="pf-sub">Team by team — ${esc(weekName)}</div><div class="pf-bd-controls"></div></div>
+        <div class="pf-bd-legend pf-legend"></div><div class="pf-bd"></div>`;
+
+    const cols = [{ k: "name", label: "Voter" }, { k: "ballots", label: "Ballots", fmt: v => v }, ...metrics.map(m => ({ k: m.k, label: m.short, fmt: m.fmt }))];
+    if (!cols.some(c => c.k === _profile.sort)) { _profile.sort = "dist"; _profile.dir = "desc"; }
+    const sorted = [...voters].sort((a, b) => {
+        const A = a[_profile.sort], B = b[_profile.sort];
+        if (A == null && B == null) return 0; if (A == null) return 1; if (B == null) return -1;
+        const c = typeof A === "string" ? A.localeCompare(B, undefined, { sensitivity: "base" }) : A - B;
+        return _profile.dir === "asc" ? c : -c;
+    });
+    html += `<div class="pf-sub">All profiled voters</div><div class="pf-table-wrap"><table class="pf-table"><thead><tr>${cols.map(c =>
+        `<th><button type="button" data-pf-sort="${c.k}"${c.k === _profile.sort ? ` data-dir="${_profile.dir}"` : ""}>${esc(c.label)}</button></th>`).join("")}</tr></thead><tbody>${sorted.map(v =>
+        `<tr data-pf-voter="${esc(v.name)}"${me && v.name === me.name ? ` class="pf-on"` : ""}>${cols.map(c =>
+            c.k === "name" ? `<td>${esc(v.name)}</td>` : v[c.k] == null ? `<td class="pf-na">—</td>` : `<td>${c.fmt(v[c.k])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+
+    html += `<div class="pf-foot">Official ballots only. Consensus = points from every other official ballot that week; unranked = #26. `
+        + (hasLean ? `Lean uses the BPI/SOR snapshot taken at each poll's deadline (weeks ${data.leanWeeks.map(w => _pfWeekLabel(year, w)).join(", ")}); early-season SOR rests on few games. `
+                   : `No lean for ${year}: weekly BPI/SOR snapshots start with 2027. `)
+        + (data.hasGames ? `Loss penalty uses ESPN results between poll deadlines.` : `No game results for ${year}, so no loss penalty.`)
+        + `</div>`;
+
+    const view = document.createElement("div");
+    view.className = "pf-view";
+    view.innerHTML = html;
+    table.innerHTML = "";
+    table.appendChild(view);
+
+    view.querySelectorAll(".pf-strip").forEach(row => {
+        const m = metrics.find(x => x.k === row.dataset.k);
+        const host = row.querySelector(".pf-svg");
+        host.innerHTML = _pfStripSvg(m, voters, me, hasLean && m.k === "lean" ? data.consLean : null, Math.max(180, host.clientWidth));
+    });
+    const compass = view.querySelector(".pf-compass");
+    if (compass) compass.innerHTML = _pfCompassSvg(data, me, Math.max(260, compass.clientWidth));
+    const weekly = view.querySelector(".pf-weekly");
+    weekly.innerHTML = _pfWeeklySvg(data, me, Math.max(260, weekly.clientWidth));
+    _pfRenderBreakdown(view, activeTab, snaps);
+
+    view.addEventListener("click", e => {
+        if (e.target.closest("[data-pf-outliers]")) {
+            _profile.hideOutliers = !_profile.hideOutliers;
+            localStorage.setItem("pfHideOutliers", _profile.hideOutliers ? "1" : "0");
+            renderVoterProfile(table, data, snaps, activeTab);
+            return;
+        }
+        const sortBtn = e.target.closest("[data-pf-sort]");
+        if (sortBtn) {
+            const k = sortBtn.dataset.pfSort;
+            if (k === _profile.sort) _profile.dir = _profile.dir === "asc" ? "desc" : "asc";
+            else { _profile.sort = k; _profile.dir = k === "name" ? "asc" : "desc"; }
+            renderVoterProfile(table, data, snaps, activeTab);
+            return;
+        }
+        const f = e.target.closest("[data-pf-filter]");
+        if (f) { _profile.filter = f.dataset.pfFilter; _pfRenderBreakdown(view, activeTab, snaps); return; }
+        const v = e.target.closest("[data-pf-voter]");
+        if (v && v.dataset.pfVoter !== me?.name) {
+            showVoterProfile(v.dataset.pfVoter);
+            document.getElementById("voter-history-box").scrollTop = 0;
+        }
+    });
+}
+
+function _pfStripSvg(m, voters, me, ref, W) {
+    const esc = _pfEsc, H = 40, pad = 9, mid = H / 2;
+    const all = voters.filter(v => v[m.k] != null);
+    if (!all.length) return "";
+    const med = _pfMedian(all.map(v => v[m.k]));
+    const keep = _pfFence(all.map(v => v[m.k]));
+    const pts = all.filter(v => keep(v[m.k]));
+    let lo = Math.min(...pts.map(v => v[m.k])), hi = Math.max(...pts.map(v => v[m.k]));
+    if (ref != null) { lo = Math.min(lo, ref); hi = Math.max(hi, ref); }
+    const span = hi - lo || 1;
+    const x0 = _pfScale(lo - span * 0.04, hi + span * 0.04, pad, W - pad);
+    const x = v => Math.min(W - pad, Math.max(pad, x0(v)));   // a hidden outlier (the selected voter) sits at the edge
+    let s = `<svg class="pf-strip-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+    s += `<line class="pf-grid" x1="${pad}" x2="${W - pad}" y1="${mid}" y2="${mid}"/>`;
+    s += `<line class="pf-median" x1="${x(med)}" x2="${x(med)}" y1="${mid - 14}" y2="${mid + 14}"><title>Field median: ${m.fmt(med)}</title></line>`;
+    for (const v of pts) {
+        if (me && v.name === me.name) continue;
+        s += `<circle class="pf-dot" data-pf-voter="${esc(v.name)}" cx="${x(v[m.k]).toFixed(1)}" cy="${(mid + _pfJitter(v.name + m.k) * 20).toFixed(1)}" r="3.5"><title>${esc(v.name)}: ${m.fmt(v[m.k])}</title></circle>`;
+    }
+    if (ref != null) {
+        const cx = x(ref);
+        s += `<path class="pf-ref" d="M${cx} ${mid - 7}L${cx + 7} ${mid}L${cx} ${mid + 7}L${cx - 7} ${mid}Z"><title>Poll consensus: ${m.fmt(ref)}</title></path>`;
+    }
+    if (me && me[m.k] != null) {
+        const off = !keep(me[m.k]);
+        s += `<rect class="pf-me${off ? " pf-me-off" : ""}" x="${x(me[m.k]) - 7}" y="${mid - 7}" width="14" height="14" rx="3"><title>${esc(me.name)}: ${m.fmt(me[m.k])}${off ? " (outlier, off the scale)" : ""}</title></rect>`;
+    }
+    return s + `</svg>`;
+}
+
+function _pfCompassSvg(data, me, W) {
+    const esc = _pfEsc;
+    const H = Math.round(Math.min(360, Math.max(260, W * 0.75)));
+    const mg = { l: 36, r: 12, t: 22, b: 36 };
+    const both = data.voters.filter(v => v.lean != null && v.dist != null);
+    if (!both.length) return `<div class="pf-empty">No lean data yet.</div>`;
+    const keepX = _pfFence(both.map(v => v.lean)), keepY = _pfFence(both.map(v => v.dist));
+    const pts = both.filter(v => keepX(v.lean) && keepY(v.dist));
+    const xs = pts.map(v => v.lean), ys = pts.map(v => v.dist);
+    const x0 = Math.min(...xs, data.consLean ?? 0) - 0.06, x1 = Math.max(...xs, data.consLean ?? 0) + 0.06;
+    const y1 = Math.max(...ys) * 1.06;
+    const X = _pfScale(x0, x1, mg.l, W - mg.r), Y = _pfScale(0, y1, H - mg.b, mg.t);
+    const yMed = _pfMedian(both.map(v => v.dist));
+    let s = `<svg class="pf-compass-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+    for (const t of _pfTicks(0, y1, 5)) s += `<line class="pf-grid" x1="${mg.l}" x2="${W - mg.r}" y1="${Y(t)}" y2="${Y(t)}"/><text class="pf-tick" x="${mg.l - 6}" y="${Y(t) + 4}" text-anchor="end">${t}</text>`;
+    for (const t of _pfTicks(x0, x1, 5)) s += `<text class="pf-tick" x="${X(t)}" y="${H - mg.b + 15}" text-anchor="middle">${_pfSigned(t, t % 1 ? (Math.abs(t * 10 % 1) > 1e-6 ? 2 : 1) : 0).replace(/^\+?0$/, "0")}</text>`;
+    s += `<line class="pf-axis" x1="${mg.l}" x2="${W - mg.r}" y1="${H - mg.b}" y2="${H - mg.b}"/>`;
+    s += `<text class="pf-end pf-end-bpi" x="${mg.l}" y="${H - 5}">← Closer to BPI</text>`;
+    s += `<text class="pf-end pf-end-sor" x="${W - mg.r}" y="${H - 5}" text-anchor="end">Closer to SOR →</text>`;
+    s += `<text class="pf-tick" x="${mg.l - 6}" y="${mg.t - 10}">Spots from consensus</text>`;
+    if (data.consLean != null) {
+        const cx = X(data.consLean);
+        s += `<line class="pf-refline" x1="${cx}" x2="${cx}" y1="${mg.t}" y2="${H - mg.b}"/>`;
+        s += `<text class="pf-tick pf-halo" x="${cx + 5}" y="${mg.t + 10}">Poll consensus</text>`;
+    }
+    s += `<line class="pf-medline" x1="${mg.l}" x2="${W - mg.r}" y1="${Y(yMed)}" y2="${Y(yMed)}"/>`;
+    s += `<text class="pf-tick pf-halo" x="${W - mg.r}" y="${Y(yMed) - 5}" text-anchor="end">Field median</text>`;
+    for (const v of pts) {
+        if (me && v.name === me.name) continue;
+        s += `<circle class="pf-dot pf-dot-lg" data-pf-voter="${esc(v.name)}" cx="${X(v.lean).toFixed(1)}" cy="${Y(v.dist).toFixed(1)}" r="5"><title>${esc(v.name)}: lean ${_pfSigned(v.lean, 2)}, ${v.dist.toFixed(2)} spots from consensus</title></circle>`;
+    }
+    if (me && me.lean != null && me.dist != null) {
+        const off = !keepX(me.lean) || !keepY(me.dist);
+        const mx = Math.min(W - mg.r, Math.max(mg.l, X(me.lean))), my = Math.min(H - mg.b, Math.max(mg.t, Y(me.dist))), right = mx < W - 110;
+        s += `<rect class="pf-me${off ? " pf-me-off" : ""}" x="${mx - 7}" y="${my - 7}" width="14" height="14" rx="3"><title>${esc(me.name)}: lean ${_pfSigned(me.lean, 2)}, ${me.dist.toFixed(2)} spots from consensus${off ? " (outlier, off the scale)" : ""}</title></rect>`;
+        s += `<text class="pf-me-label pf-halo" x="${right ? mx + 11 : mx - 11}" y="${my + 4}" text-anchor="${right ? "start" : "end"}">${esc(me.name)}</text>`;
+    }
+    return s + `</svg>`;
+}
+
+function _pfWeeklySvg(data, me, W) {
+    const esc = _pfEsc, H = 240, mg = { l: 32, r: 12, t: 12, b: 28 };
+    const weeks = data.weeks;
+    const field = data.fieldDist;
+    const mine = Object.fromEntries((me?.weekly || []).map(r => [r[0], r[1]]));
+    const vals = [...Object.values(field), ...Object.values(mine)];
+    if (!vals.length) return "";
+    const ymax = Math.max(...vals) * 1.1;
+    const X = _pfScale(0, Math.max(1, weeks.length - 1), mg.l, W - mg.r), Y = _pfScale(0, ymax, H - mg.b, mg.t);
+    let s = `<svg class="pf-weekly-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+    for (const t of _pfTicks(0, ymax, 4)) s += `<line class="pf-grid" x1="${mg.l}" x2="${W - mg.r}" y1="${Y(t)}" y2="${Y(t)}"/><text class="pf-tick" x="${mg.l - 6}" y="${Y(t) + 4}" text-anchor="end">${t}</text>`;
+    const every = Math.max(1, Math.ceil(weeks.length / Math.max(2, Math.floor((W - mg.l - mg.r) / 34))));
+    weeks.forEach((w, i) => {
+        if (i % every === 0 || i === weeks.length - 1) s += `<text class="pf-tick" x="${X(i)}" y="${H - mg.b + 15}" text-anchor="middle">${_pfWeekLabel(data.season, w)}</text>`;
+    });
+    s += `<line class="pf-axis" x1="${mg.l}" x2="${W - mg.r}" y1="${H - mg.b}" y2="${H - mg.b}"/>`;
+    const fieldPts = weeks.map((w, i) => field[w] != null ? `${X(i).toFixed(1)} ${Y(field[w]).toFixed(1)}` : null);
+    s += `<path class="pf-field-line" d="${fieldPts.filter(Boolean).map((p, j) => (j ? "L" : "M") + p).join("")}"/>`;
+    let d = "", prev = false;
+    weeks.forEach((w, i) => {
+        if (mine[w] != null) { d += (prev ? "L" : "M") + X(i).toFixed(1) + " " + Y(mine[w]).toFixed(1); prev = true; }
+        else prev = false;
+    });
+    if (d) s += `<path class="pf-me-line" d="${d}"/>`;
+    weeks.forEach((w, i) => {
+        const label = `Week ${_pfWeekLabel(data.season, w)}: ${me ? `${esc(me.name)} ${mine[w] != null ? mine[w].toFixed(2) : "no ballot"}, ` : ""}field median ${field[w] != null ? field[w].toFixed(2) : "—"}`;
+        if (mine[w] != null) s += `<circle class="pf-me-pt" cx="${X(i).toFixed(1)}" cy="${Y(mine[w]).toFixed(1)}" r="4"/>`;
+        // full-height hover column per week
+        const half = (W - mg.l - mg.r) / Math.max(1, weeks.length - 1) / 2;
+        s += `<rect class="pf-hit" x="${(X(i) - half).toFixed(1)}" y="${mg.t}" width="${(2 * half).toFixed(1)}" height="${H - mg.t - mg.b}"><title>${label}</title></rect>`;
+    });
+    return s + `</svg>`;
+}
+
+function _pfRenderBreakdown(view, activeTab, snaps) {
+    const esc = _pfEsc, CAP = 26, NR = 36, MAXR = 35;
+    const block = document.getElementById(activeTab.dataset.week);
+    const sections = block ? block.querySelectorAll(".ballot-section") : [];
+    let ballot = null;
+    for (const sec of [sections[0], sections[1]]) {
+        sec?.querySelectorAll(".voter-row").forEach(row => {
+            if (!ballot && getVoterName(row) === _profile.name)
+                ballot = Array.from(row.querySelectorAll(".team-logo")).map(i => i.dataset.team).slice(0, 25);
+        });
+        if (ballot) break;
+    }
+    const cons = (renderedConsensusOrder(sections) || []).slice(0, 25);
+    const tabs = getSortedTabs().filter(t => t.dataset.year === activeTab.dataset.year);
+    let snap = null;
+    try { snap = bpiSnapshotForTab(snaps || [], tabs, tabs.indexOf(activeTab)); } catch { snap = null; }
+    if (!snap?.sor?.length) snap = null;
+    const bpi = snap ? Object.fromEntries(snap.teams.map(t => [t[0], t[1]])) : {};
+    const sor = snap ? Object.fromEntries(snap.sor.map(t => [t[0], t[1]])) : {};
+    const vr = ballot ? Object.fromEntries(ballot.map((t, i) => [t, i + 1])) : null;
+    const cr = Object.fromEntries(cons.map((t, i) => [t, i + 1]));
+    const cap = v => Math.min(v ?? CAP, CAP);
+    const isSplit = t => { const b = cap(bpi[t]), s = cap(sor[t]); return Math.abs(b - s) >= PROFILE_SPLIT_GAP && Math.min(b, s) <= 25; };
+
+    const controls = view.querySelector(".pf-bd-controls");
+    const filter = snap ? _profile.filter : "all";
+    controls.innerHTML = snap ? `<span class="pf-seg">${[["split", "BPI–SOR splits"], ["all", "All teams"]].map(([k, l]) =>
+        `<button type="button" data-pf-filter="${k}" aria-pressed="${filter === k}">${l}</button>`).join("")}</span>` : "";
+    view.querySelector(".pf-bd-legend").innerHTML = `<span><i class="pf-sw-sq"></i>This ballot</span><span><i class="pf-sw-ring"></i>Poll consensus</span>`
+        + (snap ? `<span><i class="pf-sw-dot pf-bpi"></i>BPI</span><span><i class="pf-sw-dot pf-sor"></i>SOR</span>` : "");
+
+    const set = new Set([...cons, ...(ballot || [])]);
+    if (snap) Object.entries(bpi).concat(Object.entries(sor)).forEach(([t, r]) => { if (r <= 25) set.add(t); });
+    let teams = [...set];
+    if (filter === "split") teams = teams.filter(isSplit);
+    teams.sort((a, b) => (cr[a] ?? 99) - (cr[b] ?? 99) || (vr?.[a] ?? 99) - (vr?.[b] ?? 99) || cap(bpi[a]) - cap(bpi[b]) || a.localeCompare(b));
+
+    const host = view.querySelector(".pf-bd");
+    let note = "";
+    if (!ballot) note += `<div class="pf-note">${esc(_profile.name)} has no ballot this week. The poll${snap ? ", BPI and SOR are" : " is"} shown without it.</div>`;
+    if (!snap) note += `<div class="pf-cap">No BPI/SOR snapshot for this week.</div>`;
+    host.innerHTML = note + (teams.length ? `<div class="pf-bd-row pf-bd-axis"><div></div><div class="pf-bd-plot"></div><div class="pf-bd-side">${snap ? "Sided with" : ""}</div></div>`
+        + teams.map(t => {
+            let side = "";
+            if (vr && snap && isSplit(t)) {
+                const r = cap(vr[t]), b = cap(bpi[t]), s = cap(sor[t]), sc = (Math.abs(r - b) - Math.abs(r - s)) / Math.abs(b - s);
+                side = sc > 0.33 ? `<b class="pf-sor-text">SOR</b>` : sc < -0.33 ? `<b class="pf-bpi-text">BPI</b>` : "Between";
+            }
+            return `<div class="pf-bd-row" data-team="${esc(t)}"><div class="pf-bd-team"><img class="records-logo" data-team="${esc(t)}" alt=""><span>${esc(shortTeamName(t))}</span></div><div class="pf-bd-plot"></div><div class="pf-bd-side">${side}</div></div>`;
+        }).join("") : `<div class="pf-empty">No teams to show.</div>`);
+
+    const plot = host.querySelector(".pf-bd-plot");
+    if (!plot) return;
+    const W = Math.max(150, plot.clientWidth), pad = 9;
+    const X = _pfScale(1, NR, pad, W - pad), pos = v => X(v == null || v > MAXR ? NR : v);
+    let ax = `<svg width="${W}" height="20" viewBox="0 0 ${W} 20"><rect class="pf-band" x="${X(25.5)}" y="0" width="${W - X(25.5)}" height="20"/>`;
+    for (const t of [1, 5, 10, 15, 20, 25, 30]) ax += `<text class="pf-tick" x="${X(t)}" y="14" text-anchor="middle">#${t}</text>`;
+    ax += `<text class="pf-tick" x="${X(NR)}" y="14" text-anchor="middle">NR</text></svg>`;
+    plot.innerHTML = ax;
+    const rk = v => v == null ? "NR" : "#" + v;
+    host.querySelectorAll(".pf-bd-row[data-team] .pf-bd-plot").forEach(cell => {
+        const t = cell.parentElement.dataset.team, H = 26, y = H / 2;
+        const tip = `${shortTeamName(t)}: ${vr ? `${_profile.name} ${rk(vr[t])}, ` : ""}poll ${rk(cr[t])}${snap ? `, BPI ${rk(bpi[t])}, SOR ${rk(sor[t])}` : ""}`;
+        let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><title>${esc(tip)}</title><rect class="pf-band" x="${X(25.5)}" y="0" width="${W - X(25.5)}" height="${H}"/>`;
+        for (const k of [5, 10, 15, 20, 25]) s += `<line class="pf-grid" x1="${X(k)}" x2="${X(k)}" y1="4" y2="${H - 4}"/>`;
+        if (snap) s += `<line class="pf-span" x1="${pos(bpi[t])}" x2="${pos(sor[t])}" y1="${y}" y2="${y}"/>`;
+        if (cr[t] != null) s += `<circle class="pf-cons" cx="${pos(cr[t])}" cy="${y}" r="6"/>`;
+        if (snap) s += `<circle class="pf-bpi" cx="${pos(bpi[t])}" cy="${y}" r="5"/><circle class="pf-sor" cx="${pos(sor[t])}" cy="${y}" r="5"/>`;
+        if (vr) s += `<rect class="pf-me" x="${pos(vr[t]) - 6}" y="${y - 6}" width="12" height="12" rx="2.5"/>`;
+        cell.innerHTML = s + `</svg>`;
+    });
+    initRecordsLogos(host);
+}
+
+let _pfResizeRaf = 0;
+window.addEventListener("resize", () => {
+    const modal = document.getElementById("voter-history-modal");
+    if (!modal?.classList.contains("open") || modal.dataset.chartType !== "profile") return;
+    cancelAnimationFrame(_pfResizeRaf);
+    _pfResizeRaf = requestAnimationFrame(() => showVoterProfile());
 });
 
 
@@ -3388,7 +3818,17 @@ document.getElementById("rankings-menu")?.addEventListener("click", e => {
     if (b) toggleRanking(b.dataset.ranking);
 });
 
+// Display name of the "Overall" ranking (the key stays "Overall" for saved choices):
+// "Official RCBB" on Userpoll tables, "Overall" on AP tables (it copies AP Overall).
+function overallRankingLabel(block = activeWeekBlock()) {
+    const isAp = ON_AP_PAGE || !!block?.id.startsWith("week-ap-");
+    return isAp ? "Overall" : "Official RCBB";
+}
+
 function syncRankingsMenu(root = document) {
+    root.querySelectorAll(".settings-item[data-ranking='Overall']").forEach(el => {
+        el.textContent = overallRankingLabel();
+    });
     root.querySelectorAll("[data-ranking]").forEach(el => {
         const on = _shownRankings.has(el.dataset.ranking);
         el.classList.toggle("active", on);
@@ -3429,7 +3869,7 @@ function _overallRankingRow(block, aggRow) {
         .forEach(el => el.remove());
     row.querySelectorAll(".team-logo").forEach(img => { img.dataset.bound = ""; });
     const nameEl = row.querySelector(".voter-name");
-    if (nameEl) nameEl.textContent = "Overall";
+    if (nameEl) nameEl.textContent = overallRankingLabel(block);
     const cell = row.querySelector(".voter-cell");
     if (cell) {
         cell.dataset.bound = "1"; // skip bindVoterCells (no pin/history buttons)
@@ -7967,6 +8407,7 @@ function refreshWeekWindows(weekId) {
     if (vhm.classList.contains("open")) {
         if (vhm.dataset.chartType === "highlow") showWeekHighLowChart(weekId, vhm.dataset.chartMode || "highlow");
         else if (vhm.dataset.chartType === "ballottimes" && !weekId.startsWith("week-ap-")) showBallotTimesChart();
+        else if (vhm.dataset.chartType === "profile" && !weekId.startsWith("week-ap-")) showVoterProfile();
     }
     const ssm = document.getElementById("season-stats-modal");
     if (ssm.classList.contains("open")) {
@@ -8401,6 +8842,8 @@ document.addEventListener("keydown", e => {
                         showWeekHighLowChart(target.dataset.week, vhm2.dataset.chartMode || "highlow");
                     if (vhm2.classList.contains("open") && vhm2.dataset.chartType === "ballottimes")
                         showBallotTimesChart();
+                    if (vhm2.classList.contains("open") && vhm2.dataset.chartType === "profile")
+                        showVoterProfile();
                     backgroundLoad();
                 }
             }).catch(() => {});

@@ -1718,3 +1718,125 @@ body.filter-only-outliers .voter-row.ballot-checked:not(.ballot-outlier) { displ
     body.filter-exclude-outliers .ballot-section tbody > tr:nth-child(even of :not(.ballot-outlier)),
     body.filter-only-outliers .ballot-section tbody > tr:nth-child(even of :not(.ballot-checked:not(.ballot-outlier))) { background-color: var(--color-bg-row-alt); }
 }
+
+/* ─── Voter profile (voter menu › Profile; showVoterProfile()) ───────────── */
+:root {
+    --color-pf-bpi:          #257de0;
+    --color-pf-sor:          #f47230;
+    --color-pf-field:        #b4bcc5;
+    --color-pf-grid:         #e4e6e9;
+    --color-pf-band:         #f3f4f6;
+}
+body.dark {
+    --color-pf-bpi:          #338ced;
+    --color-pf-sor:          #e76624;
+    --color-pf-field:        #59616a;
+    --color-pf-grid:         rgba(255,255,255,0.08);
+    --color-pf-band:         #2b2b2b;
+}
+.pf-view { width: min(920px, 88vw); display: flex; flex-direction: column; gap: 12px; font-size: 13px; color: var(--color-heading); }
+.pf-empty { padding: 40px 0; text-align: center; color: var(--color-section-title); font-size: 14px; }
+.pf-note { padding: 8px 10px; border-radius: 6px; background: var(--color-pf-band); color: var(--color-avg-label); }
+.pf-cap, .pf-foot { font-size: 12px; color: var(--color-avg-label); line-height: 1.45; }
+.pf-foot { border-top: 1px solid var(--color-pf-grid); padding-top: 8px; }
+.pf-sub { font-weight: 600; font-size: 14px; margin-top: 6px; }
+.pf-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 20px; }
+.pf-traits { display: flex; flex-wrap: wrap; gap: 6px; }
+.pf-trait { font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--color-pf-grid); background: var(--color-pf-band); }
+.pf-facts { display: flex; align-items: baseline; gap: 16px; font-size: 12px; color: var(--color-avg-label); font-variant-numeric: tabular-nums; }
+.pf-facts b { color: var(--color-heading); font-size: 14px; }
+/* Hide Outliers / Show Outliers: plain text in the facts line, so it shares its baseline */
+.pf-link { font: inherit; color: var(--color-heading); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-decoration-color: var(--color-pf-grid); text-underline-offset: 3px; }
+.pf-link:hover { text-decoration-color: currentColor; }
+.pf-link:focus-visible { outline: 2px solid var(--color-heading); outline-offset: 2px; border-radius: 2px; }
+
+.pf-strips { display: flex; flex-direction: column; }
+.pf-strip { display: grid; grid-template-columns: 210px minmax(0, 1fr) 140px; gap: 16px; align-items: center; padding: 8px 0; border-top: 1px solid var(--color-pf-grid); }
+.pf-strip:first-child { border-top: 0; }
+.pf-lbl { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.pf-lbl b { font-weight: 600; }
+.pf-lbl span { font-size: 11.5px; color: var(--color-avg-label); line-height: 1.35; }
+.pf-plot { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.pf-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--color-section-title); }
+.pf-val { display: flex; flex-direction: column; align-items: flex-end; text-align: right; font-variant-numeric: tabular-nums; }
+.pf-num { font-size: 18px; font-weight: 600; line-height: 1.1; }
+.pf-num small { font-size: 11px; font-weight: normal; color: var(--color-avg-label); }
+.pf-pct { font-size: 11.5px; color: var(--color-avg-label); }
+
+.pf-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--color-avg-label); align-items: center; }
+.pf-legend i { display: inline-block; margin-right: 5px; vertical-align: -1px; }
+.pf-sw-sq { width: 10px; height: 10px; border-radius: 2px; background: var(--color-heading); }
+.pf-sw-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--color-pf-field); }
+.pf-sw-dot.pf-bpi { background: var(--color-pf-bpi); }
+.pf-sw-dot.pf-sor { background: var(--color-pf-sor); }
+.pf-sw-ring { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--color-section-title); box-sizing: border-box; }
+.pf-sw-tick { width: 2px; height: 12px; background: var(--color-avg-label); vertical-align: -2px; }
+.pf-sw-dia { width: 8px; height: 8px; transform: rotate(45deg); border: 1.5px solid var(--color-avg-label); background: var(--color-bg-modal); }
+.pf-sw-line { width: 18px; height: 2px; background: var(--color-heading); vertical-align: 3px; }
+.pf-sw-dash { width: 18px; border-top: 2px dashed var(--color-section-title); vertical-align: 3px; }
+
+.pf-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px 24px; }
+.pf-chart { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.pf-view svg { display: block; overflow: visible; font-family: inherit; }
+.pf-view svg text { fill: var(--color-avg-label); font-size: 11px; }
+.pf-view .pf-tick { fill: var(--color-section-title); font-variant-numeric: tabular-nums; }
+.pf-view .pf-halo { paint-order: stroke; stroke: var(--color-bg-modal); stroke-width: 4px; stroke-linejoin: round; }
+.pf-view .pf-grid { stroke: var(--color-pf-grid); stroke-width: 1; }
+.pf-view .pf-axis { stroke: var(--color-section-title); stroke-width: 1; }
+.pf-view .pf-median { stroke: var(--color-avg-label); stroke-width: 2; }
+.pf-view .pf-ref { fill: var(--color-bg-modal); stroke: var(--color-avg-label); stroke-width: 1.5; }
+.pf-view .pf-refline { stroke: var(--color-section-title); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.pf-view .pf-medline { stroke: var(--color-section-title); stroke-width: 1; stroke-dasharray: 2 4; }
+.pf-view .pf-dot { fill: var(--color-pf-field); cursor: pointer; }
+.pf-view .pf-dot-lg { stroke: var(--color-bg-modal); stroke-width: 1.5; }
+.pf-view .pf-dot:hover { fill: var(--color-avg-label); }
+.pf-view .pf-me { fill: var(--color-heading); stroke: var(--color-bg-modal); stroke-width: 2; }
+.pf-view .pf-me-off { fill: var(--color-bg-modal); stroke: var(--color-heading); stroke-dasharray: 3 2; }
+.pf-view .pf-me-label { fill: var(--color-heading); font-weight: 600; font-size: 12px; }
+.pf-view .pf-end-bpi { fill: var(--color-pf-bpi); font-weight: 600; }
+.pf-view .pf-end-sor { fill: var(--color-pf-sor); font-weight: 600; }
+.pf-view .pf-field-line { fill: none; stroke: var(--color-section-title); stroke-width: 2; stroke-dasharray: 5 4; }
+.pf-view .pf-me-line { fill: none; stroke: var(--color-heading); stroke-width: 2; stroke-linejoin: round; }
+.pf-view .pf-me-pt { fill: var(--color-heading); stroke: var(--color-bg-modal); stroke-width: 2; }
+.pf-view .pf-hit { fill: transparent; }
+.pf-view .pf-hit:hover { fill: var(--color-pf-grid); fill-opacity: 0.5; }
+.pf-view .pf-band { fill: var(--color-pf-band); fill-opacity: 0.7; }
+.pf-view .pf-span { stroke: var(--color-pf-field); stroke-width: 2; }
+.pf-view .pf-cons { fill: none; stroke: var(--color-section-title); stroke-width: 2; }
+.pf-view circle.pf-bpi { fill: var(--color-pf-bpi); stroke: var(--color-bg-modal); stroke-width: 2; }
+.pf-view circle.pf-sor { fill: var(--color-pf-sor); stroke: var(--color-bg-modal); stroke-width: 2; }
+.pf-bpi-text { color: var(--color-pf-bpi); }
+.pf-sor-text { color: var(--color-pf-sor); }
+
+.pf-bd-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 6px 12px; }
+.pf-seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 6px; background: var(--color-pf-band); border: 1px solid var(--color-pf-grid); }
+.pf-seg button { font: inherit; font-size: 12px; color: var(--color-avg-label); background: transparent; border: 0; border-radius: 4px; padding: 3px 9px; cursor: pointer; }
+.pf-seg button[aria-pressed="true"] { background: var(--color-bg-modal); color: var(--color-heading); font-weight: 600; }
+.pf-bd { display: flex; flex-direction: column; }
+.pf-bd-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) 64px; gap: 8px; align-items: center; min-height: 26px; }
+.pf-bd-row[data-team]:nth-child(even) { background: var(--color-pf-band); border-radius: 4px; }
+.pf-bd-team { display: flex; align-items: center; gap: 7px; min-width: 0; padding-left: 4px; white-space: nowrap; }
+.pf-bd-team span { overflow: hidden; text-overflow: ellipsis; }
+.pf-bd-team .records-logo { width: 18px; height: 18px; object-fit: contain; flex: none; }
+.pf-bd-plot { min-width: 0; }
+.pf-bd-side { font-size: 12px; color: var(--color-avg-label); text-align: right; padding-right: 4px; }
+.pf-bd-axis .pf-bd-side { font-size: 11px; color: var(--color-section-title); }
+
+.pf-table-wrap { overflow: auto; max-height: 420px; border-top: 1px solid var(--color-pf-grid); }
+.pf-table { border-collapse: collapse; width: max-content; min-width: 100%; table-layout: auto; font-size: 12px; font-variant-numeric: tabular-nums; }
+.pf-table thead th { position: sticky; top: 0; background: var(--color-bg-modal); z-index: 1; }
+#voter-history-table .pf-table th, #voter-history-table .pf-table td { padding: 4px 8px; text-align: right; border: 0; border-bottom: 1px solid var(--color-pf-grid); white-space: nowrap; }
+#voter-history-table .pf-table th:first-child, #voter-history-table .pf-table td:first-child { text-align: left; }
+.pf-table th button { font: inherit; font-weight: 600; font-size: 11px; color: var(--color-avg-label); background: none; border: 0; padding: 0; cursor: pointer; }
+.pf-table th button[data-dir]::after { content: " ↓"; color: var(--color-heading); }
+.pf-table th button[data-dir="asc"]::after { content: " ↑"; }
+.pf-table tbody tr { cursor: pointer; }
+.pf-table tbody tr:hover { background: var(--color-pf-band); }
+.pf-table tbody tr.pf-on { font-weight: 600; background: var(--color-pf-band); }
+.pf-table td.pf-na { color: var(--color-section-title); }
+
+@media (max-width: 700px) {
+    .pf-strip { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
+    .pf-plot { grid-column: 1 / -1; grid-row: 2; }
+    .pf-bd-row { grid-template-columns: 112px minmax(0, 1fr) 48px; gap: 5px; }
+}

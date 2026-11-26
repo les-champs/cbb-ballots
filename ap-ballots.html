@@ -1739,6 +1739,128 @@ body.filter-only-outliers .voter-row.ballot-checked:not(.ballot-outlier) { displ
     body.filter-only-outliers .ballot-section tbody > tr:nth-child(even of :not(.ballot-checked:not(.ballot-outlier))) { background-color: var(--color-bg-row-alt); }
 }
 
+/* ─── Voter profile (voter menu › Profile; showVoterProfile()) ───────────── */
+:root {
+    --color-pf-bpi:          #257de0;
+    --color-pf-sor:          #f47230;
+    --color-pf-field:        #b4bcc5;
+    --color-pf-grid:         #e4e6e9;
+    --color-pf-band:         #f3f4f6;
+}
+body.dark {
+    --color-pf-bpi:          #338ced;
+    --color-pf-sor:          #e76624;
+    --color-pf-field:        #59616a;
+    --color-pf-grid:         rgba(255,255,255,0.08);
+    --color-pf-band:         #2b2b2b;
+}
+.pf-view { width: min(920px, 88vw); display: flex; flex-direction: column; gap: 12px; font-size: 13px; color: var(--color-heading); }
+.pf-empty { padding: 40px 0; text-align: center; color: var(--color-section-title); font-size: 14px; }
+.pf-note { padding: 8px 10px; border-radius: 6px; background: var(--color-pf-band); color: var(--color-avg-label); }
+.pf-cap, .pf-foot { font-size: 12px; color: var(--color-avg-label); line-height: 1.45; }
+.pf-foot { border-top: 1px solid var(--color-pf-grid); padding-top: 8px; }
+.pf-sub { font-weight: 600; font-size: 14px; margin-top: 6px; }
+.pf-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 20px; }
+.pf-traits { display: flex; flex-wrap: wrap; gap: 6px; }
+.pf-trait { font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--color-pf-grid); background: var(--color-pf-band); }
+.pf-facts { display: flex; align-items: baseline; gap: 16px; font-size: 12px; color: var(--color-avg-label); font-variant-numeric: tabular-nums; }
+.pf-facts b { color: var(--color-heading); font-size: 14px; }
+/* Hide Outliers / Show Outliers: plain text in the facts line, so it shares its baseline */
+.pf-link { font: inherit; color: var(--color-heading); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-decoration-color: var(--color-pf-grid); text-underline-offset: 3px; }
+.pf-link:hover { text-decoration-color: currentColor; }
+.pf-link:focus-visible { outline: 2px solid var(--color-heading); outline-offset: 2px; border-radius: 2px; }
+
+.pf-strips { display: flex; flex-direction: column; }
+.pf-strip { display: grid; grid-template-columns: 210px minmax(0, 1fr) 140px; gap: 16px; align-items: center; padding: 8px 0; border-top: 1px solid var(--color-pf-grid); }
+.pf-strip:first-child { border-top: 0; }
+.pf-lbl { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.pf-lbl b { font-weight: 600; }
+.pf-lbl span { font-size: 11.5px; color: var(--color-avg-label); line-height: 1.35; }
+.pf-plot { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.pf-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--color-section-title); }
+.pf-val { display: flex; flex-direction: column; align-items: flex-end; text-align: right; font-variant-numeric: tabular-nums; }
+.pf-num { font-size: 18px; font-weight: 600; line-height: 1.1; }
+.pf-num small { font-size: 11px; font-weight: normal; color: var(--color-avg-label); }
+.pf-pct { font-size: 11.5px; color: var(--color-avg-label); }
+
+.pf-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--color-avg-label); align-items: center; }
+.pf-legend i { display: inline-block; margin-right: 5px; vertical-align: -1px; }
+.pf-sw-sq { width: 10px; height: 10px; border-radius: 2px; background: var(--color-heading); }
+.pf-sw-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--color-pf-field); }
+.pf-sw-dot.pf-bpi { background: var(--color-pf-bpi); }
+.pf-sw-dot.pf-sor { background: var(--color-pf-sor); }
+.pf-sw-ring { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--color-section-title); box-sizing: border-box; }
+.pf-sw-tick { width: 2px; height: 12px; background: var(--color-avg-label); vertical-align: -2px; }
+.pf-sw-dia { width: 8px; height: 8px; transform: rotate(45deg); border: 1.5px solid var(--color-avg-label); background: var(--color-bg-modal); }
+.pf-sw-line { width: 18px; height: 2px; background: var(--color-heading); vertical-align: 3px; }
+.pf-sw-dash { width: 18px; border-top: 2px dashed var(--color-section-title); vertical-align: 3px; }
+
+.pf-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px 24px; }
+.pf-chart { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.pf-view svg { display: block; overflow: visible; font-family: inherit; }
+.pf-view svg text { fill: var(--color-avg-label); font-size: 11px; }
+.pf-view .pf-tick { fill: var(--color-section-title); font-variant-numeric: tabular-nums; }
+.pf-view .pf-halo { paint-order: stroke; stroke: var(--color-bg-modal); stroke-width: 4px; stroke-linejoin: round; }
+.pf-view .pf-grid { stroke: var(--color-pf-grid); stroke-width: 1; }
+.pf-view .pf-axis { stroke: var(--color-section-title); stroke-width: 1; }
+.pf-view .pf-median { stroke: var(--color-avg-label); stroke-width: 2; }
+.pf-view .pf-ref { fill: var(--color-bg-modal); stroke: var(--color-avg-label); stroke-width: 1.5; }
+.pf-view .pf-refline { stroke: var(--color-section-title); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.pf-view .pf-medline { stroke: var(--color-section-title); stroke-width: 1; stroke-dasharray: 2 4; }
+.pf-view .pf-dot { fill: var(--color-pf-field); cursor: pointer; }
+.pf-view .pf-dot-lg { stroke: var(--color-bg-modal); stroke-width: 1.5; }
+.pf-view .pf-dot:hover { fill: var(--color-avg-label); }
+.pf-view .pf-me { fill: var(--color-heading); stroke: var(--color-bg-modal); stroke-width: 2; }
+.pf-view .pf-me-off { fill: var(--color-bg-modal); stroke: var(--color-heading); stroke-dasharray: 3 2; }
+.pf-view .pf-me-label { fill: var(--color-heading); font-weight: 600; font-size: 12px; }
+.pf-view .pf-end-bpi { fill: var(--color-pf-bpi); font-weight: 600; }
+.pf-view .pf-end-sor { fill: var(--color-pf-sor); font-weight: 600; }
+.pf-view .pf-field-line { fill: none; stroke: var(--color-section-title); stroke-width: 2; stroke-dasharray: 5 4; }
+.pf-view .pf-me-line { fill: none; stroke: var(--color-heading); stroke-width: 2; stroke-linejoin: round; }
+.pf-view .pf-me-pt { fill: var(--color-heading); stroke: var(--color-bg-modal); stroke-width: 2; }
+.pf-view .pf-hit { fill: transparent; }
+.pf-view .pf-hit:hover { fill: var(--color-pf-grid); fill-opacity: 0.5; }
+.pf-view .pf-band { fill: var(--color-pf-band); fill-opacity: 0.7; }
+.pf-view .pf-span { stroke: var(--color-pf-field); stroke-width: 2; }
+.pf-view .pf-cons { fill: none; stroke: var(--color-section-title); stroke-width: 2; }
+.pf-view circle.pf-bpi { fill: var(--color-pf-bpi); stroke: var(--color-bg-modal); stroke-width: 2; }
+.pf-view circle.pf-sor { fill: var(--color-pf-sor); stroke: var(--color-bg-modal); stroke-width: 2; }
+.pf-bpi-text { color: var(--color-pf-bpi); }
+.pf-sor-text { color: var(--color-pf-sor); }
+
+.pf-bd-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 6px 12px; }
+.pf-seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 6px; background: var(--color-pf-band); border: 1px solid var(--color-pf-grid); }
+.pf-seg button { font: inherit; font-size: 12px; color: var(--color-avg-label); background: transparent; border: 0; border-radius: 4px; padding: 3px 9px; cursor: pointer; }
+.pf-seg button[aria-pressed="true"] { background: var(--color-bg-modal); color: var(--color-heading); font-weight: 600; }
+.pf-bd { display: flex; flex-direction: column; }
+.pf-bd-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) 64px; gap: 8px; align-items: center; min-height: 26px; }
+.pf-bd-row[data-team]:nth-child(even) { background: var(--color-pf-band); border-radius: 4px; }
+.pf-bd-team { display: flex; align-items: center; gap: 7px; min-width: 0; padding-left: 4px; white-space: nowrap; }
+.pf-bd-team span { overflow: hidden; text-overflow: ellipsis; }
+.pf-bd-team .records-logo { width: 18px; height: 18px; object-fit: contain; flex: none; }
+.pf-bd-plot { min-width: 0; }
+.pf-bd-side { font-size: 12px; color: var(--color-avg-label); text-align: right; padding-right: 4px; }
+.pf-bd-axis .pf-bd-side { font-size: 11px; color: var(--color-section-title); }
+
+.pf-table-wrap { overflow: auto; max-height: 420px; border-top: 1px solid var(--color-pf-grid); }
+.pf-table { border-collapse: collapse; width: max-content; min-width: 100%; table-layout: auto; font-size: 12px; font-variant-numeric: tabular-nums; }
+.pf-table thead th { position: sticky; top: 0; background: var(--color-bg-modal); z-index: 1; }
+#voter-history-table .pf-table th, #voter-history-table .pf-table td { padding: 4px 8px; text-align: right; border: 0; border-bottom: 1px solid var(--color-pf-grid); white-space: nowrap; }
+#voter-history-table .pf-table th:first-child, #voter-history-table .pf-table td:first-child { text-align: left; }
+.pf-table th button { font: inherit; font-weight: 600; font-size: 11px; color: var(--color-avg-label); background: none; border: 0; padding: 0; cursor: pointer; }
+.pf-table th button[data-dir]::after { content: " ↓"; color: var(--color-heading); }
+.pf-table th button[data-dir="asc"]::after { content: " ↑"; }
+.pf-table tbody tr { cursor: pointer; }
+.pf-table tbody tr:hover { background: var(--color-pf-band); }
+.pf-table tbody tr.pf-on { font-weight: 600; background: var(--color-pf-band); }
+.pf-table td.pf-na { color: var(--color-section-title); }
+
+@media (max-width: 700px) {
+    .pf-strip { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
+    .pf-plot { grid-column: 1 / -1; grid-row: 2; }
+    .pf-bd-row { grid-template-columns: 112px minmax(0, 1fr) 48px; gap: 5px; }
+}
+
 </style>
 </head>
 <body>
@@ -2001,7 +2123,7 @@ body.filter-only-outliers .voter-row.ballot-checked:not(.ballot-outlier) { displ
     <h2 class="menu-popover-title">Rankings</h2>
     <h3 class="settings-group">Show</h3>
     <ul class="settings-list">
-      <li><button type="button" class="settings-item" data-ranking="Overall">Overall</button></li>
+      <li><button type="button" class="settings-item" data-ranking="Overall">Official RCBB</button></li>
       <li><button type="button" class="settings-item" data-ranking="AP 25">AP 25</button></li>
       <li><button type="button" class="settings-item" data-ranking="BPI">BPI</button></li>
       <li><button type="button" class="settings-item" data-ranking="SOR">SOR</button></li>
@@ -2377,6 +2499,7 @@ const NCAA_DARK_LOGO_IDS = new Set(["35", "39", "73", "92", "141", "157", "177",
 const CONFERENCE_DATA = {"seasons":{"2025":{"ACC":["BostonCollege","California","Clemson","Duke","FloridaState","GeorgiaTech","Louisville","MiamiFL","NCState","NorthCarolina","NotreDame","Pitt","SMU","Stanford","Syracuse","Virginia","VirginiaTech","WakeForest"],"ASUN":["AustinPeay","Bellarmine","CentralArkansas","EasternKentucky","FloridaGulfCoast","Jacksonville","Lipscomb","NorthAlabama","NorthFlorida","Queens","Stetson","WestGeorgia"],"America East":["Albany","Binghamton","Bryant","Maine","NJIT","NewHampshire","UMBC","UMassLowell","Vermont"],"American":["Charlotte","EastCarolina","FloridaAtlantic","Memphis","NorthTexas","Rice","SouthFlorida","Temple","Tulane","Tulsa","UAB","UTSA","WichitaState"],"Atlantic 10":["Davidson","Dayton","Duquesne","Fordham","GeorgeMason","GeorgeWashington","LaSalle","LoyolaChicago","RhodeIsland","Richmond","SaintJosephs","SaintLouis","StBonaventure","UMass","VCU"],"Big 12":["Arizona","ArizonaState","BYU","Baylor","Cincinnati","Colorado","Houston","IowaState","Kansas","KansasState","OklahomaState","TCU","TexasTech","UCF","Utah","WestVirginia"],"Big East":["Butler","Creighton","DePaul","Georgetown","Marquette","Providence","SetonHall","StJohns","UConn","Villanova","Xavier"],"Big Sky":["EasternWashington","Idaho","IdahoState","Montana","MontanaState","NorthernArizona","NorthernColorado","PortlandState","SacramentoState","WeberState"],"Big South":["CharlestonSouthern","GardnerWebb","HighPoint","Longwood","Presbyterian","Radford","UNCAsheville","USCUpstate","Winthrop"],"Big Ten":["Illinois","Indiana","Iowa","Maryland","Michigan","MichiganState","Minnesota","Nebraska","Northwestern","OhioState","Oregon","PennState","Purdue","Rutgers","UCLA","USC","Washington","Wisconsin"],"Big West":["CSUBakersfield","CSUN","CalPoly","CalStateFullerton","Hawaii","LongBeachState","UCDavis","UCIrvine","UCRiverside","UCSanDiego","UCSantaBarbara"],"CAA":["Campbell","Charleston","Delaware","Drexel","Elon","Hampton","Hofstra","Monmouth","NorthCarolinaAT","Northeastern","StonyBrook","Towson","UNCWilmington","WilliamandMary"],"Conference USA":["FIU","JacksonvilleState","KennesawState","Liberty","LouisianaTech","MiddleTennessee","NewMexicoState","SamHouston","UTEP","WesternKentucky"],"Horizon":["ClevelandState","DetroitMercy","GreenBay","IUPUI","Milwaukee","NorthernKentucky","Oakland","PurdueFortWayne","RobertMorris","WrightState","YoungstownState"],"Ivy":["Brown","Columbia","Cornell","Dartmouth","Harvard","Penn","Princeton","Yale"],"MAAC":["Canisius","Fairfield","Iona","Manhattan","Marist","Merrimack","MountStMarys","Niagara","Quinnipiac","Rider","SacredHeart","SaintPeters","Siena"],"MAC":["Akron","BallState","BowlingGreen","Buffalo","CentralMichigan","EasternMichigan","KentState","MiamiOH","NorthernIllinois","Ohio","Toledo","WesternMichigan"],"MEAC":["CoppinState","DelawareState","Howard","MorganState","NorfolkState","NorthCarolinaCentral","SCState","UMES"],"Missouri Valley":["Belmont","Bradley","Drake","Evansville","IllinoisState","IndianaState","MissouriState","MurrayState","NorthernIowa","SouthernIllinois","UIC","Valparaiso"],"Mountain West":["AirForce","BoiseState","ColoradoState","FresnoState","Nevada","NewMexico","SanDiegoState","SanJoseState","UNLV","UtahState","Wyoming"],"NEC":["CentralConnecticut","ChicagoState","FairleighDickinson","LIU","LeMoyne","Mercyhurst","SaintFrancisPA","Stonehill","Wagner"],"OVC":["EasternIllinois","Lindenwood","LittleRock","MoreheadState","SEMissouriState","SIUEdwardsville","SouthernIndiana","TennesseeState","TennesseeTech","UTMartin","WesternIllinois"],"Patriot":["American","Army","BostonUniversity","Bucknell","Colgate","HolyCross","Lafayette","Lehigh","LoyolaMD","Navy"],"SEC":["Alabama","Arkansas","Auburn","Florida","Georgia","Kentucky","LSU","MississippiState","Missouri","Oklahoma","OleMiss","SouthCarolina","Tennessee","Texas","TexasAM","Vanderbilt"],"SWAC":["AlabamaAM","AlabamaState","AlcornState","ArkansasPineBluff","BethuneCookman","FloridaAM","GramblingState","JacksonState","MississippiValleyState","PrairieViewAM","Southern","TexasSouthern"],"SoCon":["Chattanooga","EastTennesseeState","Furman","Mercer","Samford","TheCitadel","UNCGreensboro","VMI","WesternCarolina","Wofford"],"Southland":["HoustonChristian","IncarnateWord","Lamar","McNeese","NewOrleans","Nicholls","NorthwesternState","SELouisiana","StephenFAustin","TexasAMCommerce","TexasAMCorpusChristi","UTRGV"],"Summit":["Denver","KansasCity","NorthDakota","NorthDakotaState","Omaha","OralRoberts","SouthDakota","SouthDakotaState","StThomas"],"Sun Belt":["AppalachianState","ArkansasState","CoastalCarolina","GeorgiaSouthern","GeorgiaState","JamesMadison","Louisiana","LouisianaMonroe","Marshall","OldDominion","SouthAlabama","SouthernMiss","TexasState","Troy"],"WAC":["AbileneChristian","CaliforniaBaptist","GrandCanyon","Seattle","SouthernUtah","TarletonState","UTArlington","UtahTech","UtahValley"],"WCC":["Gonzaga","LoyolaMarymount","OregonState","Pacific","Pepperdine","Portland","SaintMarys","SanDiego","SanFrancisco","SantaClara","WashingtonState"]},"2026":{"ACC":["BostonCollege","California","Clemson","Duke","FloridaState","GeorgiaTech","Louisville","MiamiFL","NCState","NorthCarolina","NotreDame","Pitt","SMU","Stanford","Syracuse","Virginia","VirginiaTech","WakeForest"],"ASUN":["AustinPeay","Bellarmine","CentralArkansas","EasternKentucky","FloridaGulfCoast","Jacksonville","Lipscomb","NorthAlabama","NorthFlorida","Queens","Stetson","WestGeorgia"],"America East":["Albany","Binghamton","Bryant","Maine","NJIT","NewHampshire","UMBC","UMassLowell","Vermont"],"American":["Charlotte","EastCarolina","FloridaAtlantic","Memphis","NorthTexas","Rice","SouthFlorida","Temple","Tulane","Tulsa","UAB","UTSA","WichitaState"],"Atlantic 10":["Davidson","Dayton","Duquesne","Fordham","GeorgeMason","GeorgeWashington","LaSalle","LoyolaChicago","RhodeIsland","Richmond","SaintJosephs","SaintLouis","StBonaventure","VCU"],"Big 12":["Arizona","ArizonaState","BYU","Baylor","Cincinnati","Colorado","Houston","IowaState","Kansas","KansasState","OklahomaState","TCU","TexasTech","UCF","Utah","WestVirginia"],"Big East":["Butler","Creighton","DePaul","Georgetown","Marquette","Providence","SetonHall","StJohns","UConn","Villanova","Xavier"],"Big Sky":["EasternWashington","Idaho","IdahoState","Montana","MontanaState","NorthernArizona","NorthernColorado","PortlandState","SacramentoState","WeberState"],"Big South":["CharlestonSouthern","GardnerWebb","HighPoint","Longwood","Presbyterian","Radford","UNCAsheville","USCUpstate","Winthrop"],"Big Ten":["Illinois","Indiana","Iowa","Maryland","Michigan","MichiganState","Minnesota","Nebraska","Northwestern","OhioState","Oregon","PennState","Purdue","Rutgers","UCLA","USC","Washington","Wisconsin"],"Big West":["CSUBakersfield","CSUN","CalPoly","CalStateFullerton","Hawaii","LongBeachState","UCDavis","UCIrvine","UCRiverside","UCSanDiego","UCSantaBarbara"],"CAA":["Campbell","Charleston","Drexel","Elon","Hampton","Hofstra","Monmouth","NorthCarolinaAT","Northeastern","StonyBrook","Towson","UNCWilmington","WilliamandMary"],"Conference USA":["Delaware","FIU","JacksonvilleState","KennesawState","Liberty","LouisianaTech","MiddleTennessee","MissouriState","NewMexicoState","SamHouston","UTEP","WesternKentucky"],"Horizon":["ClevelandState","DetroitMercy","GreenBay","IUPUI","Milwaukee","NorthernKentucky","Oakland","PurdueFortWayne","RobertMorris","WrightState","YoungstownState"],"Ivy":["Brown","Columbia","Cornell","Dartmouth","Harvard","Penn","Princeton","Yale"],"MAAC":["Canisius","Fairfield","Iona","Manhattan","Marist","Merrimack","MountStMarys","Niagara","Quinnipiac","Rider","SacredHeart","SaintPeters","Siena"],"MAC":["Akron","BallState","BowlingGreen","Buffalo","CentralMichigan","EasternMichigan","KentState","MiamiOH","NorthernIllinois","Ohio","Toledo","UMass","WesternMichigan"],"MEAC":["CoppinState","DelawareState","Howard","MorganState","NorfolkState","NorthCarolinaCentral","SCState","UMES"],"Missouri Valley":["Belmont","Bradley","Drake","Evansville","IllinoisState","IndianaState","MurrayState","NorthernIowa","SouthernIllinois","UIC","Valparaiso"],"Mountain West":["AirForce","BoiseState","ColoradoState","FresnoState","GrandCanyon","Nevada","NewMexico","SanDiegoState","SanJoseState","UNLV","UtahState","Wyoming"],"NEC":["CentralConnecticut","ChicagoState","FairleighDickinson","LIU","LeMoyne","Mercyhurst","NewHaven","SaintFrancisPA","Stonehill","Wagner"],"OVC":["EasternIllinois","Lindenwood","LittleRock","MoreheadState","SEMissouriState","SIUEdwardsville","SouthernIndiana","TennesseeState","TennesseeTech","UTMartin","WesternIllinois"],"Patriot":["American","Army","BostonUniversity","Bucknell","Colgate","HolyCross","Lafayette","Lehigh","LoyolaMD","Navy"],"SEC":["Alabama","Arkansas","Auburn","Florida","Georgia","Kentucky","LSU","MississippiState","Missouri","Oklahoma","OleMiss","SouthCarolina","Tennessee","Texas","TexasAM","Vanderbilt"],"SWAC":["AlabamaAM","AlabamaState","AlcornState","ArkansasPineBluff","BethuneCookman","FloridaAM","GramblingState","JacksonState","MississippiValleyState","PrairieViewAM","Southern","TexasSouthern"],"SoCon":["Chattanooga","EastTennesseeState","Furman","Mercer","Samford","TheCitadel","UNCGreensboro","VMI","WesternCarolina","Wofford"],"Southland":["HoustonChristian","IncarnateWord","Lamar","McNeese","NewOrleans","Nicholls","NorthwesternState","SELouisiana","StephenFAustin","TexasAMCommerce","TexasAMCorpusChristi","UTRGV"],"Summit":["Denver","KansasCity","NorthDakota","NorthDakotaState","Omaha","OralRoberts","SouthDakota","SouthDakotaState","StThomas"],"Sun Belt":["AppalachianState","ArkansasState","CoastalCarolina","GeorgiaSouthern","GeorgiaState","JamesMadison","Louisiana","LouisianaMonroe","Marshall","OldDominion","SouthAlabama","SouthernMiss","TexasState","Troy"],"WAC":["AbileneChristian","CaliforniaBaptist","SouthernUtah","TarletonState","UTArlington","UtahTech","UtahValley"],"WCC":["Gonzaga","LoyolaMarymount","OregonState","Pacific","Pepperdine","Portland","SaintMarys","SanDiego","SanFrancisco","SantaClara","Seattle","WashingtonState"]},"2027":{"ACC":["BostonCollege","California","Clemson","Duke","FloridaState","GeorgiaTech","Louisville","MiamiFL","NCState","NorthCarolina","NotreDame","Pitt","SMU","Stanford","Syracuse","Virginia","VirginiaTech","WakeForest"],"ASUN":["Bellarmine","FloridaGulfCoast","Jacksonville","Lipscomb","NorthFlorida","Queens","Stetson","WestFlorida"],"America East":["Albany","Binghamton","Bryant","Maine","NJIT","NewHampshire","UMBC","UMassLowell","Vermont"],"American":["Charlotte","EastCarolina","FloridaAtlantic","Memphis","NorthTexas","Rice","SouthFlorida","Temple","Tulane","Tulsa","UAB","UTSA","WichitaState"],"Atlantic 10":["Davidson","Dayton","Duquesne","Fordham","GeorgeMason","GeorgeWashington","LaSalle","LoyolaChicago","RhodeIsland","Richmond","SaintJosephs","SaintLouis","StBonaventure","VCU"],"Big 12":["Arizona","ArizonaState","BYU","Baylor","Cincinnati","Colorado","Houston","IowaState","Kansas","KansasState","OklahomaState","TCU","TexasTech","UCF","Utah","WestVirginia"],"Big East":["Butler","Creighton","DePaul","Georgetown","Marquette","Providence","SetonHall","StJohns","UConn","Villanova","Xavier"],"Big Sky":["EasternWashington","Idaho","IdahoState","Montana","MontanaState","NorthernArizona","NorthernColorado","PortlandState","SouthernUtah","UtahTech","WeberState"],"Big South":["CharlestonSouthern","GardnerWebb","HighPoint","Longwood","Presbyterian","Radford","UNCAsheville","USCUpstate","Winthrop"],"Big Ten":["Illinois","Indiana","Iowa","Maryland","Michigan","MichiganState","Minnesota","Nebraska","Northwestern","OhioState","Oregon","PennState","Purdue","Rutgers","UCLA","USC","Washington","Wisconsin"],"Big West":["CSUBakersfield","CSUN","CalPoly","CalStateFullerton","CaliforniaBaptist","LongBeachState","SacramentoState","UCIrvine","UCRiverside","UCSanDiego","UCSantaBarbara","UtahValley"],"CAA":["Campbell","Charleston","Drexel","Elon","Hampton","Hofstra","Monmouth","NorthCarolinaAT","Northeastern","StonyBrook","Towson","UNCWilmington","WilliamandMary"],"Conference USA":["Delaware","FIU","JacksonvilleState","KennesawState","Liberty","MiddleTennessee","MissouriState","NewMexicoState","SamHouston","WesternKentucky"],"Horizon":["ClevelandState","DetroitMercy","GreenBay","IUPUI","Milwaukee","NorthernIllinois","NorthernKentucky","Oakland","PurdueFortWayne","RobertMorris","WrightState","YoungstownState"],"Ivy":["Brown","Columbia","Cornell","Dartmouth","Harvard","Penn","Princeton","Yale"],"MAC":["Akron","BallState","BowlingGreen","Buffalo","CentralMichigan","EasternMichigan","KentState","MiamiOH","Ohio","Toledo","UMass","WesternMichigan"],"MEAC":["CoppinState","DelawareState","Howard","MorganState","NorfolkState","NorthCarolinaCentral","SCState","UMES"],"Metro":["Canisius","Fairfield","Iona","Manhattan","Marist","Merrimack","MountStMarys","Niagara","Quinnipiac","Rider","SacredHeart","SaintPeters","Siena"],"Missouri Valley":["Belmont","Bradley","Drake","Evansville","IllinoisState","IndianaState","MurrayState","NorthernIowa","SouthernIllinois","UIC","Valparaiso"],"Mountain West":["AirForce","GrandCanyon","Hawaii","Nevada","NewMexico","SanJoseState","UCDavis","UNLV","UTEP","Wyoming"],"NEC":["CentralConnecticut","ChicagoState","FairleighDickinson","LIU","LeMoyne","Mercyhurst","NewHaven","Stonehill","Wagner"],"OVC":["EasternIllinois","Lindenwood","MoreheadState","SEMissouriState","SIUEdwardsville","SouthernIndiana","TennesseeState","UTMartin","WesternIllinois"],"Pac-12":["BoiseState","ColoradoState","FresnoState","Gonzaga","OregonState","SanDiegoState","TexasState","UtahState","WashingtonState"],"Patriot":["American","Army","BostonUniversity","Bucknell","Colgate","HolyCross","Lafayette","Lehigh","LoyolaMD","Navy"],"SEC":["Alabama","Arkansas","Auburn","Florida","Georgia","Kentucky","LSU","MississippiState","Missouri","Oklahoma","OleMiss","SouthCarolina","Tennessee","Texas","TexasAM","Vanderbilt"],"SWAC":["AlabamaAM","AlabamaState","AlcornState","ArkansasPineBluff","BethuneCookman","FloridaAM","GramblingState","JacksonState","MississippiValleyState","PrairieViewAM","Southern","TexasSouthern"],"SoCon":["Chattanooga","EastTennesseeState","Furman","Mercer","Samford","TennesseeTech","TheCitadel","UNCGreensboro","VMI","WesternCarolina","Wofford"],"Southland":["HoustonChristian","IncarnateWord","Lamar","McNeese","NewOrleans","Nicholls","NorthwesternState","SELouisiana","StephenFAustin","TexasAMCommerce","TexasAMCorpusChristi","UTRGV"],"Summit":["KansasCity","NorthDakota","NorthDakotaState","Omaha","OralRoberts","SouthDakota","SouthDakotaState","StThomas"],"Sun Belt":["AppalachianState","ArkansasState","CoastalCarolina","GeorgiaSouthern","GeorgiaState","JamesMadison","Louisiana","LouisianaMonroe","LouisianaTech","Marshall","OldDominion","SouthAlabama","SouthernMiss","Troy"],"UAC":["AbileneChristian","AustinPeay","CentralArkansas","EasternKentucky","LittleRock","NorthAlabama","TarletonState","UTArlington","WestGeorgia"],"WCC":["Denver","LoyolaMarymount","Pacific","Pepperdine","Portland","SaintMarys","SanDiego","SanFrancisco","SantaClara","Seattle"]}},"power":["ACC","Big Ten","Big 12","SEC","Big East","Pac-12"],"aliases":{"CollegeofCharleston":"Charleston","Citadel":"TheCitadel","NebraskaOmaha":"Omaha","MT":"MiddleTennessee","USF":"SouthFlorida","EastTexasAM":"TexasAMCommerce","IUIndy":"IUPUI"},"names":{"TexasAM":"Texas A&M","TexasAMCommerce":"East Texas A&M","TexasAMCorpusChristi":"Texas A&M-CC","FloridaAM":"Florida A&M","AlabamaAM":"Alabama A&M","PrairieViewAM":"Prairie View A&M","NorthCarolinaAT":"North Carolina A&T","IUPUI":"IU Indy","StJohns":"St. John's","SaintMarys":"Saint Mary's","SaintJosephs":"Saint Joseph's","SaintPeters":"Saint Peter's","MountStMarys":"Mount St. Mary's","StBonaventure":"St. Bonaventure","StThomas":"St. Thomas","SaintFrancisPA":"Saint Francis (PA)","MiamiFL":"Miami (FL)","MiamiOH":"Miami (OH)","OleMiss":"Ole Miss","NCState":"NC State","Pitt":"Pitt","TheCitadel":"The Citadel","LoyolaMD":"Loyola (MD)","LoyolaChicago":"Loyola Chicago","WilliamandMary":"William & Mary","StephenFAustin":"Stephen F. Austin","SEMissouriState":"SE Missouri State","SIUEdwardsville":"SIUE","SCState":"South Carolina State","UMES":"Maryland Eastern Shore","UNCGreensboro":"UNC Greensboro","UNCWilmington":"UNC Wilmington","UNCAsheville":"UNC Asheville","USCUpstate":"USC Upstate","UTMartin":"UT Martin","UTArlington":"UT Arlington","UTRGV":"UTRGV","ArkansasPineBluff":"Arkansas-Pine Bluff","BethuneCookman":"Bethune-Cookman","GardnerWebb":"Gardner-Webb","LouisianaMonroe":"Louisiana-Monroe","SELouisiana":"SE Louisiana","NJIT":"NJIT","UIC":"UIC","CSUBakersfield":"CSU Bakersfield","CSUN":"CSUN","CalStateFullerton":"Cal State Fullerton","LeMoyne":"Le Moyne","FairleighDickinson":"Fairleigh Dickinson","DetroitMercy":"Detroit Mercy","EastTennesseeState":"East Tennessee State","SouthFlorida":"South Florida","NewOrleans":"New Orleans","UMassLowell":"UMass Lowell","DePaul":"DePaul","UConn":"UConn","UMass":"UMass","McNeese":"McNeese"},"short":{"AlabamaState":"Alabama ST","AlcornState":"Alcorn ST","AppalachianState":"App ST","ArizonaState":"Arizona ST","ArkansasState":"Arkansas ST","BallState":"Ball ST","BoiseState":"Boise ST","ChicagoState":"Chicago ST","ClevelandState":"Cleveland ST","ColoradoState":"Colorado ST","CoppinState":"Coppin ST","DelawareState":"Delaware ST","FloridaState":"Florida ST","FresnoState":"Fresno ST","GeorgiaState":"Georgia ST","GramblingState":"Grambling ST","IdahoState":"Idaho ST","IllinoisState":"Illinois ST","IndianaState":"Indiana ST","IowaState":"Iowa ST","JacksonState":"Jackson ST","JacksonvilleState":"Jax ST","KansasState":"Kansas ST","KennesawState":"Kennesaw ST","KentState":"Kent ST","LongBeachState":"Long Beach ST","MichiganState":"Michigan ST","MississippiState":"Miss. ST","MissouriState":"Missouri ST","MontanaState":"Montana ST","MoreheadState":"Morehead ST","MorganState":"Morgan ST","MurrayState":"Murray ST","NewMexicoState":"New Mexico ST","NorfolkState":"Norfolk ST","OhioState":"Ohio ST","OklahomaState":"Oklahoma ST","OregonState":"Oregon ST","PennState":"Penn ST","PortlandState":"Portland ST","SacramentoState":"Sacramento ST","SCState":"SC ST","SEMissouriState":"SE Missouri ST","TarletonState":"Tarleton ST","TennesseeState":"Tenn. ST","TexasState":"Texas ST","UtahState":"Utah ST","WashingtonState":"Wash. ST","WeberState":"Weber ST","WichitaState":"Wichita ST","WrightState":"Wright ST","YoungstownState":"Youngstown ST","NorthwesternState":"NW ST","NorthDakotaState":"N. Dakota ST","SouthDakotaState":"S. Dakota ST","CentralArkansas":"C. Arkansas","CentralConnecticut":"C. Conn.","CentralMichigan":"C. Michigan","EastCarolina":"E. Carolina","EasternIllinois":"E. Illinois","EasternKentucky":"E. Kentucky","EasternMichigan":"E. Michigan","EasternWashington":"E. Washington","NorthAlabama":"N. Alabama","NorthDakota":"N. Dakota","NorthFlorida":"N. Florida","NorthTexas":"N. Texas","NorthernArizona":"N. Arizona","NorthernColorado":"N. Colorado","NorthernIllinois":"N. Illinois","NorthernIowa":"N. Iowa","NorthernKentucky":"N. Kentucky","SouthAlabama":"S. Alabama","SouthCarolina":"S. Carolina","SouthDakota":"S. Dakota","SouthernIllinois":"S. Illinois","SouthernIndiana":"S. Indiana","SouthernMiss":"So. Miss","SouthernUtah":"S. Utah","WestFlorida":"W. Florida","WestGeorgia":"W. Georgia","WesternCarolina":"W. Carolina","WesternIllinois":"W. Illinois","WesternKentucky":"W. Kentucky","WesternMichigan":"W. Michigan","TexasAMCommerce":"E. Texas A&M","CharlestonSouthern":"Charleston So.","GeorgiaSouthern":"Georgia So.","TexasSouthern":"Texas So.","SaintFrancisPA":"St. Francis (PA)","SaintJosephs":"St. Joseph's","SaintLouis":"St. Louis","SaintMarys":"St. Mary's","SaintPeters":"St. Peter's","MountStMarys":"Mt. St. Mary's","StBonaventure":"St. Bona","AbileneChristian":"Abilene Chr.","HoustonChristian":"Houston Chr.","BostonCollege":"Boston Col.","BostonUniversity":"Boston U.","BowlingGreen":"Bowling Grn","California":"Cal","CaliforniaBaptist":"Cal Baptist","CalStateFullerton":"CS Fullerton","CSUBakersfield":"Bakersfield","CoastalCarolina":"Coastal Car.","DetroitMercy":"Detroit","GeorgeWashington":"G. Washington","GeorgiaTech":"Ga. Tech","LouisianaTech":"La. Tech","LoyolaChicago":"Loyola Chi.","MiddleTennessee":"Middle Tenn.","TennesseeTech":"Tenn. Tech","NorthCarolinaAT":"NC A&T","NorthCarolinaCentral":"NC Central","PrairieViewAM":"Prairie View","PurdueFortWayne":"Purdue FW","TexasAMCorpusChristi":"A&M-CC","TheCitadel":"Citadel","VirginiaTech":"Va. Tech","BethuneCookman":"B-Cookman","ArkansasPineBluff":"UAPB","EastTennesseeState":"ETSU","FairleighDickinson":"FDU","FloridaAtlantic":"FAU","FloridaGulfCoast":"FGCU","IncarnateWord":"UIW","JamesMadison":"JMU","LouisianaMonroe":"ULM","LoyolaMarymount":"LMU","MississippiValleyState":"MVSU","NewHampshire":"UNH","NorthCarolina":"UNC","OldDominion":"ODU","SanDiegoState":"SDSU","SanJoseState":"SJSU","SouthFlorida":"USF","StephenFAustin":"SFA","UCSanDiego":"UCSD","UCSantaBarbara":"UCSB","UNCAsheville":"UNCA","UNCGreensboro":"UNCG","UNCWilmington":"UNCW","UTArlington":"UTA","WestVirginia":"WVU","WilliamandMary":"W&M"},"espn":{"AbileneChristian":"2000","AirForce":"2005","Akron":"2006","Alabama":"333","AlabamaAM":"2010","AlabamaState":"2011","Albany":"399","AlcornState":"2016","American":"44","AppalachianState":"2026","Arizona":"12","ArizonaState":"9","Arkansas":"8","ArkansasPineBluff":"2029","ArkansasState":"2032","Army":"349","Auburn":"2","AustinPeay":"2046","BYU":"252","BallState":"2050","Baylor":"239","Bellarmine":"91","Belmont":"2057","BethuneCookman":"2065","Binghamton":"2066","BoiseState":"68","BostonCollege":"103","BostonUniversity":"104","BowlingGreen":"189","Bradley":"71","Brown":"225","Bryant":"2803","Bucknell":"2083","Buffalo":"2084","Butler":"2086","CSUBakersfield":"2934","CSUN":"2463","CalPoly":"13","CalStateFullerton":"2239","California":"25","CaliforniaBaptist":"2856","Campbell":"2097","Canisius":"2099","CentralArkansas":"2110","CentralConnecticut":"2115","CentralMichigan":"2117","Charleston":"232","CharlestonSouthern":"2127","Charlotte":"2429","Chattanooga":"236","ChicagoState":"2130","Cincinnati":"2132","Clemson":"228","ClevelandState":"325","CoastalCarolina":"324","Colgate":"2142","Colorado":"38","ColoradoState":"36","Columbia":"171","CoppinState":"2154","Cornell":"172","Creighton":"156","Dartmouth":"159","Davidson":"2166","Dayton":"2168","DePaul":"305","Delaware":"48","DelawareState":"2169","Denver":"2172","DetroitMercy":"2174","Drake":"2181","Drexel":"2182","Duke":"150","Duquesne":"2184","EastCarolina":"151","EastTennesseeState":"2193","EasternIllinois":"2197","EasternKentucky":"2198","EasternMichigan":"2199","EasternWashington":"331","Elon":"2210","Evansville":"339","FIU":"2229","Fairfield":"2217","FairleighDickinson":"161","Florida":"57","FloridaAM":"50","FloridaAtlantic":"2226","FloridaGulfCoast":"526","FloridaState":"52","Fordham":"2230","FresnoState":"278","Furman":"231","GardnerWebb":"2241","GeorgeMason":"2244","GeorgeWashington":"45","Georgetown":"46","Georgia":"61","GeorgiaSouthern":"290","GeorgiaState":"2247","GeorgiaTech":"59","Gonzaga":"2250","GramblingState":"2755","GrandCanyon":"2253","GreenBay":"2739","Hampton":"2261","Harvard":"108","Hawaii":"62","HighPoint":"2272","Hofstra":"2275","HolyCross":"107","Houston":"248","HoustonChristian":"2277","Howard":"47","IUPUI":"85","Idaho":"70","IdahoState":"304","Illinois":"356","IllinoisState":"2287","IncarnateWord":"2916","Indiana":"84","IndianaState":"282","Iona":"314","Iowa":"2294","IowaState":"66","JacksonState":"2296","Jacksonville":"294","JacksonvilleState":"55","JamesMadison":"256","Kansas":"2305","KansasCity":"140","KansasState":"2306","KennesawState":"338","KentState":"2309","Kentucky":"96","LIU":"112358","LSU":"99","LaSalle":"2325","Lafayette":"322","Lamar":"2320","LeMoyne":"2330","Lehigh":"2329","Liberty":"2335","Lindenwood":"2815","Lipscomb":"288","LittleRock":"2031","LongBeachState":"299","Longwood":"2344","Louisiana":"309","LouisianaMonroe":"2433","LouisianaTech":"2348","Louisville":"97","LoyolaChicago":"2350","LoyolaMD":"2352","LoyolaMarymount":"2351","Maine":"311","Manhattan":"2363","Marist":"2368","Marquette":"269","Marshall":"276","Maryland":"120","McNeese":"2377","Memphis":"235","Mercer":"2382","Mercyhurst":"2385","Merrimack":"2771","MiamiFL":"2390","MiamiOH":"193","Michigan":"130","MichiganState":"127","MiddleTennessee":"2393","Milwaukee":"270","Minnesota":"135","MississippiState":"344","MississippiValleyState":"2400","Missouri":"142","MissouriState":"2623","Monmouth":"2405","Montana":"149","MontanaState":"147","MoreheadState":"2413","MorganState":"2415","MountStMarys":"116","MurrayState":"93","NCState":"152","NJIT":"2885","Navy":"2426","Nebraska":"158","Nevada":"2440","NewHampshire":"160","NewHaven":"2441","NewMexico":"167","NewMexicoState":"166","NewOrleans":"2443","Niagara":"315","Nicholls":"2447","NorfolkState":"2450","NorthAlabama":"2453","NorthCarolina":"153","NorthCarolinaAT":"2448","NorthCarolinaCentral":"2428","NorthDakota":"155","NorthDakotaState":"2449","NorthFlorida":"2454","NorthTexas":"249","Northeastern":"111","NorthernArizona":"2464","NorthernColorado":"2458","NorthernIllinois":"2459","NorthernIowa":"2460","NorthernKentucky":"94","Northwestern":"77","NorthwesternState":"2466","NotreDame":"87","Oakland":"2473","Ohio":"195","OhioState":"194","Oklahoma":"201","OklahomaState":"197","OldDominion":"295","OleMiss":"145","Omaha":"2437","OralRoberts":"198","Oregon":"2483","OregonState":"204","Pacific":"279","Penn":"219","PennState":"213","Pepperdine":"2492","Pitt":"221","Portland":"2501","PortlandState":"2502","PrairieViewAM":"2504","Presbyterian":"2506","Princeton":"163","Providence":"2507","Purdue":"2509","PurdueFortWayne":"2870","Queens":"2511","Quinnipiac":"2514","Radford":"2515","RhodeIsland":"227","Rice":"242","Richmond":"257","Rider":"2520","RobertMorris":"2523","Rutgers":"164","SCState":"2569","SELouisiana":"2545","SEMissouriState":"2546","SIUEdwardsville":"2565","SMU":"2567","SacramentoState":"16","SacredHeart":"2529","SaintFrancisPA":"2598","SaintJosephs":"2603","SaintLouis":"139","SaintMarys":"2608","SaintPeters":"2612","SamHouston":"2534","Samford":"2535","SanDiego":"301","SanDiegoState":"21","SanFrancisco":"2539","SanJoseState":"23","SantaClara":"2541","Seattle":"2547","SetonHall":"2550","Siena":"2561","SouthAlabama":"6","SouthCarolina":"2579","SouthDakota":"233","SouthDakotaState":"2571","SouthFlorida":"58","Southern":"2582","SouthernIllinois":"79","SouthernIndiana":"88","SouthernMiss":"2572","SouthernUtah":"253","StBonaventure":"179","StJohns":"2599","StThomas":"2900","Stanford":"24","StephenFAustin":"2617","Stetson":"56","Stonehill":"284","StonyBrook":"2619","Syracuse":"183","TCU":"2628","TarletonState":"2627","Temple":"218","Tennessee":"2633","TennesseeState":"2634","TennesseeTech":"2635","Texas":"251","TexasAM":"245","TexasAMCommerce":"2837","TexasAMCorpusChristi":"357","TexasSouthern":"2640","TexasState":"326","TexasTech":"2641","TheCitadel":"2643","Toledo":"2649","Towson":"119","Troy":"2653","Tulane":"2655","Tulsa":"202","UAB":"5","UCDavis":"302","UCF":"2116","UCIrvine":"300","UCLA":"26","UCRiverside":"27","UCSanDiego":"28","UCSantaBarbara":"2540","UConn":"41","UIC":"82","UMBC":"2378","UMES":"2379","UMass":"113","UMassLowell":"2349","UNCAsheville":"2427","UNCGreensboro":"2430","UNCWilmington":"350","UNLV":"2439","USC":"30","USCUpstate":"2908","UTArlington":"250","UTEP":"2638","UTMartin":"2630","UTRGV":"292","UTSA":"2636","Utah":"254","UtahState":"328","UtahTech":"3101","UtahValley":"3084","VCU":"2670","VMI":"2678","Valparaiso":"2674","Vanderbilt":"238","Vermont":"261","Villanova":"222","Virginia":"258","VirginiaTech":"259","Wagner":"2681","WakeForest":"154","Washington":"264","WashingtonState":"265","WeberState":"2692","WestFlorida":"2697","WestGeorgia":"2698","WestVirginia":"277","WesternCarolina":"2717","WesternIllinois":"2710","WesternKentucky":"98","WesternMichigan":"2711","WichitaState":"2724","WilliamandMary":"2729","Winthrop":"2737","Wisconsin":"275","Wofford":"2747","WrightState":"2750","Wyoming":"2751","Xavier":"2752","Yale":"43","YoungstownState":"2754"}};
 const QUAD_FILES = {"2026": {"net": true, "quads": false}, "2027": {"net": false, "quads": true}};
 const BPI_FILES = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2025, 2026, 2027];
+const PROFILE_FILES = [2025, 2026, 2027];
 const isDarkMode=()=>document.body.classList.contains('dark');
 const SVG_NS="http://www.w3.org/2000/svg";
 let _sortedTabsCache=null;
@@ -3810,6 +3933,10 @@ id:"history",show:()=>true,label:()=>"History",
 run:row=>showVoterHistory(getVoterName(row)),
 },
 {
+id:"profile",show:voterMenuCanProfile,label:()=>"Profile",
+run:row=>showVoterProfile(getVoterName(row)),
+},
+{
 id:"similar",show:voterMenuCanSimilar,
 label:row=>currentSort==="similar"&&similarTo===getVoterName(row)
 ?"Stop sorting by similarity":"Sort by similarity",
@@ -4062,11 +4189,393 @@ const table=document.getElementById("voter-history-table");
 table.classList.remove("week-stats-table");
 title.textContent=username + " \u2013 " + currentYear + " Ballots";
 renderVoterHistoryTable(mergedData,yearTabs,table);
+modal.dataset.chartType="history";
 modal.classList.add("open");
 bindTeamLogos();
 }
 document.getElementById("voter-history-modal").addEventListener("click",e=>{
 if(e.target===e.currentTarget)e.currentTarget.classList.remove("open");
+});
+const PROFILE_FIRST_YEAR=2025;
+const PROFILE_TRAIT_PCT=80;
+const PROFILE_SPLIT_GAP=5;
+const _profileFiles={};
+const _profile={name:null,sort:"dist",dir:"desc",filter:"split",token:0,
+hideOutliers:localStorage.getItem("pfHideOutliers")==="1"};
+const _pfEsc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const _pfFixed=(v,d)=>(Math.abs(v)<0.5*10**-d?0:v).toFixed(d).replace("-","−");
+const _pfSigned=(v,d)=>(Math.abs(v)<0.5*10**-d?"":v>0?"+":"−")+ Math.abs(Math.abs(v)<0.5*10**-d?0:v).toFixed(d);
+const PROFILE_METRICS=[
+{k:"lean",label:"Résumé vs predictive",short:"Lean",lo:"Closer to BPI",hi:"Closer to SOR",
+desc:"On teams where BPI and SOR disagree, which one the ballot sits closer to (−1 BPI, +1 SOR).",
+fmt:v=>_pfSigned(v,2),trait:["Predictive voter","Résumé voter"]},
+{k:"dist",label:"Distance from consensus",short:"Cons. dist",lo:"With the crowd",hi:"Contrarian",
+desc:"Average rank gap from the rest of the poll, weighted toward the top spots.",
+fmt:v=>_pfFixed(v,2),unit:"spots",trait:["Votes with the crowd","Contrarian"]},
+{k:"lead",label:"Ahead of the poll",short:"Ahead",lo:"Follows",hi:"Leads",
+desc:"How well this week's disagreements predict next week's poll movement.",
+fmt:v=>_pfFixed(v,2),unit:"correlation",trait:["Follows the poll","Ahead of the poll"]},
+{k:"loss",label:"Loss penalty",short:"Loss pen.",lo:"Patient",hi:"Punishing",
+desc:"Extra spots a team drops after a loss, compared with teams that didn't lose.",
+fmt:v=>_pfFixed(v,1),unit:"spots",trait:["Patient after losses","Punishes losses"]},
+{k:"vol",label:"Weekly movement",short:"Movement",lo:"Steady",hi:"Restless",
+desc:"Average spots each ballot slot moves from the previous ballot.",
+fmt:v=>_pfFixed(v,1),unit:"spots per slot",trait:["Steady ballot","Moves teams a lot"]},
+{k:"mid",label:"Mid-major lean",short:"Mid-major",lo:"Fewer",hi:"More",
+desc:"Mid-major teams per ballot compared with the consensus top 25.",
+fmt:v=>_pfSigned(v,1),unit:"teams",trait:["Power-conference lean","Mid-major friendly"]},
+];
+function fetchProfiles(season){
+if(typeof PROFILE_FILES==="undefined"||!PROFILE_FILES.includes(Number(season)))return Promise.resolve(null);
+if(!_profileFiles[season]){
+_profileFiles[season]=fetch(`profiles-${season}.json`)
+.then(r=>{if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json();})
+.catch(e=>{delete _profileFiles[season];throw e;});
+}
+return _profileFiles[season];
+}
+function profileSeasonAvailable(year){
+return!ON_AP_PAGE&&_apCurrentYear===null&&Number(year)>=PROFILE_FIRST_YEAR
+&&typeof PROFILE_FILES!=="undefined"&&PROFILE_FILES.includes(Number(year));
+}
+function voterMenuCanProfile(row){
+if(!isKeybindsUnlocked()||!voterMenuCanSimilar(row)||!row.classList.contains("voter-row")
+||row.classList.contains("row-weighted-ranking")
+||row.closest(".ballot-section")?.id?.endsWith("-aggregate"))return false;
+return profileSeasonAvailable(document.querySelector(".week-tab.active")?.dataset.year);
+}
+async function showVoterProfile(name){
+if(!isKeybindsUnlocked())return;
+const activeTab=document.querySelector(".week-tab.active");
+if(!activeTab||!profileSeasonAvailable(activeTab.dataset.year))return;
+if(name)_profile.name=name;
+if(!_profile.name)return;
+const year=activeTab.dataset.year;
+const token=++_profile.token;
+const modal=document.getElementById("voter-history-modal");
+const title=document.getElementById("voter-history-title");
+const table=document.getElementById("voter-history-table");
+const wasOpen=modal.classList.contains("open")&&modal.dataset.chartType==="profile";
+table.classList.remove("week-stats-table");
+table.style.cssText="display:block; white-space:normal; width:100%;";
+modal.dataset.chartType="profile";
+title.innerHTML=`${modalWeekArrowsHtml()}${year} Profile — ${_pfEsc(_profile.name)}`;
+if(!wasOpen||!table.querySelector(".pf-view"))table.innerHTML=`<div class="pf-view"><div class="pf-empty">Loading…</div></div>`;
+modal.classList.add("open");
+let data,snaps;
+try{data=await fetchProfiles(year);}
+catch(e){
+if(token===_profile.token)table.innerHTML=`<div class="pf-view"><div class="pf-empty">Couldn't load the ${year} profiles (${_pfEsc(e.message)}).</div></div>`;
+return;
+}
+try{snaps=await fetchBpiHistory(year);}catch{snaps=[];}
+if(token!==_profile.token||modal.dataset.chartType!=="profile"||!modal.classList.contains("open"))return;
+if(!data){table.innerHTML=`<div class="pf-view"><div class="pf-empty">No profiles for ${year}.</div></div>`;return;}
+renderVoterProfile(table,data,snaps,activeTab);
+}
+function _pfPct(values,v){
+const below=values.filter(x=>x<v).length;
+return Math.round(100*below / Math.max(1,values.length - 1));
+}
+const _pfOrdinal=n=>n +(n%100>=11&&n%100<=13?"th":["th","st","nd","rd"][n%10]||"th");
+const _pfScale=(d0,d1,r0,r1)=>v=>r0 +(v - d0)/((d1 - d0)||1)*(r1 - r0);
+const _pfMedian=xs=>{const s=[...xs].sort((a,b)=>a - b),m=s.length>>1;return s.length%2?s[m]:(s[m - 1]+ s[m])/ 2;};
+const _pfJitter=s=>{let h=2166136261;for(const c of s)h=Math.imul(h^c.charCodeAt(0),16777619);return((h>>>0)%1000)/ 1000 - 0.5;};
+function _pfFence(xs){
+if(!_profile.hideOutliers||xs.length<8)return()=>true;
+const avg=xs.reduce((a,b)=>a + b,0)/ xs.length;
+const sd=Math.sqrt(xs.reduce((a,x)=>a +(x - avg)**2,0)/ xs.length);
+return v=>!(sd>0)||Math.abs(v - avg)/ sd<OUTLIER_SD_THRESHOLD;
+}
+function _pfTicks(a,b,n){
+const step0=(b - a)/ n||1,mag=10**Math.floor(Math.log10(step0));
+const step=[1,2,2.5,5,10].map(m=>m*mag).find(s=>s>=step0);
+const out=[];
+for(let t=Math.ceil(a / step)*step;t<=b + 1e-9;t +=step)out.push(+t.toFixed(6));
+return out;
+}
+function _pfWeekLabel(year,week){
+const tab=getSortedTabs().find(t=>t.dataset.week===`week-${year}-${week}`);
+return tab?String(displayWeekNum(tab)):String(week);
+}
+function renderVoterProfile(table,data,snaps,activeTab){
+const esc=_pfEsc;
+const year=data.season;
+const voters=data.voters;
+const me=voters.find(v=>v.name===_profile.name)
+||voters.find(v=>v.name.toLowerCase()===_profile.name.toLowerCase());
+const hasLean=data.leanWeeks.length>0;
+const metrics=PROFILE_METRICS.filter(m=>m.k!=="lean"||hasLean);
+const values=Object.fromEntries(metrics.map(m=>[m.k,voters.map(v=>v[m.k]).filter(x=>x!=null)]));
+const outlierToggle=`<button type="button" class="pf-link" data-pf-outliers aria-pressed="${_profile.hideOutliers}" title="${_profile.hideOutliers
+?"Put voters back on the charts"
+:`Leave values ${OUTLIER_SD_THRESHOLD}+ standard deviations from the field average off the charts`}">${_profile.hideOutliers?"Show Outliers":"Hide Outliers"}</button>`;
+let html="";
+if(me){
+const traits=[];
+if(voters.length>=10)for(const m of metrics){
+if(me[m.k]==null)continue;
+const p=_pfPct(values[m.k],me[m.k]);
+if(p>=PROFILE_TRAIT_PCT)traits.push([m.trait[1],p]);
+else if(p<=100 - PROFILE_TRAIT_PCT)traits.push([m.trait[0],100 - p]);
+}
+traits.sort((a,b)=>b[1]- a[1]);
+html +=`<div class="pf-head"><div class="pf-traits">${traits.length
+?traits.map(t=>`<span class="pf-trait">${esc(t[0])}</span>`).join("")
+:`<span class="pf-trait">Middle of the field on every measure</span>`}</div>
+            <div class="pf-facts"><span><b>${me.ballots}</b> ballots</span>${outlierToggle}</div></div>`;
+}else{
+html +=`<div class="pf-note">${esc(_profile.name)} has no ${year} profile: profiles cover official voters with ${data.minBallots}+ ballots this season. Pick a voter from the table below.</div>
+            <div class="pf-head"><div></div><div class="pf-facts">${outlierToggle}</div></div>`;
+}
+html +=`<div class="pf-strips">${metrics.map(m=>{
+const v=me?.[m.k];
+const val=v==null
+?`<span class="pf-num">—</span><span class="pf-pct">${me?(m.k==="loss"?"Too few losses yet":"Not enough data"):""}</span>`
+:`<span class="pf-num">${m.fmt(v)}${m.unit?` <small>${esc(m.unit)}</small>`:""}</span><span class="pf-pct">${_pfOrdinal(_pfPct(values[m.k],v))} percentile${m.k==="lean"?` · ${me.leanBallots} ballot${me.leanBallots===1?"":"s"}`:""}</span>`;
+return `<div class="pf-strip" data-k="${m.k}"><div class="pf-lbl"><b>${esc(m.label)}</b><span>${esc(m.desc)}</span></div>
+            <div class="pf-plot"><div class="pf-svg"></div><div class="pf-ends"><span>← ${esc(m.lo)}</span><span>${esc(m.hi)} →</span></div></div>
+            <div class="pf-val">${val}</div></div>`;
+}).join("")}</div>
+    <div class="pf-legend"><span><i class="pf-sw-sq"></i>${esc(me?me.name:"Selected voter")}</span><span><i class="pf-sw-dot"></i>Other voters</span><span><i class="pf-sw-tick"></i>Field median</span>${hasLean?`<span><i class="pf-sw-dia"></i>Poll consensus</span>`:""}</div>`;
+html +=`<div class="pf-charts">${hasLean?`<div class="pf-chart"><div class="pf-sub">Voter compass</div>
+        <div class="pf-cap">Across: which ESPN ranking the ballots sit closer to. Up: distance from the rest of the poll.</div><div class="pf-compass"></div></div>`:""}
+        <div class="pf-chart"><div class="pf-sub">Distance from consensus by week</div>
+        <div class="pf-legend"><span><i class="pf-sw-line"></i>${esc(me?me.name:"Selected voter")}</span><span><i class="pf-sw-dash"></i>Field median</span></div><div class="pf-weekly"></div></div></div>`;
+const weekName=weekTextLabel(activeTab)||`Week ${displayWeekNum(activeTab)}`;
+html +=`<div class="pf-bd-head"><div class="pf-sub">Team by team — ${esc(weekName)}</div><div class="pf-bd-controls"></div></div>
+        <div class="pf-bd-legend pf-legend"></div><div class="pf-bd"></div>`;
+const cols=[{k:"name",label:"Voter"},{k:"ballots",label:"Ballots",fmt:v=>v},...metrics.map(m=>({k:m.k,label:m.short,fmt:m.fmt}))];
+if(!cols.some(c=>c.k===_profile.sort)){_profile.sort="dist";_profile.dir="desc";}
+const sorted=[...voters].sort((a,b)=>{
+const A=a[_profile.sort],B=b[_profile.sort];
+if(A==null&&B==null)return 0;if(A==null)return 1;if(B==null)return -1;
+const c=typeof A==="string"?A.localeCompare(B,undefined,{sensitivity:"base"}):A - B;
+return _profile.dir==="asc"?c:-c;
+});
+html +=`<div class="pf-sub">All profiled voters</div><div class="pf-table-wrap"><table class="pf-table"><thead><tr>${cols.map(c=>
+`<th><button type="button" data-pf-sort="${c.k}"${c.k===_profile.sort?` data-dir="${_profile.dir}"`:""}>${esc(c.label)}</button></th>`).join("")}</tr></thead><tbody>${sorted.map(v=>
+`<tr data-pf-voter="${esc(v.name)}"${me&&v.name===me.name?` class="pf-on"`:""}>${cols.map(c=>
+c.k==="name"?`<td>${esc(v.name)}</td>`:v[c.k]==null?`<td class="pf-na">—</td>`:`<td>${c.fmt(v[c.k])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+html +=`<div class="pf-foot">Official ballots only. Consensus = points from every other official ballot that week; unranked = #26. `
++(hasLean?`Lean uses the BPI/SOR snapshot taken at each poll's deadline (weeks ${data.leanWeeks.map(w=>_pfWeekLabel(year,w)).join(", ")}); early-season SOR rests on few games. `
+:`No lean for ${year}: weekly BPI/SOR snapshots start with 2027. `)
++(data.hasGames?`Loss penalty uses ESPN results between poll deadlines.`:`No game results for ${year}, so no loss penalty.`)
++ `</div>`;
+const view=document.createElement("div");
+view.className="pf-view";
+view.innerHTML=html;
+table.innerHTML="";
+table.appendChild(view);
+view.querySelectorAll(".pf-strip").forEach(row=>{
+const m=metrics.find(x=>x.k===row.dataset.k);
+const host=row.querySelector(".pf-svg");
+host.innerHTML=_pfStripSvg(m,voters,me,hasLean&&m.k==="lean"?data.consLean:null,Math.max(180,host.clientWidth));
+});
+const compass=view.querySelector(".pf-compass");
+if(compass)compass.innerHTML=_pfCompassSvg(data,me,Math.max(260,compass.clientWidth));
+const weekly=view.querySelector(".pf-weekly");
+weekly.innerHTML=_pfWeeklySvg(data,me,Math.max(260,weekly.clientWidth));
+_pfRenderBreakdown(view,activeTab,snaps);
+view.addEventListener("click",e=>{
+if(e.target.closest("[data-pf-outliers]")){
+_profile.hideOutliers=!_profile.hideOutliers;
+localStorage.setItem("pfHideOutliers",_profile.hideOutliers?"1":"0");
+renderVoterProfile(table,data,snaps,activeTab);
+return;
+}
+const sortBtn=e.target.closest("[data-pf-sort]");
+if(sortBtn){
+const k=sortBtn.dataset.pfSort;
+if(k===_profile.sort)_profile.dir=_profile.dir==="asc"?"desc":"asc";
+else{_profile.sort=k;_profile.dir=k==="name"?"asc":"desc";}
+renderVoterProfile(table,data,snaps,activeTab);
+return;
+}
+const f=e.target.closest("[data-pf-filter]");
+if(f){_profile.filter=f.dataset.pfFilter;_pfRenderBreakdown(view,activeTab,snaps);return;}
+const v=e.target.closest("[data-pf-voter]");
+if(v&&v.dataset.pfVoter!==me?.name){
+showVoterProfile(v.dataset.pfVoter);
+document.getElementById("voter-history-box").scrollTop=0;
+}
+});
+}
+function _pfStripSvg(m,voters,me,ref,W){
+const esc=_pfEsc,H=40,pad=9,mid=H / 2;
+const all=voters.filter(v=>v[m.k]!=null);
+if(!all.length)return "";
+const med=_pfMedian(all.map(v=>v[m.k]));
+const keep=_pfFence(all.map(v=>v[m.k]));
+const pts=all.filter(v=>keep(v[m.k]));
+let lo=Math.min(...pts.map(v=>v[m.k])),hi=Math.max(...pts.map(v=>v[m.k]));
+if(ref!=null){lo=Math.min(lo,ref);hi=Math.max(hi,ref);}
+const span=hi - lo||1;
+const x0=_pfScale(lo - span*0.04,hi + span*0.04,pad,W - pad);
+const x=v=>Math.min(W - pad,Math.max(pad,x0(v)));
+let s=`<svg class="pf-strip-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+s +=`<line class="pf-grid" x1="${pad}" x2="${W - pad}" y1="${mid}" y2="${mid}"/>`;
+s +=`<line class="pf-median" x1="${x(med)}" x2="${x(med)}" y1="${mid - 14}" y2="${mid + 14}"><title>Field median: ${m.fmt(med)}</title></line>`;
+for(const v of pts){
+if(me&&v.name===me.name)continue;
+s +=`<circle class="pf-dot" data-pf-voter="${esc(v.name)}" cx="${x(v[m.k]).toFixed(1)}" cy="${(mid + _pfJitter(v.name + m.k)*20).toFixed(1)}" r="3.5"><title>${esc(v.name)}: ${m.fmt(v[m.k])}</title></circle>`;
+}
+if(ref!=null){
+const cx=x(ref);
+s +=`<path class="pf-ref" d="M${cx} ${mid - 7}L${cx + 7} ${mid}L${cx} ${mid + 7}L${cx - 7} ${mid}Z"><title>Poll consensus: ${m.fmt(ref)}</title></path>`;
+}
+if(me&&me[m.k]!=null){
+const off=!keep(me[m.k]);
+s +=`<rect class="pf-me${off?" pf-me-off":""}" x="${x(me[m.k])- 7}" y="${mid - 7}" width="14" height="14" rx="3"><title>${esc(me.name)}: ${m.fmt(me[m.k])}${off?" (outlier, off the scale)":""}</title></rect>`;
+}
+return s + `</svg>`;
+}
+function _pfCompassSvg(data,me,W){
+const esc=_pfEsc;
+const H=Math.round(Math.min(360,Math.max(260,W*0.75)));
+const mg={l:36,r:12,t:22,b:36};
+const both=data.voters.filter(v=>v.lean!=null&&v.dist!=null);
+if(!both.length)return `<div class="pf-empty">No lean data yet.</div>`;
+const keepX=_pfFence(both.map(v=>v.lean)),keepY=_pfFence(both.map(v=>v.dist));
+const pts=both.filter(v=>keepX(v.lean)&&keepY(v.dist));
+const xs=pts.map(v=>v.lean),ys=pts.map(v=>v.dist);
+const x0=Math.min(...xs,data.consLean??0)- 0.06,x1=Math.max(...xs,data.consLean??0)+ 0.06;
+const y1=Math.max(...ys)*1.06;
+const X=_pfScale(x0,x1,mg.l,W - mg.r),Y=_pfScale(0,y1,H - mg.b,mg.t);
+const yMed=_pfMedian(both.map(v=>v.dist));
+let s=`<svg class="pf-compass-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+for(const t of _pfTicks(0,y1,5))s +=`<line class="pf-grid" x1="${mg.l}" x2="${W - mg.r}" y1="${Y(t)}" y2="${Y(t)}"/><text class="pf-tick" x="${mg.l - 6}" y="${Y(t)+ 4}" text-anchor="end">${t}</text>`;
+for(const t of _pfTicks(x0,x1,5))s +=`<text class="pf-tick" x="${X(t)}" y="${H - mg.b + 15}" text-anchor="middle">${_pfSigned(t,t%1?(Math.abs(t*10%1)>1e-6?2:1):0).replace(/^\+?0$/,"0")}</text>`;
+s +=`<line class="pf-axis" x1="${mg.l}" x2="${W - mg.r}" y1="${H - mg.b}" y2="${H - mg.b}"/>`;
+s +=`<text class="pf-end pf-end-bpi" x="${mg.l}" y="${H - 5}">← Closer to BPI</text>`;
+s +=`<text class="pf-end pf-end-sor" x="${W - mg.r}" y="${H - 5}" text-anchor="end">Closer to SOR →</text>`;
+s +=`<text class="pf-tick" x="${mg.l - 6}" y="${mg.t - 10}">Spots from consensus</text>`;
+if(data.consLean!=null){
+const cx=X(data.consLean);
+s +=`<line class="pf-refline" x1="${cx}" x2="${cx}" y1="${mg.t}" y2="${H - mg.b}"/>`;
+s +=`<text class="pf-tick pf-halo" x="${cx + 5}" y="${mg.t + 10}">Poll consensus</text>`;
+}
+s +=`<line class="pf-medline" x1="${mg.l}" x2="${W - mg.r}" y1="${Y(yMed)}" y2="${Y(yMed)}"/>`;
+s +=`<text class="pf-tick pf-halo" x="${W - mg.r}" y="${Y(yMed)- 5}" text-anchor="end">Field median</text>`;
+for(const v of pts){
+if(me&&v.name===me.name)continue;
+s +=`<circle class="pf-dot pf-dot-lg" data-pf-voter="${esc(v.name)}" cx="${X(v.lean).toFixed(1)}" cy="${Y(v.dist).toFixed(1)}" r="5"><title>${esc(v.name)}: lean ${_pfSigned(v.lean,2)}, ${v.dist.toFixed(2)} spots from consensus</title></circle>`;
+}
+if(me&&me.lean!=null&&me.dist!=null){
+const off=!keepX(me.lean)||!keepY(me.dist);
+const mx=Math.min(W - mg.r,Math.max(mg.l,X(me.lean))),my=Math.min(H - mg.b,Math.max(mg.t,Y(me.dist))),right=mx<W - 110;
+s +=`<rect class="pf-me${off?" pf-me-off":""}" x="${mx - 7}" y="${my - 7}" width="14" height="14" rx="3"><title>${esc(me.name)}: lean ${_pfSigned(me.lean,2)}, ${me.dist.toFixed(2)} spots from consensus${off?" (outlier, off the scale)":""}</title></rect>`;
+s +=`<text class="pf-me-label pf-halo" x="${right?mx + 11:mx - 11}" y="${my + 4}" text-anchor="${right?"start":"end"}">${esc(me.name)}</text>`;
+}
+return s + `</svg>`;
+}
+function _pfWeeklySvg(data,me,W){
+const esc=_pfEsc,H=240,mg={l:32,r:12,t:12,b:28};
+const weeks=data.weeks;
+const field=data.fieldDist;
+const mine=Object.fromEntries((me?.weekly||[]).map(r=>[r[0],r[1]]));
+const vals=[...Object.values(field),...Object.values(mine)];
+if(!vals.length)return "";
+const ymax=Math.max(...vals)*1.1;
+const X=_pfScale(0,Math.max(1,weeks.length - 1),mg.l,W - mg.r),Y=_pfScale(0,ymax,H - mg.b,mg.t);
+let s=`<svg class="pf-weekly-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+for(const t of _pfTicks(0,ymax,4))s +=`<line class="pf-grid" x1="${mg.l}" x2="${W - mg.r}" y1="${Y(t)}" y2="${Y(t)}"/><text class="pf-tick" x="${mg.l - 6}" y="${Y(t)+ 4}" text-anchor="end">${t}</text>`;
+const every=Math.max(1,Math.ceil(weeks.length / Math.max(2,Math.floor((W - mg.l - mg.r)/ 34))));
+weeks.forEach((w,i)=>{
+if(i%every===0||i===weeks.length - 1)s +=`<text class="pf-tick" x="${X(i)}" y="${H - mg.b + 15}" text-anchor="middle">${_pfWeekLabel(data.season,w)}</text>`;
+});
+s +=`<line class="pf-axis" x1="${mg.l}" x2="${W - mg.r}" y1="${H - mg.b}" y2="${H - mg.b}"/>`;
+const fieldPts=weeks.map((w,i)=>field[w]!=null?`${X(i).toFixed(1)} ${Y(field[w]).toFixed(1)}`:null);
+s +=`<path class="pf-field-line" d="${fieldPts.filter(Boolean).map((p,j)=>(j?"L":"M")+ p).join("")}"/>`;
+let d="",prev=false;
+weeks.forEach((w,i)=>{
+if(mine[w]!=null){d +=(prev?"L":"M")+ X(i).toFixed(1)+ " " + Y(mine[w]).toFixed(1);prev=true;}
+else prev=false;
+});
+if(d)s +=`<path class="pf-me-line" d="${d}"/>`;
+weeks.forEach((w,i)=>{
+const label=`Week ${_pfWeekLabel(data.season,w)}: ${me?`${esc(me.name)} ${mine[w]!=null?mine[w].toFixed(2):"no ballot"}, `:""}field median ${field[w]!=null?field[w].toFixed(2):"—"}`;
+if(mine[w]!=null)s +=`<circle class="pf-me-pt" cx="${X(i).toFixed(1)}" cy="${Y(mine[w]).toFixed(1)}" r="4"/>`;
+const half=(W - mg.l - mg.r)/ Math.max(1,weeks.length - 1)/ 2;
+s +=`<rect class="pf-hit" x="${(X(i)- half).toFixed(1)}" y="${mg.t}" width="${(2*half).toFixed(1)}" height="${H - mg.t - mg.b}"><title>${label}</title></rect>`;
+});
+return s + `</svg>`;
+}
+function _pfRenderBreakdown(view,activeTab,snaps){
+const esc=_pfEsc,CAP=26,NR=36,MAXR=35;
+const block=document.getElementById(activeTab.dataset.week);
+const sections=block?block.querySelectorAll(".ballot-section"):[];
+let ballot=null;
+for(const sec of[sections[0],sections[1]]){
+sec?.querySelectorAll(".voter-row").forEach(row=>{
+if(!ballot&&getVoterName(row)===_profile.name)
+ballot=Array.from(row.querySelectorAll(".team-logo")).map(i=>i.dataset.team).slice(0,25);
+});
+if(ballot)break;
+}
+const cons=(renderedConsensusOrder(sections)||[]).slice(0,25);
+const tabs=getSortedTabs().filter(t=>t.dataset.year===activeTab.dataset.year);
+let snap=null;
+try{snap=bpiSnapshotForTab(snaps||[],tabs,tabs.indexOf(activeTab));}catch{snap=null;}
+if(!snap?.sor?.length)snap=null;
+const bpi=snap?Object.fromEntries(snap.teams.map(t=>[t[0],t[1]])):{};
+const sor=snap?Object.fromEntries(snap.sor.map(t=>[t[0],t[1]])):{};
+const vr=ballot?Object.fromEntries(ballot.map((t,i)=>[t,i + 1])):null;
+const cr=Object.fromEntries(cons.map((t,i)=>[t,i + 1]));
+const cap=v=>Math.min(v??CAP,CAP);
+const isSplit=t=>{const b=cap(bpi[t]),s=cap(sor[t]);return Math.abs(b - s)>=PROFILE_SPLIT_GAP&&Math.min(b,s)<=25;};
+const controls=view.querySelector(".pf-bd-controls");
+const filter=snap?_profile.filter:"all";
+controls.innerHTML=snap?`<span class="pf-seg">${[["split","BPI–SOR splits"],["all","All teams"]].map(([k,l])=>
+`<button type="button" data-pf-filter="${k}" aria-pressed="${filter===k}">${l}</button>`).join("")}</span>`:"";
+view.querySelector(".pf-bd-legend").innerHTML=`<span><i class="pf-sw-sq"></i>This ballot</span><span><i class="pf-sw-ring"></i>Poll consensus</span>`
++(snap?`<span><i class="pf-sw-dot pf-bpi"></i>BPI</span><span><i class="pf-sw-dot pf-sor"></i>SOR</span>`:"");
+const set=new Set([...cons,...(ballot||[])]);
+if(snap)Object.entries(bpi).concat(Object.entries(sor)).forEach(([t,r])=>{if(r<=25)set.add(t);});
+let teams=[...set];
+if(filter==="split")teams=teams.filter(isSplit);
+teams.sort((a,b)=>(cr[a]??99)-(cr[b]??99)||(vr?.[a]??99)-(vr?.[b]??99)||cap(bpi[a])- cap(bpi[b])||a.localeCompare(b));
+const host=view.querySelector(".pf-bd");
+let note="";
+if(!ballot)note +=`<div class="pf-note">${esc(_profile.name)} has no ballot this week. The poll${snap?", BPI and SOR are":" is"} shown without it.</div>`;
+if(!snap)note +=`<div class="pf-cap">No BPI/SOR snapshot for this week.</div>`;
+host.innerHTML=note +(teams.length?`<div class="pf-bd-row pf-bd-axis"><div></div><div class="pf-bd-plot"></div><div class="pf-bd-side">${snap?"Sided with":""}</div></div>`
++ teams.map(t=>{
+let side="";
+if(vr&&snap&&isSplit(t)){
+const r=cap(vr[t]),b=cap(bpi[t]),s=cap(sor[t]),sc=(Math.abs(r - b)- Math.abs(r - s))/ Math.abs(b - s);
+side=sc>0.33?`<b class="pf-sor-text">SOR</b>`:sc<-0.33?`<b class="pf-bpi-text">BPI</b>`:"Between";
+}
+return `<div class="pf-bd-row" data-team="${esc(t)}"><div class="pf-bd-team"><img class="records-logo" data-team="${esc(t)}" alt=""><span>${esc(shortTeamName(t))}</span></div><div class="pf-bd-plot"></div><div class="pf-bd-side">${side}</div></div>`;
+}).join(""):`<div class="pf-empty">No teams to show.</div>`);
+const plot=host.querySelector(".pf-bd-plot");
+if(!plot)return;
+const W=Math.max(150,plot.clientWidth),pad=9;
+const X=_pfScale(1,NR,pad,W - pad),pos=v=>X(v==null||v>MAXR?NR:v);
+let ax=`<svg width="${W}" height="20" viewBox="0 0 ${W} 20"><rect class="pf-band" x="${X(25.5)}" y="0" width="${W - X(25.5)}" height="20"/>`;
+for(const t of[1,5,10,15,20,25,30])ax +=`<text class="pf-tick" x="${X(t)}" y="14" text-anchor="middle">#${t}</text>`;
+ax +=`<text class="pf-tick" x="${X(NR)}" y="14" text-anchor="middle">NR</text></svg>`;
+plot.innerHTML=ax;
+const rk=v=>v==null?"NR":"#" + v;
+host.querySelectorAll(".pf-bd-row[data-team] .pf-bd-plot").forEach(cell=>{
+const t=cell.parentElement.dataset.team,H=26,y=H / 2;
+const tip=`${shortTeamName(t)}: ${vr?`${_profile.name} ${rk(vr[t])}, `:""}poll ${rk(cr[t])}${snap?`, BPI ${rk(bpi[t])}, SOR ${rk(sor[t])}`:""}`;
+let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><title>${esc(tip)}</title><rect class="pf-band" x="${X(25.5)}" y="0" width="${W - X(25.5)}" height="${H}"/>`;
+for(const k of[5,10,15,20,25])s +=`<line class="pf-grid" x1="${X(k)}" x2="${X(k)}" y1="4" y2="${H - 4}"/>`;
+if(snap)s +=`<line class="pf-span" x1="${pos(bpi[t])}" x2="${pos(sor[t])}" y1="${y}" y2="${y}"/>`;
+if(cr[t]!=null)s +=`<circle class="pf-cons" cx="${pos(cr[t])}" cy="${y}" r="6"/>`;
+if(snap)s +=`<circle class="pf-bpi" cx="${pos(bpi[t])}" cy="${y}" r="5"/><circle class="pf-sor" cx="${pos(sor[t])}" cy="${y}" r="5"/>`;
+if(vr)s +=`<rect class="pf-me" x="${pos(vr[t])- 6}" y="${y - 6}" width="12" height="12" rx="2.5"/>`;
+cell.innerHTML=s + `</svg>`;
+});
+initRecordsLogos(host);
+}
+let _pfResizeRaf=0;
+window.addEventListener("resize",()=>{
+const modal=document.getElementById("voter-history-modal");
+if(!modal?.classList.contains("open")||modal.dataset.chartType!=="profile")return;
+cancelAnimationFrame(_pfResizeRaf);
+_pfResizeRaf=requestAnimationFrame(()=>showVoterProfile());
 });
 function bindTeamLogos(root){
 (root||document).querySelectorAll(".team-logo").forEach(logo=>{
@@ -5140,7 +5649,14 @@ document.getElementById("rankings-menu")?.addEventListener("click",e=>{
 const b=e.target.closest(".settings-item[data-ranking]");
 if(b)toggleRanking(b.dataset.ranking);
 });
+function overallRankingLabel(block=activeWeekBlock()){
+const isAp=ON_AP_PAGE||!!block?.id.startsWith("week-ap-");
+return isAp?"Overall":"Official RCBB";
+}
 function syncRankingsMenu(root=document){
+root.querySelectorAll(".settings-item[data-ranking='Overall']").forEach(el=>{
+el.textContent=overallRankingLabel();
+});
 root.querySelectorAll("[data-ranking]").forEach(el=>{
 const on=_shownRankings.has(el.dataset.ranking);
 el.classList.toggle("active",on);
@@ -5174,7 +5690,7 @@ row.querySelectorAll(".pin-btn, .similar-btn, .voter-menu-btn, .delta-label, .av
 .forEach(el=>el.remove());
 row.querySelectorAll(".team-logo").forEach(img=>{img.dataset.bound="";});
 const nameEl=row.querySelector(".voter-name");
-if(nameEl)nameEl.textContent="Overall";
+if(nameEl)nameEl.textContent=overallRankingLabel(block);
 const cell=row.querySelector(".voter-cell");
 if(cell){
 cell.dataset.bound="1";
@@ -8927,6 +9443,7 @@ const vhm=document.getElementById("voter-history-modal");
 if(vhm.classList.contains("open")){
 if(vhm.dataset.chartType==="highlow")showWeekHighLowChart(weekId,vhm.dataset.chartMode||"highlow");
 else if(vhm.dataset.chartType==="ballottimes"&&!weekId.startsWith("week-ap-"))showBallotTimesChart();
+else if(vhm.dataset.chartType==="profile"&&!weekId.startsWith("week-ap-"))showVoterProfile();
 }
 const ssm=document.getElementById("season-stats-modal");
 if(ssm.classList.contains("open")){
@@ -9292,6 +9809,8 @@ if(vhm2.classList.contains("open")&&vhm2.dataset.chartType==="highlow")
 showWeekHighLowChart(target.dataset.week,vhm2.dataset.chartMode||"highlow");
 if(vhm2.classList.contains("open")&&vhm2.dataset.chartType==="ballottimes")
 showBallotTimesChart();
+if(vhm2.classList.contains("open")&&vhm2.dataset.chartType==="profile")
+showVoterProfile();
 backgroundLoad();
 }
 }).catch(()=>{});
