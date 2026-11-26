@@ -6,10 +6,13 @@ in userpoll.py (so every --rebuild and week scrape refreshes it) for Userpoll se
 >= FIRST_SEASON. Provisional ballots are never used.
 
 Measures (one value per voter, plus a per-week distance series):
-    dist  Distance from consensus: weighted mean |voter rank - consensus rank| over the
-          voter's teams + the consensus top 25, weighted toward the top (weight 26 - best of
-          the two ranks). Consensus = points (25 for #1 .. 1 for #25) from every *other*
-          official ballot that week. Unranked = #26 throughout.
+    dist  Distance from consensus: the homepage Consensus sort's number, averaged over the
+          voter's ballots (so it equals the Year window's Cons Δ). Per ballot: half the sum
+          of |voter rank - consensus rank| over the consensus top 25 plus the voter's teams
+          outside it, unranked = #26 (consensusDistance() in script.js). Consensus = the
+          leave-one-out top 25: points (25 for #1 .. 1 for #25) from every *other* official
+          ballot that week, ties by the rendered Official Overall order (makeLooConsensus()).
+    distW The same with the Weighted consensus setting on: ballotDistance() vs that consensus.
     lead  Ahead of the poll: correlation between (voter rank - consensus rank) this week and
           the consensus's move to next week, pooled over the season.
     loss  Loss penalty: mean rank change of the voter's teams that lost since the previous
@@ -27,9 +30,9 @@ completed games only, with start times), refreshed daily for the current season 
 refresh-quads workflow. Without it, loss is null.
 
     {"season": 2027, "minBallots": 3, "weeks": [0, 2, 3], "leanWeeks": [2, 3],
-     "consLean": 0.21, "fieldDist": {"2": 1.8}, "fieldLean": {"2": 0.2},
-     "voters": [{"name", "ballots", "leanBallots", "nLoss", "dist", "lead", "loss", "vol",
-                 "mid", "lean", "weekly": [[week, dist, lean|null], ...]}, ...]}
+     "consLean": 0.21, "fieldDist": {"2": 41}, "fieldDistW": {"2": 52.3}, "fieldLean": {"2": 0.2},
+     "voters": [{"name", "ballots", "leanBallots", "nLoss", "dist", "distW", "lead", "loss",
+                 "vol", "mid", "lean", "weekly": [[week, dist, lean|null, distW], ...]}, ...]}
 """
 
 import datetime
@@ -75,8 +78,11 @@ def parse_season(html, year):
             teams = re.findall(r'<img class="logo team-logo" data-team="([^"]+)"', row)
             if len(teams) >= 25:
                 ballots[name.group(1).strip()] = teams[:25]
+        agg = re.search(rf'id="week-{year}-{m.group(1)}-aggregate".*?<tr class="voter-row">(.*?)</tr>', block, re.S)
+        order = re.findall(r'<img class="logo team-logo" data-team="([^"]+)"', agg.group(1)) if agg else []
         if ballots:
-            weeks.append({"week": int(m.group(1)), "deadline": deadline, "ballots": ballots})
+            weeks.append({"week": int(m.group(1)), "deadline": deadline, "ballots": ballots,
+                          "agg": order[:25] or [t for t, _ in sorted(_cons_rank(ballots).items(), key=lambda x: x[1])][:25]})
     return sorted(weeks, key=lambda w: w["week"])
 
 
@@ -182,6 +188,45 @@ def _cons_rank(ballots, exclude=None):
     return {t: i + 1 for i, t in enumerate(sorted(pts, key=lambda t: (-pts[t], t)))}
 
 
+def _loo(ballots, agg, voter):
+    """makeLooConsensus() in script.js: top 25 by points from every other ballot, ties by
+    the Official Overall order (agg), then name."""
+    pts = {}
+    for v, b in ballots.items():
+        if v == voter:
+            continue
+        for i, t in enumerate(b[:25]):
+            pts[t] = pts.get(t, 0) + 25 - i
+    idx = {t: i for i, t in enumerate(agg)}
+    order = sorted((t for t, p in pts.items() if p > 0), key=lambda t: (-pts[t], idx.get(t, 99), t))
+    return order[:25] or list(agg)
+
+
+def _cons_distance(teams, cons):
+    """consensusDistance() in script.js."""
+    total = sum(abs(i - (teams.index(t) if t in teams else 25)) for i, t in enumerate(cons))
+    cs = set(cons)
+    total += sum(25 - p for p, t in enumerate(teams[:25]) if t not in cs)
+    return total / 2
+
+
+SIMILAR_UNSHARED_PENALTY = 1
+
+
+def _ballot_distance(a, b):
+    """ballotDistance() in script.js (the Weighted consensus setting)."""
+    ra = {t: i for i, t in enumerate(a[:25])}
+    rb = {t: i for i, t in enumerate(b[:25])}
+    w = lambda r: 4 * 0.8 ** r + 0.5  # noqa: E731
+    total = 0.0
+    for t in sorted(set(ra) | set(rb)):
+        pa, pb = ra.get(t, 25), rb.get(t, 25)
+        shared = t in ra and t in rb
+        gap = abs(pa - pb) + (0 if shared else SIMILAR_UNSHARED_PENALTY)
+        total += gap * (w(min(pa, pb)) if shared else max(w(min(pa, pb)), 1))
+    return total / 2
+
+
 def _rk(ranks, team):
     return min(ranks.get(team, CAP), CAP)
 
@@ -192,16 +237,6 @@ def _brank(ballot):
 
 def _top25(ranks):
     return {t for t, r in ranks.items() if r <= 25}
-
-
-def _dist(vr, cr):
-    num = den = 0
-    for t in sorted(set(vr) | _top25(cr)):
-        a, c = _rk(vr, t), _rk(cr, t)
-        w = CAP - min(a, c)
-        num += w * abs(a - c)
-        den += w
-    return num / den if den else 0.0
 
 
 def _lean_items(vr, snap):
@@ -243,7 +278,7 @@ def compute(season, weeks, losses, snaps):
     tier = lambda t: conferences.tier(t, season)  # noqa: E731
     acc = {v: {"weekly": [], "lead": ([], []), "loss": [], "vol": [], "mid": [], "lean": [], "leanBallots": 0}
            for v in pop}
-    field_dist, field_lean, cons_lean, lean_weeks = {}, {}, [], []
+    field_dist, field_dist_w, field_lean, cons_lean, lean_weeks = {}, {}, {}, [], []
 
     for i, w in enumerate(weeks):
         B = w["ballots"]
@@ -253,14 +288,16 @@ def compute(season, weeks, losses, snaps):
         if snap:
             lean_weeks.append(w["week"])
             cons_lean += _lean_items({t: r for t, r in _cons_rank(B).items() if r <= 25}, snap)
-        dists, leans = [], []
+        dists, dists_w, leans = [], [], []
         for v in pop:
             if v not in B:
                 continue
             a = acc[v]
-            vr, cr = _brank(B[v]), _cons_rank(B, v)
-            d = _dist(vr, cr)
+            cons = _loo(B, w["agg"], v)
+            vr, cr = _brank(B[v]), _brank(cons)
+            d, dw = _cons_distance(B[v], cons), _ballot_distance(B[v], cons)
             dists.append(d)
+            dists_w.append(dw)
             lean = None
             if snap:
                 items = _lean_items(vr, snap)
@@ -269,11 +306,11 @@ def compute(season, weeks, losses, snaps):
                 lean = _wmean(items)
                 if lean is not None:
                     leans.append(lean)
-            a["weekly"].append([w["week"], round(d, 2), _r(lean, 2)])
+            a["weekly"].append([w["week"], d, _r(lean, 2), round(dw, 2)])
             a["mid"].append(sum(tier(t) == "Mid-Major" for t in B[v])
                             - sum(tier(t) == "Mid-Major" for t in _top25(cr)))
             if nxt:
-                cn = _cons_rank(nxt["ballots"], v)
+                cn = _brank(_loo(nxt["ballots"], nxt["agg"], v))
                 for t in sorted(set(vr) | _top25(cr)):
                     a["lead"][0].append(_rk(vr, t) - _rk(cr, t))
                     a["lead"][1].append(_rk(cn, t) - _rk(cr, t))
@@ -285,7 +322,8 @@ def compute(season, weeks, losses, snaps):
                         lost = any(prv["deadline"] < g <= w["deadline"] for g in losses.get(t, ()))
                         a["loss"].append((lost, _rk(vr, t) - _rk(pr, t)))
         if dists:
-            field_dist[str(w["week"])] = round(st.median(dists), 2)
+            field_dist[str(w["week"])] = st.median(dists)
+            field_dist_w[str(w["week"])] = round(st.median(dists_w), 2)
         if leans:
             field_lean[str(w["week"])] = round(st.median(leans), 2)
 
@@ -299,7 +337,8 @@ def compute(season, weeks, losses, snaps):
             "ballots": counts[v],
             "leanBallots": a["leanBallots"],
             "nLoss": len(lost),
-            "dist": _r(st.mean(d for _, d, _ in a["weekly"])) if a["weekly"] else None,
+            "dist": _r(st.mean(r[1] for r in a["weekly"])) if a["weekly"] else None,
+            "distW": _r(st.mean(r[3] for r in a["weekly"])) if a["weekly"] else None,
             "lead": _r(_corr(*a["lead"])),
             "loss": _r(st.mean(lost) - st.mean(kept)) if len(lost) >= MIN_LOSSES and kept else None,
             "vol": _r(st.mean(a["vol"])) if a["vol"] else None,
@@ -314,6 +353,7 @@ def compute(season, weeks, losses, snaps):
         "leanWeeks": lean_weeks,
         "consLean": _r(_wmean(cons_lean)),
         "fieldDist": field_dist,
+        "fieldDistW": field_dist_w,
         "fieldLean": field_lean,
         "hasGames": bool(losses),
         "voters": voters,

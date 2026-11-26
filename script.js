@@ -2095,7 +2095,8 @@ const PROFILE_FIRST_YEAR = 2025;
 const PROFILE_TRAIT_PCT = 80;        // percentile at/above (or 100 - it at/below) that earns a trait chip
 const PROFILE_SPLIT_GAP = 5;         // BPI and SOR ranks (capped at 26) this far apart = a "split" team
 const _profileFiles = {};            // season → Promise<profiles payload>
-const _profile = { name: null, sort: "dist", dir: "desc", filter: "split", token: 0,
+// compare = a voter clicked on the strips / compass, tagged beside the profile voter (cleared on voter change)
+const _profile = { name: null, compare: null, sort: "dist", dir: "desc", filter: "split", token: 0,
     hideOutliers: localStorage.getItem("pfHideOutliers") === "1" };
 
 const _pfEsc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -2105,11 +2106,11 @@ const _pfSigned = (v, d) => (Math.abs(v) < 0.5 * 10 ** -d ? "" : v > 0 ? "+" : "
 
 const PROFILE_METRICS = [
     { k: "lean", label: "Résumé vs predictive", short: "Lean", lo: "Closer to BPI", hi: "Closer to SOR",
-      desc: "On teams where BPI and SOR disagree, which one the ballot sits closer to (−1 BPI, +1 SOR).",
+      desc: "Ballot is closer to BPI (−1) or to SOR (+1).",
       fmt: v => _pfSigned(v, 2), trait: ["Predictive voter", "Résumé voter"] },
     { k: "dist", label: "Distance from consensus", short: "Cons. dist", lo: "With the crowd", hi: "Contrarian",
-      desc: "Average rank gap from the rest of the poll, weighted toward the top spots.",
-      fmt: v => _pfFixed(v, 2), unit: "spots", trait: ["Votes with the crowd", "Contrarian"] },
+      desc: "The Consensus sort's distance, averaged over the voter's ballots.",
+      fmt: v => _pfFixed(v, 1), unit: "spots", trait: ["Votes with the crowd", "Contrarian"] },
     { k: "lead", label: "Ahead of the poll", short: "Ahead", lo: "Follows", hi: "Leads",
       desc: "How well this week's disagreements predict next week's poll movement.",
       fmt: v => _pfFixed(v, 2), unit: "correlation", trait: ["Follows the poll", "Ahead of the poll"] },
@@ -2152,7 +2153,7 @@ async function showVoterProfile(name) {
     if (!isKeybindsUnlocked()) return;
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab || !profileSeasonAvailable(activeTab.dataset.year)) return;
-    if (name) _profile.name = name;
+    if (name) { _profile.name = name; _profile.compare = null; }
     if (!_profile.name) return;
     const year = activeTab.dataset.year;
     const token = ++_profile.token;
@@ -2208,7 +2209,17 @@ function _pfWeekLabel(year, week) {
     return tab ? String(displayWeekNum(tab)) : String(week);
 }
 
+// Distance from consensus follows the Weighted consensus setting, like the Consensus sort:
+// swap in the weighted numbers (distW, fieldDistW, weekly[3]) when it's on.
+function _pfDistView(data) {
+    if (!_weightedConsensus || !data.fieldDistW || data._weighted) return data;
+    return { ...data, _weighted: true, fieldDist: data.fieldDistW,
+        voters: data.voters.map(v => ({ ...v, dist: v.distW, weekly: v.weekly.map(r => [r[0], r[3], r[2]]) })) };
+}
+const _pfDistFmt = v => Number.isInteger(v) ? String(v) : v.toFixed(1);
+
 function renderVoterProfile(table, data, snaps, activeTab) {
+    data = _pfDistView(data);
     const esc = _pfEsc;
     const year = data.season;
     const voters = data.voters;
@@ -2248,8 +2259,7 @@ function renderVoterProfile(table, data, snaps, activeTab) {
         return `<div class="pf-strip" data-k="${m.k}"><div class="pf-lbl"><b>${esc(m.label)}</b><span>${esc(m.desc)}</span></div>
             <div class="pf-plot"><div class="pf-svg"></div><div class="pf-ends"><span>← ${esc(m.lo)}</span><span>${esc(m.hi)} →</span></div></div>
             <div class="pf-val">${val}</div></div>`;
-    }).join("")}</div>
-    <div class="pf-legend"><span><i class="pf-sw-sq"></i>${esc(me ? me.name : "Selected voter")}</span><span><i class="pf-sw-dot"></i>Other voters</span><span><i class="pf-sw-tick"></i>Field median</span>${hasLean ? `<span><i class="pf-sw-dia"></i>Poll consensus</span>` : ""}</div>`;
+    }).join("")}</div>`;
 
     html += `<div class="pf-charts">${hasLean ? `<div class="pf-chart"><div class="pf-sub">Voter compass</div>
         <div class="pf-cap">Across: which ESPN ranking the ballots sit closer to. Up: distance from the rest of the poll.</div><div class="pf-compass"></div></div>` : ""}
@@ -2274,6 +2284,7 @@ function renderVoterProfile(table, data, snaps, activeTab) {
             c.k === "name" ? `<td>${esc(v.name)}</td>` : v[c.k] == null ? `<td class="pf-na">—</td>` : `<td>${c.fmt(v[c.k])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
 
     html += `<div class="pf-foot">Official ballots only. Consensus = points from every other official ballot that week; unranked = #26. `
+        + `Distance from consensus is the homepage Consensus sort's number${data._weighted ? " (Weighted consensus is on)" : ""}, averaged over the season. `
         + (hasLean ? `Lean uses the BPI/SOR snapshot taken at each poll's deadline (weeks ${data.leanWeeks.map(w => _pfWeekLabel(year, w)).join(", ")}); early-season SOR rests on few games. `
                    : `No lean for ${year}: weekly BPI/SOR snapshots start with 2027. `)
         + (data.hasGames ? `Loss penalty uses ESPN results between poll deadlines.` : `No game results for ${year}, so no loss penalty.`)
@@ -2285,13 +2296,17 @@ function renderVoterProfile(table, data, snaps, activeTab) {
     table.innerHTML = "";
     table.appendChild(view);
 
-    view.querySelectorAll(".pf-strip").forEach(row => {
-        const m = metrics.find(x => x.k === row.dataset.k);
-        const host = row.querySelector(".pf-svg");
-        host.innerHTML = _pfStripSvg(m, voters, me, hasLean && m.k === "lean" ? data.consLean : null, Math.max(180, host.clientWidth));
-    });
-    const compass = view.querySelector(".pf-compass");
-    if (compass) compass.innerHTML = _pfCompassSvg(data, me, Math.max(260, compass.clientWidth));
+    const drawMarks = () => {
+        const other = _profile.compare && _profile.compare !== me?.name ? voters.find(v => v.name === _profile.compare) || null : null;
+        view.querySelectorAll(".pf-strip").forEach(row => {
+            const m = metrics.find(x => x.k === row.dataset.k);
+            const host = row.querySelector(".pf-svg");
+            host.innerHTML = _pfStripSvg(m, voters, me, hasLean && m.k === "lean" ? data.consLean : null, Math.max(180, host.clientWidth), other);
+        });
+        const compass = view.querySelector(".pf-compass");
+        if (compass) compass.innerHTML = _pfCompassSvg(data, me, Math.max(260, compass.clientWidth), other);
+    };
+    drawMarks();
     const weekly = view.querySelector(".pf-weekly");
     weekly.innerHTML = _pfWeeklySvg(data, me, Math.max(260, weekly.clientWidth));
     _pfRenderBreakdown(view, activeTab, snaps);
@@ -2311,6 +2326,14 @@ function renderVoterProfile(table, data, snaps, activeTab) {
             renderVoterProfile(table, data, snaps, activeTab);
             return;
         }
+        // Strip / compass dots compare instead of switching voter; a tag or the halo clears it
+        const cmp = e.target.closest("[data-pf-compare]");
+        if (cmp) {
+            const n = cmp.dataset.pfCompare;
+            _profile.compare = n && n !== _profile.compare && n !== me?.name ? n : null;
+            drawMarks();
+            return;
+        }
         const f = e.target.closest("[data-pf-filter]");
         if (f) { _profile.filter = f.dataset.pfFilter; _pfRenderBreakdown(view, activeTab, snaps); return; }
         const v = e.target.closest("[data-pf-voter]");
@@ -2321,8 +2344,30 @@ function renderVoterProfile(table, data, snaps, activeTab) {
     });
 }
 
-function _pfStripSvg(m, voters, me, ref, W) {
-    const esc = _pfEsc, H = 40, pad = 9, mid = H / 2;
+// Value tag: "Name value" pill on a stem over a dot at cx. Clicking it clears the comparison.
+let _pfMeasureCtx = null;
+function _pfTextW(t) {
+    _pfMeasureCtx ||= document.createElement("canvas").getContext("2d");
+    _pfMeasureCtx.font = `600 8px ${getComputedStyle(document.body).fontFamily}`;
+    return _pfMeasureCtx.measureText(t).width;
+}
+function _pfTagSvg(cx, mid, W, text, title, off) {
+    const top = mid - 14, w = _pfTextW(text) + 8, px = Math.min(W - w / 2 - 1, Math.max(w / 2 + 1, cx));
+    return `<g class="pf-tag${off ? " pf-tag-off" : ""}" data-pf-compare=""><title>${title}</title>`
+        + `<line class="pf-tag-stem" x1="${cx}" x2="${cx}" y1="${top + 2}" y2="${mid - 3}"/>`
+        + `<circle class="pf-tag-dot" cx="${cx}" cy="${mid}" r="3"/>`
+        + `<rect class="pf-tag-box" x="${(px - w / 2).toFixed(1)}" y="${top - 9}" width="${w.toFixed(1)}" height="11" rx="5.5"/>`
+        + `<text class="pf-tag-text" x="${px.toFixed(1)}" y="${top - 0.8}" text-anchor="middle">${_pfEsc(text)}</text></g>`;
+}
+// Profile voter: a dark dot in a soft halo
+function _pfHaloSvg(cx, cy, title, off) {
+    return `<g class="pf-halo-mark${off ? " pf-halo-off" : ""}" data-pf-compare=""><title>${title}</title>`
+        + `<circle class="pf-halo-bg" cx="${cx}" cy="${cy}" r="11"/><circle class="pf-halo-dot" cx="${cx}" cy="${cy}" r="5"/></g>`;
+}
+
+// me = profile voter (halo dot); other = compared voter (value tag)
+function _pfStripSvg(m, voters, me, ref, W, other) {
+    const esc = _pfEsc, H = 52, pad = 9, mid = 32;
     const all = voters.filter(v => v[m.k] != null);
     if (!all.length) return "";
     const med = _pfMedian(all.map(v => v[m.k]));
@@ -2333,25 +2378,29 @@ function _pfStripSvg(m, voters, me, ref, W) {
     const span = hi - lo || 1;
     const x0 = _pfScale(lo - span * 0.04, hi + span * 0.04, pad, W - pad);
     const x = v => Math.min(W - pad, Math.max(pad, x0(v)));   // a hidden outlier (the selected voter) sits at the edge
+    const offTxt = v => keep(v) ? "" : " (outlier, off the scale)";
     let s = `<svg class="pf-strip-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
     s += `<line class="pf-grid" x1="${pad}" x2="${W - pad}" y1="${mid}" y2="${mid}"/>`;
-    s += `<line class="pf-median" x1="${x(med)}" x2="${x(med)}" y1="${mid - 14}" y2="${mid + 14}"><title>Field median: ${m.fmt(med)}</title></line>`;
+    s += `<line class="pf-median" x1="${x(med)}" x2="${x(med)}" y1="${mid - 18}" y2="${mid + 18}"><title>Field median: ${m.fmt(med)}</title></line>`;
     for (const v of pts) {
-        if (me && v.name === me.name) continue;
-        s += `<circle class="pf-dot" data-pf-voter="${esc(v.name)}" cx="${x(v[m.k]).toFixed(1)}" cy="${(mid + _pfJitter(v.name + m.k) * 20).toFixed(1)}" r="3.5"><title>${esc(v.name)}: ${m.fmt(v[m.k])}</title></circle>`;
+        if (v === me || v === other) continue;
+        s += `<circle class="pf-dot" data-pf-compare="${esc(v.name)}" cx="${x(v[m.k]).toFixed(1)}" cy="${(mid + _pfJitter(v.name + m.k) * 20).toFixed(1)}" r="3.5"><title>${esc(v.name)}: ${m.fmt(v[m.k])} (click to compare)</title></circle>`;
     }
     if (ref != null) {
         const cx = x(ref);
         s += `<path class="pf-ref" d="M${cx} ${mid - 7}L${cx + 7} ${mid}L${cx} ${mid + 7}L${cx - 7} ${mid}Z"><title>Poll consensus: ${m.fmt(ref)}</title></path>`;
     }
     if (me && me[m.k] != null) {
-        const off = !keep(me[m.k]);
-        s += `<rect class="pf-me${off ? " pf-me-off" : ""}" x="${x(me[m.k]) - 7}" y="${mid - 7}" width="14" height="14" rx="3"><title>${esc(me.name)}: ${m.fmt(me[m.k])}${off ? " (outlier, off the scale)" : ""}</title></rect>`;
+        const title = `${esc(me.name)}: ${m.fmt(me[m.k])}${offTxt(me[m.k])}`;
+        s += _pfHaloSvg(x(me[m.k]), mid, title, !keep(me[m.k]));
     }
+    if (other && other[m.k] != null)
+        s += _pfTagSvg(x(other[m.k]), mid, W, `${other.name} ${m.fmt(other[m.k])}`,
+            `${esc(other.name)}: ${m.fmt(other[m.k])}${offTxt(other[m.k])} (click to clear)`, !keep(other[m.k]));
     return s + `</svg>`;
 }
 
-function _pfCompassSvg(data, me, W) {
+function _pfCompassSvg(data, me, W, other) {
     const esc = _pfEsc;
     const H = Math.round(Math.min(360, Math.max(260, W * 0.75)));
     const mg = { l: 36, r: 12, t: 22, b: 36 };
@@ -2379,14 +2428,21 @@ function _pfCompassSvg(data, me, W) {
     s += `<line class="pf-medline" x1="${mg.l}" x2="${W - mg.r}" y1="${Y(yMed)}" y2="${Y(yMed)}"/>`;
     s += `<text class="pf-tick pf-halo" x="${W - mg.r}" y="${Y(yMed) - 5}" text-anchor="end">Field median</text>`;
     for (const v of pts) {
-        if (me && v.name === me.name) continue;
-        s += `<circle class="pf-dot pf-dot-lg" data-pf-voter="${esc(v.name)}" cx="${X(v.lean).toFixed(1)}" cy="${Y(v.dist).toFixed(1)}" r="5"><title>${esc(v.name)}: lean ${_pfSigned(v.lean, 2)}, ${v.dist.toFixed(2)} spots from consensus</title></circle>`;
+        if (v === me || v === other) continue;
+        s += `<circle class="pf-dot pf-dot-lg" data-pf-compare="${esc(v.name)}" cx="${X(v.lean).toFixed(1)}" cy="${Y(v.dist).toFixed(1)}" r="5"><title>${esc(v.name)}: lean ${_pfSigned(v.lean, 2)}, ${_pfDistFmt(v.dist)} spots from consensus (click to compare)</title></circle>`;
     }
+    const place = v => {
+        const off = !keepX(v.lean) || !keepY(v.dist);
+        return { off, x: Math.min(W - mg.r, Math.max(mg.l, X(v.lean))), y: Math.min(H - mg.b, Math.max(mg.t, Y(v.dist))),
+            title: `${esc(v.name)}: lean ${_pfSigned(v.lean, 2)}, ${_pfDistFmt(v.dist)} spots from consensus${off ? " (outlier, off the scale)" : ""}` };
+    };
     if (me && me.lean != null && me.dist != null) {
-        const off = !keepX(me.lean) || !keepY(me.dist);
-        const mx = Math.min(W - mg.r, Math.max(mg.l, X(me.lean))), my = Math.min(H - mg.b, Math.max(mg.t, Y(me.dist))), right = mx < W - 110;
-        s += `<rect class="pf-me${off ? " pf-me-off" : ""}" x="${mx - 7}" y="${my - 7}" width="14" height="14" rx="3"><title>${esc(me.name)}: lean ${_pfSigned(me.lean, 2)}, ${me.dist.toFixed(2)} spots from consensus${off ? " (outlier, off the scale)" : ""}</title></rect>`;
-        s += `<text class="pf-me-label pf-halo" x="${right ? mx + 11 : mx - 11}" y="${my + 4}" text-anchor="${right ? "start" : "end"}">${esc(me.name)}</text>`;
+        const p = place(me);
+        s += _pfHaloSvg(p.x, p.y, p.title, p.off);
+    }
+    if (other && other.lean != null && other.dist != null) {
+        const p = place(other);
+        s += _pfTagSvg(p.x, p.y, W, other.name, `${p.title} (click to clear)`, p.off);
     }
     return s + `</svg>`;
 }
@@ -2416,7 +2472,7 @@ function _pfWeeklySvg(data, me, W) {
     });
     if (d) s += `<path class="pf-me-line" d="${d}"/>`;
     weeks.forEach((w, i) => {
-        const label = `Week ${_pfWeekLabel(data.season, w)}: ${me ? `${esc(me.name)} ${mine[w] != null ? mine[w].toFixed(2) : "no ballot"}, ` : ""}field median ${field[w] != null ? field[w].toFixed(2) : "—"}`;
+        const label = `Week ${_pfWeekLabel(data.season, w)}: ${me ? `${esc(me.name)} ${mine[w] != null ? _pfDistFmt(mine[w]) : "no ballot"}, ` : ""}field median ${field[w] != null ? _pfDistFmt(field[w]) : "—"}`;
         if (mine[w] != null) s += `<circle class="pf-me-pt" cx="${X(i).toFixed(1)}" cy="${Y(mine[w]).toFixed(1)}" r="4"/>`;
         // full-height hover column per week
         const half = (W - mg.l - mg.r) / Math.max(1, weeks.length - 1) / 2;
@@ -2453,7 +2509,7 @@ function _pfRenderBreakdown(view, activeTab, snaps) {
     const filter = snap ? _profile.filter : "all";
     controls.innerHTML = snap ? `<span class="pf-seg">${[["split", "BPI–SOR splits"], ["all", "All teams"]].map(([k, l]) =>
         `<button type="button" data-pf-filter="${k}" aria-pressed="${filter === k}">${l}</button>`).join("")}</span>` : "";
-    view.querySelector(".pf-bd-legend").innerHTML = `<span><i class="pf-sw-sq"></i>This ballot</span><span><i class="pf-sw-ring"></i>Poll consensus</span>`
+    view.querySelector(".pf-bd-legend").innerHTML = `<span><i class="pf-sw-halo"></i>This ballot</span><span><i class="pf-sw-ring"></i>Poll consensus</span>`
         + (snap ? `<span><i class="pf-sw-dot pf-bpi"></i>BPI</span><span><i class="pf-sw-dot pf-sor"></i>SOR</span>` : "");
 
     const set = new Set([...cons, ...(ballot || [])]);
@@ -2493,7 +2549,7 @@ function _pfRenderBreakdown(view, activeTab, snaps) {
         if (snap) s += `<line class="pf-span" x1="${pos(bpi[t])}" x2="${pos(sor[t])}" y1="${y}" y2="${y}"/>`;
         if (cr[t] != null) s += `<circle class="pf-cons" cx="${pos(cr[t])}" cy="${y}" r="6"/>`;
         if (snap) s += `<circle class="pf-bpi" cx="${pos(bpi[t])}" cy="${y}" r="5"/><circle class="pf-sor" cx="${pos(sor[t])}" cy="${y}" r="5"/>`;
-        if (vr) s += `<rect class="pf-me" x="${pos(vr[t]) - 6}" y="${y - 6}" width="12" height="12" rx="2.5"/>`;
+        if (vr) s += `<circle class="pf-halo-bg" cx="${pos(vr[t])}" cy="${y}" r="10"/><circle class="pf-halo-dot" cx="${pos(vr[t])}" cy="${y}" r="5"/>`;
         cell.innerHTML = s + `</svg>`;
     });
     initRecordsLogos(host);

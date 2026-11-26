@@ -1785,13 +1785,11 @@ body.dark {
 
 .pf-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--color-avg-label); align-items: center; }
 .pf-legend i { display: inline-block; margin-right: 5px; vertical-align: -1px; }
-.pf-sw-sq { width: 10px; height: 10px; border-radius: 2px; background: var(--color-heading); }
+.pf-sw-halo { width: 9px; height: 9px; border-radius: 50%; background: var(--color-heading); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-heading) 15%, transparent); margin-left: 3px; }
 .pf-sw-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--color-pf-field); }
 .pf-sw-dot.pf-bpi { background: var(--color-pf-bpi); }
 .pf-sw-dot.pf-sor { background: var(--color-pf-sor); }
 .pf-sw-ring { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--color-section-title); box-sizing: border-box; }
-.pf-sw-tick { width: 2px; height: 12px; background: var(--color-avg-label); vertical-align: -2px; }
-.pf-sw-dia { width: 8px; height: 8px; transform: rotate(45deg); border: 1.5px solid var(--color-avg-label); background: var(--color-bg-modal); }
 .pf-sw-line { width: 18px; height: 2px; background: var(--color-heading); vertical-align: 3px; }
 .pf-sw-dash { width: 18px; border-top: 2px dashed var(--color-section-title); vertical-align: 3px; }
 
@@ -1803,16 +1801,23 @@ body.dark {
 .pf-view .pf-halo { paint-order: stroke; stroke: var(--color-bg-modal); stroke-width: 4px; stroke-linejoin: round; }
 .pf-view .pf-grid { stroke: var(--color-pf-grid); stroke-width: 1; }
 .pf-view .pf-axis { stroke: var(--color-section-title); stroke-width: 1; }
-.pf-view .pf-median { stroke: var(--color-avg-label); stroke-width: 2; }
+.pf-view .pf-median { stroke: var(--color-avg-label); stroke-width: 2; stroke-dasharray: 0.1 4; stroke-linecap: round; }
 .pf-view .pf-ref { fill: var(--color-bg-modal); stroke: var(--color-avg-label); stroke-width: 1.5; }
 .pf-view .pf-refline { stroke: var(--color-section-title); stroke-width: 1.5; stroke-dasharray: 4 4; }
 .pf-view .pf-medline { stroke: var(--color-section-title); stroke-width: 1; stroke-dasharray: 2 4; }
 .pf-view .pf-dot { fill: var(--color-pf-field); cursor: pointer; }
 .pf-view .pf-dot-lg { stroke: var(--color-bg-modal); stroke-width: 1.5; }
 .pf-view .pf-dot:hover { fill: var(--color-avg-label); }
-.pf-view .pf-me { fill: var(--color-heading); stroke: var(--color-bg-modal); stroke-width: 2; }
-.pf-view .pf-me-off { fill: var(--color-bg-modal); stroke: var(--color-heading); stroke-dasharray: 3 2; }
-.pf-view .pf-me-label { fill: var(--color-heading); font-weight: 600; font-size: 12px; }
+.pf-view .pf-tag { cursor: pointer; }
+.pf-view .pf-tag-box { fill: var(--color-heading); }
+.pf-view svg .pf-tag-text { fill: var(--color-bg-modal); font-weight: 600; font-size: 8px; }
+.pf-view .pf-tag-stem { stroke: var(--color-heading); stroke-width: 1; }
+.pf-view .pf-tag-dot { fill: var(--color-heading); stroke: var(--color-bg-modal); stroke-width: 1.5; }
+.pf-view .pf-tag-off .pf-tag-dot { fill: var(--color-bg-modal); stroke: var(--color-heading); stroke-dasharray: 2 2; }
+.pf-view .pf-halo-mark { cursor: pointer; }
+.pf-view .pf-halo-bg { fill: var(--color-heading); fill-opacity: 0.13; }
+.pf-view .pf-halo-dot { fill: var(--color-heading); stroke: var(--color-bg-modal); stroke-width: 1.5; }
+.pf-view .pf-halo-off .pf-halo-dot { fill: var(--color-bg-modal); stroke: var(--color-heading); stroke-dasharray: 2 2; }
 .pf-view .pf-end-bpi { fill: var(--color-pf-bpi); font-weight: 600; }
 .pf-view .pf-end-sor { fill: var(--color-pf-sor); font-weight: 600; }
 .pf-view .pf-field-line { fill: none; stroke: var(--color-section-title); stroke-width: 2; stroke-dasharray: 5 4; }
@@ -4484,18 +4489,18 @@ const PROFILE_FIRST_YEAR=2025;
 const PROFILE_TRAIT_PCT=80;
 const PROFILE_SPLIT_GAP=5;
 const _profileFiles={};
-const _profile={name:null,sort:"dist",dir:"desc",filter:"split",token:0,
+const _profile={name:null,compare:null,sort:"dist",dir:"desc",filter:"split",token:0,
 hideOutliers:localStorage.getItem("pfHideOutliers")==="1"};
 const _pfEsc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const _pfFixed=(v,d)=>(Math.abs(v)<0.5*10**-d?0:v).toFixed(d).replace("-","−");
 const _pfSigned=(v,d)=>(Math.abs(v)<0.5*10**-d?"":v>0?"+":"−")+ Math.abs(Math.abs(v)<0.5*10**-d?0:v).toFixed(d);
 const PROFILE_METRICS=[
 {k:"lean",label:"Résumé vs predictive",short:"Lean",lo:"Closer to BPI",hi:"Closer to SOR",
-desc:"On teams where BPI and SOR disagree, which one the ballot sits closer to (−1 BPI, +1 SOR).",
+desc:"Ballot is closer to BPI (−1) or to SOR (+1).",
 fmt:v=>_pfSigned(v,2),trait:["Predictive voter","Résumé voter"]},
 {k:"dist",label:"Distance from consensus",short:"Cons. dist",lo:"With the crowd",hi:"Contrarian",
-desc:"Average rank gap from the rest of the poll, weighted toward the top spots.",
-fmt:v=>_pfFixed(v,2),unit:"spots",trait:["Votes with the crowd","Contrarian"]},
+desc:"The Consensus sort's distance, averaged over the voter's ballots.",
+fmt:v=>_pfFixed(v,1),unit:"spots",trait:["Votes with the crowd","Contrarian"]},
 {k:"lead",label:"Ahead of the poll",short:"Ahead",lo:"Follows",hi:"Leads",
 desc:"How well this week's disagreements predict next week's poll movement.",
 fmt:v=>_pfFixed(v,2),unit:"correlation",trait:["Follows the poll","Ahead of the poll"]},
@@ -4532,7 +4537,7 @@ async function showVoterProfile(name){
 if(!isKeybindsUnlocked())return;
 const activeTab=document.querySelector(".week-tab.active");
 if(!activeTab||!profileSeasonAvailable(activeTab.dataset.year))return;
-if(name)_profile.name=name;
+if(name){_profile.name=name;_profile.compare=null;}
 if(!_profile.name)return;
 const year=activeTab.dataset.year;
 const token=++_profile.token;
@@ -4582,7 +4587,14 @@ function _pfWeekLabel(year,week){
 const tab=getSortedTabs().find(t=>t.dataset.week===`week-${year}-${week}`);
 return tab?String(displayWeekNum(tab)):String(week);
 }
+function _pfDistView(data){
+if(!_weightedConsensus||!data.fieldDistW||data._weighted)return data;
+return{...data,_weighted:true,fieldDist:data.fieldDistW,
+voters:data.voters.map(v=>({...v,dist:v.distW,weekly:v.weekly.map(r=>[r[0],r[3],r[2]])}))};
+}
+const _pfDistFmt=v=>Number.isInteger(v)?String(v):v.toFixed(1);
 function renderVoterProfile(table,data,snaps,activeTab){
+data=_pfDistView(data);
 const esc=_pfEsc;
 const year=data.season;
 const voters=data.voters;
@@ -4620,8 +4632,7 @@ const val=v==null
 return `<div class="pf-strip" data-k="${m.k}"><div class="pf-lbl"><b>${esc(m.label)}</b><span>${esc(m.desc)}</span></div>
             <div class="pf-plot"><div class="pf-svg"></div><div class="pf-ends"><span>← ${esc(m.lo)}</span><span>${esc(m.hi)} →</span></div></div>
             <div class="pf-val">${val}</div></div>`;
-}).join("")}</div>
-    <div class="pf-legend"><span><i class="pf-sw-sq"></i>${esc(me?me.name:"Selected voter")}</span><span><i class="pf-sw-dot"></i>Other voters</span><span><i class="pf-sw-tick"></i>Field median</span>${hasLean?`<span><i class="pf-sw-dia"></i>Poll consensus</span>`:""}</div>`;
+}).join("")}</div>`;
 html +=`<div class="pf-charts">${hasLean?`<div class="pf-chart"><div class="pf-sub">Voter compass</div>
         <div class="pf-cap">Across: which ESPN ranking the ballots sit closer to. Up: distance from the rest of the poll.</div><div class="pf-compass"></div></div>`:""}
         <div class="pf-chart"><div class="pf-sub">Distance from consensus by week</div>
@@ -4642,6 +4653,7 @@ html +=`<div class="pf-sub">All profiled voters</div><div class="pf-table-wrap">
 `<tr data-pf-voter="${esc(v.name)}"${me&&v.name===me.name?` class="pf-on"`:""}>${cols.map(c=>
 c.k==="name"?`<td>${esc(v.name)}</td>`:v[c.k]==null?`<td class="pf-na">—</td>`:`<td>${c.fmt(v[c.k])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
 html +=`<div class="pf-foot">Official ballots only. Consensus = points from every other official ballot that week; unranked = #26. `
++ `Distance from consensus is the homepage Consensus sort's number${data._weighted?" (Weighted consensus is on)":""}, averaged over the season. `
 +(hasLean?`Lean uses the BPI/SOR snapshot taken at each poll's deadline (weeks ${data.leanWeeks.map(w=>_pfWeekLabel(year,w)).join(", ")}); early-season SOR rests on few games. `
 :`No lean for ${year}: weekly BPI/SOR snapshots start with 2027. `)
 +(data.hasGames?`Loss penalty uses ESPN results between poll deadlines.`:`No game results for ${year}, so no loss penalty.`)
@@ -4651,13 +4663,17 @@ view.className="pf-view";
 view.innerHTML=html;
 table.innerHTML="";
 table.appendChild(view);
+const drawMarks=()=>{
+const other=_profile.compare&&_profile.compare!==me?.name?voters.find(v=>v.name===_profile.compare)||null:null;
 view.querySelectorAll(".pf-strip").forEach(row=>{
 const m=metrics.find(x=>x.k===row.dataset.k);
 const host=row.querySelector(".pf-svg");
-host.innerHTML=_pfStripSvg(m,voters,me,hasLean&&m.k==="lean"?data.consLean:null,Math.max(180,host.clientWidth));
+host.innerHTML=_pfStripSvg(m,voters,me,hasLean&&m.k==="lean"?data.consLean:null,Math.max(180,host.clientWidth),other);
 });
 const compass=view.querySelector(".pf-compass");
-if(compass)compass.innerHTML=_pfCompassSvg(data,me,Math.max(260,compass.clientWidth));
+if(compass)compass.innerHTML=_pfCompassSvg(data,me,Math.max(260,compass.clientWidth),other);
+};
+drawMarks();
 const weekly=view.querySelector(".pf-weekly");
 weekly.innerHTML=_pfWeeklySvg(data,me,Math.max(260,weekly.clientWidth));
 _pfRenderBreakdown(view,activeTab,snaps);
@@ -4676,6 +4692,13 @@ else{_profile.sort=k;_profile.dir=k==="name"?"asc":"desc";}
 renderVoterProfile(table,data,snaps,activeTab);
 return;
 }
+const cmp=e.target.closest("[data-pf-compare]");
+if(cmp){
+const n=cmp.dataset.pfCompare;
+_profile.compare=n&&n!==_profile.compare&&n!==me?.name?n:null;
+drawMarks();
+return;
+}
 const f=e.target.closest("[data-pf-filter]");
 if(f){_profile.filter=f.dataset.pfFilter;_pfRenderBreakdown(view,activeTab,snaps);return;}
 const v=e.target.closest("[data-pf-voter]");
@@ -4685,8 +4708,26 @@ document.getElementById("voter-history-box").scrollTop=0;
 }
 });
 }
-function _pfStripSvg(m,voters,me,ref,W){
-const esc=_pfEsc,H=40,pad=9,mid=H / 2;
+let _pfMeasureCtx=null;
+function _pfTextW(t){
+_pfMeasureCtx||=document.createElement("canvas").getContext("2d");
+_pfMeasureCtx.font=`600 8px ${getComputedStyle(document.body).fontFamily}`;
+return _pfMeasureCtx.measureText(t).width;
+}
+function _pfTagSvg(cx,mid,W,text,title,off){
+const top=mid - 14,w=_pfTextW(text)+ 8,px=Math.min(W - w / 2 - 1,Math.max(w / 2 + 1,cx));
+return `<g class="pf-tag${off?" pf-tag-off":""}" data-pf-compare=""><title>${title}</title>`
++ `<line class="pf-tag-stem" x1="${cx}" x2="${cx}" y1="${top + 2}" y2="${mid - 3}"/>`
++ `<circle class="pf-tag-dot" cx="${cx}" cy="${mid}" r="3"/>`
++ `<rect class="pf-tag-box" x="${(px - w / 2).toFixed(1)}" y="${top - 9}" width="${w.toFixed(1)}" height="11" rx="5.5"/>`
++ `<text class="pf-tag-text" x="${px.toFixed(1)}" y="${top - 0.8}" text-anchor="middle">${_pfEsc(text)}</text></g>`;
+}
+function _pfHaloSvg(cx,cy,title,off){
+return `<g class="pf-halo-mark${off?" pf-halo-off":""}" data-pf-compare=""><title>${title}</title>`
++ `<circle class="pf-halo-bg" cx="${cx}" cy="${cy}" r="11"/><circle class="pf-halo-dot" cx="${cx}" cy="${cy}" r="5"/></g>`;
+}
+function _pfStripSvg(m,voters,me,ref,W,other){
+const esc=_pfEsc,H=52,pad=9,mid=32;
 const all=voters.filter(v=>v[m.k]!=null);
 if(!all.length)return "";
 const med=_pfMedian(all.map(v=>v[m.k]));
@@ -4697,24 +4738,28 @@ if(ref!=null){lo=Math.min(lo,ref);hi=Math.max(hi,ref);}
 const span=hi - lo||1;
 const x0=_pfScale(lo - span*0.04,hi + span*0.04,pad,W - pad);
 const x=v=>Math.min(W - pad,Math.max(pad,x0(v)));
+const offTxt=v=>keep(v)?"":" (outlier, off the scale)";
 let s=`<svg class="pf-strip-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
 s +=`<line class="pf-grid" x1="${pad}" x2="${W - pad}" y1="${mid}" y2="${mid}"/>`;
-s +=`<line class="pf-median" x1="${x(med)}" x2="${x(med)}" y1="${mid - 14}" y2="${mid + 14}"><title>Field median: ${m.fmt(med)}</title></line>`;
+s +=`<line class="pf-median" x1="${x(med)}" x2="${x(med)}" y1="${mid - 18}" y2="${mid + 18}"><title>Field median: ${m.fmt(med)}</title></line>`;
 for(const v of pts){
-if(me&&v.name===me.name)continue;
-s +=`<circle class="pf-dot" data-pf-voter="${esc(v.name)}" cx="${x(v[m.k]).toFixed(1)}" cy="${(mid + _pfJitter(v.name + m.k)*20).toFixed(1)}" r="3.5"><title>${esc(v.name)}: ${m.fmt(v[m.k])}</title></circle>`;
+if(v===me||v===other)continue;
+s +=`<circle class="pf-dot" data-pf-compare="${esc(v.name)}" cx="${x(v[m.k]).toFixed(1)}" cy="${(mid + _pfJitter(v.name + m.k)*20).toFixed(1)}" r="3.5"><title>${esc(v.name)}: ${m.fmt(v[m.k])} (click to compare)</title></circle>`;
 }
 if(ref!=null){
 const cx=x(ref);
 s +=`<path class="pf-ref" d="M${cx} ${mid - 7}L${cx + 7} ${mid}L${cx} ${mid + 7}L${cx - 7} ${mid}Z"><title>Poll consensus: ${m.fmt(ref)}</title></path>`;
 }
 if(me&&me[m.k]!=null){
-const off=!keep(me[m.k]);
-s +=`<rect class="pf-me${off?" pf-me-off":""}" x="${x(me[m.k])- 7}" y="${mid - 7}" width="14" height="14" rx="3"><title>${esc(me.name)}: ${m.fmt(me[m.k])}${off?" (outlier, off the scale)":""}</title></rect>`;
+const title=`${esc(me.name)}: ${m.fmt(me[m.k])}${offTxt(me[m.k])}`;
+s +=_pfHaloSvg(x(me[m.k]),mid,title,!keep(me[m.k]));
 }
+if(other&&other[m.k]!=null)
+s +=_pfTagSvg(x(other[m.k]),mid,W,`${other.name} ${m.fmt(other[m.k])}`,
+`${esc(other.name)}: ${m.fmt(other[m.k])}${offTxt(other[m.k])} (click to clear)`,!keep(other[m.k]));
 return s + `</svg>`;
 }
-function _pfCompassSvg(data,me,W){
+function _pfCompassSvg(data,me,W,other){
 const esc=_pfEsc;
 const H=Math.round(Math.min(360,Math.max(260,W*0.75)));
 const mg={l:36,r:12,t:22,b:36};
@@ -4742,14 +4787,21 @@ s +=`<text class="pf-tick pf-halo" x="${cx + 5}" y="${mg.t + 10}">Poll consensus
 s +=`<line class="pf-medline" x1="${mg.l}" x2="${W - mg.r}" y1="${Y(yMed)}" y2="${Y(yMed)}"/>`;
 s +=`<text class="pf-tick pf-halo" x="${W - mg.r}" y="${Y(yMed)- 5}" text-anchor="end">Field median</text>`;
 for(const v of pts){
-if(me&&v.name===me.name)continue;
-s +=`<circle class="pf-dot pf-dot-lg" data-pf-voter="${esc(v.name)}" cx="${X(v.lean).toFixed(1)}" cy="${Y(v.dist).toFixed(1)}" r="5"><title>${esc(v.name)}: lean ${_pfSigned(v.lean,2)}, ${v.dist.toFixed(2)} spots from consensus</title></circle>`;
+if(v===me||v===other)continue;
+s +=`<circle class="pf-dot pf-dot-lg" data-pf-compare="${esc(v.name)}" cx="${X(v.lean).toFixed(1)}" cy="${Y(v.dist).toFixed(1)}" r="5"><title>${esc(v.name)}: lean ${_pfSigned(v.lean,2)}, ${_pfDistFmt(v.dist)} spots from consensus (click to compare)</title></circle>`;
 }
+const place=v=>{
+const off=!keepX(v.lean)||!keepY(v.dist);
+return{off,x:Math.min(W - mg.r,Math.max(mg.l,X(v.lean))),y:Math.min(H - mg.b,Math.max(mg.t,Y(v.dist))),
+title:`${esc(v.name)}: lean ${_pfSigned(v.lean,2)}, ${_pfDistFmt(v.dist)} spots from consensus${off?" (outlier, off the scale)":""}`};
+};
 if(me&&me.lean!=null&&me.dist!=null){
-const off=!keepX(me.lean)||!keepY(me.dist);
-const mx=Math.min(W - mg.r,Math.max(mg.l,X(me.lean))),my=Math.min(H - mg.b,Math.max(mg.t,Y(me.dist))),right=mx<W - 110;
-s +=`<rect class="pf-me${off?" pf-me-off":""}" x="${mx - 7}" y="${my - 7}" width="14" height="14" rx="3"><title>${esc(me.name)}: lean ${_pfSigned(me.lean,2)}, ${me.dist.toFixed(2)} spots from consensus${off?" (outlier, off the scale)":""}</title></rect>`;
-s +=`<text class="pf-me-label pf-halo" x="${right?mx + 11:mx - 11}" y="${my + 4}" text-anchor="${right?"start":"end"}">${esc(me.name)}</text>`;
+const p=place(me);
+s +=_pfHaloSvg(p.x,p.y,p.title,p.off);
+}
+if(other&&other.lean!=null&&other.dist!=null){
+const p=place(other);
+s +=_pfTagSvg(p.x,p.y,W,other.name,`${p.title} (click to clear)`,p.off);
 }
 return s + `</svg>`;
 }
@@ -4778,7 +4830,7 @@ else prev=false;
 });
 if(d)s +=`<path class="pf-me-line" d="${d}"/>`;
 weeks.forEach((w,i)=>{
-const label=`Week ${_pfWeekLabel(data.season,w)}: ${me?`${esc(me.name)} ${mine[w]!=null?mine[w].toFixed(2):"no ballot"}, `:""}field median ${field[w]!=null?field[w].toFixed(2):"—"}`;
+const label=`Week ${_pfWeekLabel(data.season,w)}: ${me?`${esc(me.name)} ${mine[w]!=null?_pfDistFmt(mine[w]):"no ballot"}, `:""}field median ${field[w]!=null?_pfDistFmt(field[w]):"—"}`;
 if(mine[w]!=null)s +=`<circle class="pf-me-pt" cx="${X(i).toFixed(1)}" cy="${Y(mine[w]).toFixed(1)}" r="4"/>`;
 const half=(W - mg.l - mg.r)/ Math.max(1,weeks.length - 1)/ 2;
 s +=`<rect class="pf-hit" x="${(X(i)- half).toFixed(1)}" y="${mg.t}" width="${(2*half).toFixed(1)}" height="${H - mg.t - mg.b}"><title>${label}</title></rect>`;
@@ -4812,7 +4864,7 @@ const controls=view.querySelector(".pf-bd-controls");
 const filter=snap?_profile.filter:"all";
 controls.innerHTML=snap?`<span class="pf-seg">${[["split","BPI–SOR splits"],["all","All teams"]].map(([k,l])=>
 `<button type="button" data-pf-filter="${k}" aria-pressed="${filter===k}">${l}</button>`).join("")}</span>`:"";
-view.querySelector(".pf-bd-legend").innerHTML=`<span><i class="pf-sw-sq"></i>This ballot</span><span><i class="pf-sw-ring"></i>Poll consensus</span>`
+view.querySelector(".pf-bd-legend").innerHTML=`<span><i class="pf-sw-halo"></i>This ballot</span><span><i class="pf-sw-ring"></i>Poll consensus</span>`
 +(snap?`<span><i class="pf-sw-dot pf-bpi"></i>BPI</span><span><i class="pf-sw-dot pf-sor"></i>SOR</span>`:"");
 const set=new Set([...cons,...(ballot||[])]);
 if(snap)Object.entries(bpi).concat(Object.entries(sor)).forEach(([t,r])=>{if(r<=25)set.add(t);});
@@ -4849,7 +4901,7 @@ for(const k of[5,10,15,20,25])s +=`<line class="pf-grid" x1="${X(k)}" x2="${X(k)
 if(snap)s +=`<line class="pf-span" x1="${pos(bpi[t])}" x2="${pos(sor[t])}" y1="${y}" y2="${y}"/>`;
 if(cr[t]!=null)s +=`<circle class="pf-cons" cx="${pos(cr[t])}" cy="${y}" r="6"/>`;
 if(snap)s +=`<circle class="pf-bpi" cx="${pos(bpi[t])}" cy="${y}" r="5"/><circle class="pf-sor" cx="${pos(sor[t])}" cy="${y}" r="5"/>`;
-if(vr)s +=`<rect class="pf-me" x="${pos(vr[t])- 6}" y="${y - 6}" width="12" height="12" rx="2.5"/>`;
+if(vr)s +=`<circle class="pf-halo-bg" cx="${pos(vr[t])}" cy="${y}" r="10"/><circle class="pf-halo-dot" cx="${pos(vr[t])}" cy="${y}" r="5"/>`;
 cell.innerHTML=s + `</svg>`;
 });
 initRecordsLogos(host);

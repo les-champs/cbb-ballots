@@ -1765,13 +1765,11 @@ body.dark {
 
 .pf-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--color-avg-label); align-items: center; }
 .pf-legend i { display: inline-block; margin-right: 5px; vertical-align: -1px; }
-.pf-sw-sq { width: 10px; height: 10px; border-radius: 2px; background: var(--color-heading); }
+.pf-sw-halo { width: 9px; height: 9px; border-radius: 50%; background: var(--color-heading); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-heading) 15%, transparent); margin-left: 3px; }
 .pf-sw-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--color-pf-field); }
 .pf-sw-dot.pf-bpi { background: var(--color-pf-bpi); }
 .pf-sw-dot.pf-sor { background: var(--color-pf-sor); }
 .pf-sw-ring { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--color-section-title); box-sizing: border-box; }
-.pf-sw-tick { width: 2px; height: 12px; background: var(--color-avg-label); vertical-align: -2px; }
-.pf-sw-dia { width: 8px; height: 8px; transform: rotate(45deg); border: 1.5px solid var(--color-avg-label); background: var(--color-bg-modal); }
 .pf-sw-line { width: 18px; height: 2px; background: var(--color-heading); vertical-align: 3px; }
 .pf-sw-dash { width: 18px; border-top: 2px dashed var(--color-section-title); vertical-align: 3px; }
 
@@ -1783,16 +1781,23 @@ body.dark {
 .pf-view .pf-halo { paint-order: stroke; stroke: var(--color-bg-modal); stroke-width: 4px; stroke-linejoin: round; }
 .pf-view .pf-grid { stroke: var(--color-pf-grid); stroke-width: 1; }
 .pf-view .pf-axis { stroke: var(--color-section-title); stroke-width: 1; }
-.pf-view .pf-median { stroke: var(--color-avg-label); stroke-width: 2; }
+.pf-view .pf-median { stroke: var(--color-avg-label); stroke-width: 2; stroke-dasharray: 0.1 4; stroke-linecap: round; }
 .pf-view .pf-ref { fill: var(--color-bg-modal); stroke: var(--color-avg-label); stroke-width: 1.5; }
 .pf-view .pf-refline { stroke: var(--color-section-title); stroke-width: 1.5; stroke-dasharray: 4 4; }
 .pf-view .pf-medline { stroke: var(--color-section-title); stroke-width: 1; stroke-dasharray: 2 4; }
 .pf-view .pf-dot { fill: var(--color-pf-field); cursor: pointer; }
 .pf-view .pf-dot-lg { stroke: var(--color-bg-modal); stroke-width: 1.5; }
 .pf-view .pf-dot:hover { fill: var(--color-avg-label); }
-.pf-view .pf-me { fill: var(--color-heading); stroke: var(--color-bg-modal); stroke-width: 2; }
-.pf-view .pf-me-off { fill: var(--color-bg-modal); stroke: var(--color-heading); stroke-dasharray: 3 2; }
-.pf-view .pf-me-label { fill: var(--color-heading); font-weight: 600; font-size: 12px; }
+.pf-view .pf-tag { cursor: pointer; }
+.pf-view .pf-tag-box { fill: var(--color-heading); }
+.pf-view svg .pf-tag-text { fill: var(--color-bg-modal); font-weight: 600; font-size: 8px; }
+.pf-view .pf-tag-stem { stroke: var(--color-heading); stroke-width: 1; }
+.pf-view .pf-tag-dot { fill: var(--color-heading); stroke: var(--color-bg-modal); stroke-width: 1.5; }
+.pf-view .pf-tag-off .pf-tag-dot { fill: var(--color-bg-modal); stroke: var(--color-heading); stroke-dasharray: 2 2; }
+.pf-view .pf-halo-mark { cursor: pointer; }
+.pf-view .pf-halo-bg { fill: var(--color-heading); fill-opacity: 0.13; }
+.pf-view .pf-halo-dot { fill: var(--color-heading); stroke: var(--color-bg-modal); stroke-width: 1.5; }
+.pf-view .pf-halo-off .pf-halo-dot { fill: var(--color-bg-modal); stroke: var(--color-heading); stroke-dasharray: 2 2; }
 .pf-view .pf-end-bpi { fill: var(--color-pf-bpi); font-weight: 600; }
 .pf-view .pf-end-sor { fill: var(--color-pf-sor); font-weight: 600; }
 .pf-view .pf-field-line { fill: none; stroke: var(--color-section-title); stroke-width: 2; stroke-dasharray: 5 4; }
