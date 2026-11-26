@@ -4727,7 +4727,7 @@ return `<g class="pf-halo-mark${off?" pf-halo-off":""}" data-pf-compare=""><titl
 + `<circle class="pf-halo-bg" cx="${cx}" cy="${cy}" r="11"/><circle class="pf-halo-dot" cx="${cx}" cy="${cy}" r="5"/></g>`;
 }
 function _pfStripSvg(m,voters,me,ref,W,other){
-const esc=_pfEsc,H=52,pad=9,mid=32;
+const esc=_pfEsc,H=40,pad=9,mid=20;
 const all=voters.filter(v=>v[m.k]!=null);
 if(!all.length)return "";
 const med=_pfMedian(all.map(v=>v[m.k]));
@@ -4741,7 +4741,7 @@ const x=v=>Math.min(W - pad,Math.max(pad,x0(v)));
 const offTxt=v=>keep(v)?"":" (outlier, off the scale)";
 let s=`<svg class="pf-strip-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
 s +=`<line class="pf-grid" x1="${pad}" x2="${W - pad}" y1="${mid}" y2="${mid}"/>`;
-s +=`<line class="pf-median" x1="${x(med)}" x2="${x(med)}" y1="${mid - 18}" y2="${mid + 18}"><title>Field median: ${m.fmt(med)}</title></line>`;
+s +=`<line class="pf-median" x1="${x(med)}" x2="${x(med)}" y1="${mid - 14}" y2="${mid + 14}"><title>Field median: ${m.fmt(med)}</title></line>`;
 for(const v of pts){
 if(v===me||v===other)continue;
 s +=`<circle class="pf-dot" data-pf-compare="${esc(v.name)}" cx="${x(v[m.k]).toFixed(1)}" cy="${(mid + _pfJitter(v.name + m.k)*20).toFixed(1)}" r="3.5"><title>${esc(v.name)}: ${m.fmt(v[m.k])} (click to compare)</title></circle>`;
