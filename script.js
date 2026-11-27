@@ -1085,7 +1085,92 @@ function setBallotFilter(mode) {
     document.body.classList.toggle("filter-exclude-outliers", _ballotFilter === "exclude");
     document.body.classList.toggle("filter-only-outliers", _ballotFilter === "only");
     if (_ballotFilter !== "all") markOutlierBallots(activeWeekBlock());
+    syncFilterRankingRow(activeWeekBlock());
     syncFilterMenu();
+}
+
+// ── Filter consensus row (Table › Filter) ───────────────────────────────────
+// While a filter is on, the Official and Provisional tables get a ranking row at the
+// top: Overall points from only the official ballots the filter keeps (provisional
+// ballots never count). Movement compares with the same filter's row the week before.
+// Shown seasons only (2025+). The row is .overall-row.ranking-row.filter-ranking-row;
+// syncRankingRows() leaves it alone and places the Rankings rows below it.
+const FILTER_RANKING = {
+    exclude: { label: "Normpoll",  tip: n => `Consensus of the ${n} official ballots that aren't outliers` },
+    only:    { label: "Unusupoll", tip: n => `Consensus of the ${n} official outlier ballots` },
+};
+
+// {pts, voters} over the block's official ballots that the filter mode keeps.
+function filteredBallotPoints(block, mode) {
+    markOutlierBallots(block);
+    const pts = {};
+    let voters = 0;
+    block.querySelector(".ballot-section")?.querySelectorAll(".voter-row.ballot-checked").forEach(row => {
+        if (row.classList.contains("ballot-outlier") !== (mode === "only")) return;
+        const teams = Array.from(row.querySelectorAll(".logo-cell .team-logo")).slice(0, 25).map(l => l.dataset.team);
+        if (!teams.length) return;
+        voters++;
+        teams.forEach((t, i) => { pts[t] = (pts[t] || 0) + (25 - i); });
+    });
+    return { pts, voters };
+}
+
+// Teams by points; ties go to the week's consensus order.
+function _rankByPoints(pts, consensus) {
+    const cRank = {};
+    (consensus || []).forEach((t, i) => { cRank[t] = i; });
+    return Object.keys(pts).sort((a, b) => pts[b] - pts[a] || (cRank[a] ?? 99) - (cRank[b] ?? 99)).slice(0, 25);
+}
+
+function _blockTabs(block) {
+    const tabs = block.id.startsWith("week-ap-") ? getSortedApTabs() : getSortedTabs();
+    const i = tabs.findIndex(t => t.dataset.week === block.id);
+    return { tab: tabs[i], prev: i >= 0 && tabs[i + 1]?.dataset.year === tabs[i].dataset.year ? tabs[i + 1] : null };
+}
+
+// Template row for a block and filter mode (null when no ballot passes), cached per block.
+function _filterRankingTemplate(block, mode) {
+    const cache = block._filterRankingTpl || (block._filterRankingTpl = {});
+    if (mode in cache) return cache[mode];
+    const { pts, voters } = filteredBallotPoints(block, mode);
+    if (!voters) return cache[mode] = null;
+    const ranked = _rankByPoints(pts, getConsensusOrder(block));
+    const prevBlock = (() => { const p = _blockTabs(block).prev; return p ? document.getElementById(p.dataset.week) : null; })();
+    const prevRankOf = {};
+    let hasPrev = false;
+    if (prevBlock) {
+        const prev = filteredBallotPoints(prevBlock, mode);
+        hasPrev = prev.voters > 0;
+        _rankByPoints(prev.pts, getConsensusOrder(prevBlock)).forEach((t, i) => { prevRankOf[t] = i + 1; });
+    }
+    const { label, tip } = FILTER_RANKING[mode];
+    const tr = _buildPointsRankingRow(label, ranked, pts, prevRankOf, hasPrev);
+    tr.querySelector(".voter-name").title = tip(voters);
+    return cache[mode] = tr;
+}
+
+function syncFilterRankingRow(block) {
+    if (!block) return;
+    const sections = block.querySelectorAll(".ballot-section");
+    const tbodies = [sections[0], sections[1]].map(s => s?.querySelector("tbody"))
+        .filter(tb => tb && tb.querySelector(".voter-row"));
+    const conf = FILTER_RANKING[_ballotFilter];
+    tbodies.forEach(tb => tb.querySelectorAll(":scope > .filter-ranking-row").forEach(r => {
+        if (r.dataset.ranking !== conf?.label) r.remove();
+    }));
+    if (!conf) return;
+    const year = _blockTabs(block).tab?.dataset.year;
+    if (!year || isHiddenYear(year)) return;
+    const missing = tbodies.filter(tb => !tb.querySelector(":scope > .filter-ranking-row"));
+    if (!missing.length) return;
+    const tpl = _filterRankingTemplate(block, _ballotFilter);
+    if (!tpl) return;
+    missing.forEach(tb => {
+        const row = _sourceRankingRow(tpl, conf.label);
+        row.classList.add("filter-ranking-row");
+        tb.prepend(row);
+    });
+    bindTeamLogos(block);
 }
 
 function syncFilterMenu(root = document) {
@@ -4327,9 +4412,10 @@ function syncRankingRows(block) {
     const tbodies = [sections[0], sections[1]].map(s => s?.querySelector("tbody"))
         .filter(tb => tb && tb.querySelector(".voter-row")); // skip sections with no ballots
     if (!tbodies.length) return;
-    tbodies.forEach(tb => tb.querySelectorAll(":scope > .overall-row").forEach(r => {
+    tbodies.forEach(tb => tb.querySelectorAll(":scope > .overall-row:not(.filter-ranking-row)").forEach(r => {
         if (!_shownRankings.has(r.dataset.ranking)) r.remove();
     }));
+    syncFilterRankingRow(block);
     const isAp = ON_AP_PAGE || block.id.startsWith("week-ap-");
     const year = getSortedTabs().find(t => t.dataset.week === block.id)?.dataset.year;
     const userpollOnly = !isAp && year && !isHiddenYear(year);
