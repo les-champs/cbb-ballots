@@ -2187,10 +2187,9 @@ document.getElementById("voter-history-modal").addEventListener("click", e => {
 // Userpoll only (not AP mode or ap-ballots.html), seasons >= PROFILE_FIRST_YEAR.
 const PROFILE_FIRST_YEAR = 2025;
 const PROFILE_TRAIT_PCT = 80;        // percentile at/above (or 100 - it at/below) that earns a trait chip
-const PROFILE_SPLIT_GAP = 5;         // BPI and SOR ranks (capped at 26) this far apart = a "split" team
 const _profileFiles = {};            // season → Promise<profiles payload>
 // compare = a voter clicked on the strips / compass, tagged beside the profile voter (cleared on voter change)
-const _profile = { name: null, compare: null, filter: "split", token: 0,
+const _profile = { name: null, compare: null, token: 0,
     hideOutliers: localStorage.getItem("pfHideOutliers") === "1" };
 
 const _pfEsc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -2361,7 +2360,7 @@ function renderVoterProfile(table, data, snaps, activeTab) {
         <div class="pf-legend"><span><i class="pf-sw-line"></i>${esc(me ? me.name : "Selected voter")}</span><span><i class="pf-sw-dash"></i>Field median</span></div><div class="pf-weekly"></div></div></div>`;
 
     const weekName = weekTextLabel(activeTab) || `Week ${displayWeekNum(activeTab)}`;
-    html += `<div class="pf-bd-head"><div class="pf-sub">Team by team — ${esc(weekName)}</div><div class="pf-bd-controls"></div></div>
+    html += `<div class="pf-bd-head"><div class="pf-sub">Team by team — ${esc(weekName)}</div></div>
         <div class="pf-bd-legend pf-legend"></div><div class="pf-bd"></div>`;
 
     const view = document.createElement("div");
@@ -2400,8 +2399,6 @@ function renderVoterProfile(table, data, snaps, activeTab) {
             drawMarks();
             return;
         }
-        const f = e.target.closest("[data-pf-filter]");
-        if (f) { _profile.filter = f.dataset.pfFilter; _pfRenderBreakdown(view, activeTab, snaps); }
     });
 }
 
@@ -2534,9 +2531,9 @@ function _pfWeeklySvg(data, me, W) {
     weeks.forEach((w, i) => {
         const label = `Week ${_pfWeekLabel(data.season, w)}: ${me ? `${esc(me.name)} ${mine[w] != null ? _pfDistFmt(mine[w]) : "no ballot"}, ` : ""}field median ${field[w] != null ? _pfDistFmt(field[w]) : "—"}`;
         if (mine[w] != null) s += `<circle class="pf-me-pt" cx="${X(i).toFixed(1)}" cy="${Y(mine[w]).toFixed(1)}" r="4"/>`;
-        // full-height hover column per week
+        // full-height hover column per week (tooltip only, no highlight)
         const half = (W - mg.l - mg.r) / Math.max(1, weeks.length - 1) / 2;
-        s += `<rect class="pf-hit" x="${(X(i) - half).toFixed(1)}" y="${mg.t}" width="${(2 * half).toFixed(1)}" height="${H - mg.t - mg.b}"><title>${label}</title></rect>`;
+        s += `<rect class="pf-hit pf-hit-quiet" x="${(X(i) - half).toFixed(1)}" y="${mg.t}" width="${(2 * half).toFixed(1)}" height="${H - mg.t - mg.b}"><title>${label}</title></rect>`;
     });
     return s + `</svg>`;
 }
@@ -2563,40 +2560,26 @@ function _pfRenderBreakdown(view, activeTab, snaps) {
     const vr = ballot ? Object.fromEntries(ballot.map((t, i) => [t, i + 1])) : null;
     const cr = Object.fromEntries(cons.map((t, i) => [t, i + 1]));
     const cap = v => Math.min(v ?? CAP, CAP);
-    const isSplit = t => { const b = cap(bpi[t]), s = cap(sor[t]); return Math.abs(b - s) >= PROFILE_SPLIT_GAP && Math.min(b, s) <= 25; };
 
-    const controls = view.querySelector(".pf-bd-controls");
-    const filter = snap ? _profile.filter : "all";
-    controls.innerHTML = snap ? `<span class="pf-seg">${[["split", "BPI–SOR splits"], ["all", "All teams"]].map(([k, l]) =>
-        `<button type="button" data-pf-filter="${k}" aria-pressed="${filter === k}">${l}</button>`).join("")}</span>` : "";
-    view.querySelector(".pf-bd-legend").innerHTML = `<span><i class="pf-sw-halo"></i>This ballot</span><span><i class="pf-sw-ring"></i>Poll consensus</span>`
-        + (snap ? `<span><i class="pf-sw-dot pf-bpi"></i>BPI</span><span><i class="pf-sw-dot pf-sor"></i>SOR</span>` : "");
+    view.querySelector(".pf-bd-legend").innerHTML = `<span><b class="pf-lg-num pf-num-me">#</b>This ballot</span><span><i class="pf-sw-tick"></i>Poll consensus</span>`
+        + (snap ? `<span><b class="pf-lg-num pf-num-bpi">#</b>BPI</span><span><b class="pf-lg-num pf-num-sor">#</b>SOR</span>` : "");
 
-    const set = new Set([...cons, ...(ballot || [])]);
-    if (snap) Object.entries(bpi).concat(Object.entries(sor)).forEach(([t, r]) => { if (r <= 25) set.add(t); });
-    let teams = [...set];
-    if (filter === "split") teams = teams.filter(isSplit);
+    // Poll top 25 + this voter's ballot (BPI/SOR-only teams stay off)
+    let teams = [...new Set([...cons, ...(ballot || [])])];
     teams.sort((a, b) => (cr[a] ?? 99) - (cr[b] ?? 99) || (vr?.[a] ?? 99) - (vr?.[b] ?? 99) || cap(bpi[a]) - cap(bpi[b]) || a.localeCompare(b));
 
     const host = view.querySelector(".pf-bd");
     let note = "";
     if (!ballot) note += `<div class="pf-note">${esc(_profile.name)} has no ballot this week. The poll${snap ? ", BPI and SOR are" : " is"} shown without it.</div>`;
     if (!snap) note += `<div class="pf-cap">No BPI/SOR snapshot for this week.</div>`;
-    host.innerHTML = note + (teams.length ? `<div class="pf-bd-row pf-bd-axis"><div></div><div class="pf-bd-plot"></div><div class="pf-bd-side">${snap ? "Sided with" : ""}</div></div>`
-        + teams.map(t => {
-            let side = "";
-            if (vr && snap && isSplit(t)) {
-                const r = cap(vr[t]), b = cap(bpi[t]), s = cap(sor[t]), sc = (Math.abs(r - b) - Math.abs(r - s)) / Math.abs(b - s);
-                side = sc > 0.33 ? `<b class="pf-sor-text">SOR</b>` : sc < -0.33 ? `<b class="pf-bpi-text">BPI</b>` : "Between";
-            }
-            return `<div class="pf-bd-row" data-team="${esc(t)}"><div class="pf-bd-team"><img class="records-logo" data-team="${esc(t)}" alt=""><span>${esc(shortTeamName(t))}</span></div><div class="pf-bd-plot"></div><div class="pf-bd-side">${side}</div></div>`;
-        }).join("") : `<div class="pf-empty">No teams to show.</div>`);
+    host.innerHTML = note + (teams.length ? `<div class="pf-bd-row pf-bd-axis"><div></div><div class="pf-bd-plot"></div></div>`
+        + teams.map(t => `<div class="pf-bd-row" data-team="${esc(t)}"><div class="pf-bd-team"><img class="records-logo" data-team="${esc(t)}" alt=""><span>${esc(shortTeamName(t))}</span></div><div class="pf-bd-plot"></div></div>`).join("") : `<div class="pf-empty">No teams to show.</div>`);
 
     const plot = host.querySelector(".pf-bd-plot");
     if (!plot) return;
     const W = Math.max(150, plot.clientWidth), pad = 9;
     const X = _pfScale(1, NR, pad, W - pad), pos = v => X(v == null || v > MAXR ? NR : v);
-    let ax = `<svg width="${W}" height="20" viewBox="0 0 ${W} 20"><rect class="pf-band" x="${X(25.5)}" y="0" width="${W - X(25.5)}" height="20"/>`;
+    let ax = `<svg width="${W}" height="20" viewBox="0 0 ${W} 20">`;
     for (const t of [1, 5, 10, 15, 20, 25, 30]) ax += `<text class="pf-tick" x="${X(t)}" y="14" text-anchor="middle">#${t}</text>`;
     ax += `<text class="pf-tick" x="${X(NR)}" y="14" text-anchor="middle">NR</text></svg>`;
     plot.innerHTML = ax;
@@ -2604,12 +2587,36 @@ function _pfRenderBreakdown(view, activeTab, snaps) {
     host.querySelectorAll(".pf-bd-row[data-team] .pf-bd-plot").forEach(cell => {
         const t = cell.parentElement.dataset.team, H = 26, y = H / 2;
         const tip = `${shortTeamName(t)}: ${vr ? `${_profile.name} ${rk(vr[t])}, ` : ""}poll ${rk(cr[t])}${snap ? `, BPI ${rk(bpi[t])}, SOR ${rk(sor[t])}` : ""}`;
-        let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><title>${esc(tip)}</title><rect class="pf-band" x="${X(25.5)}" y="0" width="${W - X(25.5)}" height="${H}"/>`;
+        let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><title>${esc(tip)}</title>`;
         for (const k of [5, 10, 15, 20, 25]) s += `<line class="pf-grid" x1="${X(k)}" x2="${X(k)}" y1="4" y2="${H - 4}"/>`;
         if (snap) s += `<line class="pf-span" x1="${pos(bpi[t])}" x2="${pos(sor[t])}" y1="${y}" y2="${y}"/>`;
-        if (cr[t] != null) s += `<circle class="pf-cons" cx="${pos(cr[t])}" cy="${y}" r="6"/>`;
-        if (snap) s += `<circle class="pf-bpi" cx="${pos(bpi[t])}" cy="${y}" r="5"/><circle class="pf-sor" cx="${pos(sor[t])}" cy="${y}" r="5"/>`;
-        if (vr) s += `<circle class="pf-halo-bg" cx="${pos(vr[t])}" cy="${y}" r="10"/><circle class="pf-halo-dot" cx="${pos(vr[t])}" cy="${y}" r="5"/>`;
+        // Ranks as colored numbers (this ballot, BPI, SOR); ranks past MAXR sit at NR with their number.
+        // Numbers closer than BD_NUM_GAP px are stacked vertically (at the smaller size) so they stay readable.
+        const nums = [];
+        if (vr) nums.push(["me", vr[t]]);
+        if (snap) nums.push(["bpi", bpi[t]], ["sor", sor[t]]);
+        const items = nums.map(([k, v]) => ({ k, x: pos(v), label: v == null ? "NR" : String(v) })).sort((a, b) => a.x - b.x);
+        const BD_NUM_GAP = 16, offs = { 1: [0], 2: [-5, 5], 3: [-8, 0, 8] };
+        const groups = [];
+        for (let i = 0; i < items.length;) {
+            let j = i + 1;
+            while (j < items.length && items[j].x - items[j - 1].x < BD_NUM_GAP) j++;
+            groups.push(items.slice(i, j));
+            i = j;
+        }
+        // Poll consensus: a short hash mark. Where it would run into a number it becomes a small
+        // dot above and below that number instead, and nothing at all next to a stacked group.
+        if (cr[t] != null) {
+            const cx = pos(cr[t]);
+            const halfW = (it, solo) => it.label.length * (solo ? 4.3 : 3.4) + 1.5;   // ≈ half the text width at 14px / 11px bold
+            const hit = groups.find(g => g.some(it => Math.abs(cx - it.x) < halfW(it, g.length === 1)));
+            if (!hit) s += `<line class="pf-cons" x1="${cx}" x2="${cx}" y1="${y - 5.5}" y2="${y + 5.5}"/>`;
+            else if (hit.length === 1) s += `<circle class="pf-cons-dot" cx="${cx}" cy="${y - 10}" r="1.5"/><circle class="pf-cons-dot" cx="${cx}" cy="${y + 10}" r="1.5"/>`;
+        }
+        for (const grp of groups) {
+            const o = offs[grp.length];
+            grp.forEach((it, n) => s += `<text class="pf-num pf-num-${it.k}${grp.length === 1 ? " pf-num-solo" : ""}" x="${it.x}" y="${y + o[n]}" text-anchor="middle" dominant-baseline="central">${it.label}</text>`);
+        }
         cell.innerHTML = s + `</svg>`;
     });
     initRecordsLogos(host);

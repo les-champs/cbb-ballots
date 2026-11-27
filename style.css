@@ -1767,11 +1767,7 @@ body.dark {
 
 .pf-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--color-avg-label); align-items: center; }
 .pf-legend i { display: inline-block; margin-right: 5px; vertical-align: -1px; }
-.pf-sw-halo { width: 9px; height: 9px; border-radius: 50%; background: var(--color-heading); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-heading) 15%, transparent); margin-left: 3px; }
-.pf-sw-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--color-pf-field); }
-.pf-sw-dot.pf-bpi { background: var(--color-pf-bpi); }
-.pf-sw-dot.pf-sor { background: var(--color-pf-sor); }
-.pf-sw-ring { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--color-section-title); box-sizing: border-box; }
+.pf-sw-tick { width: 2px; height: 12px; background: var(--color-section-title); }
 .pf-sw-line { width: 18px; height: 2px; background: var(--color-heading); vertical-align: 3px; }
 .pf-sw-dash { width: 18px; border-top: 2px dashed var(--color-section-title); vertical-align: 3px; }
 
@@ -1807,27 +1803,29 @@ body.dark {
 .pf-view .pf-me-pt { fill: var(--color-heading); stroke: var(--color-bg-modal); stroke-width: 2; }
 .pf-view .pf-hit { fill: transparent; }
 .pf-view .pf-hit:hover { fill: var(--color-pf-grid); fill-opacity: 0.5; }
-.pf-view .pf-band { fill: var(--color-pf-band); fill-opacity: 0.7; }
+.pf-view .pf-hit-quiet:hover { fill: transparent; }
+.pf-view .pf-num { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; paint-order: stroke; stroke: var(--color-bg-modal); stroke-width: 3px; stroke-linejoin: round; }
+.pf-view .pf-num-solo { font-size: 14px; }
+.pf-view .pf-cons-dot { fill: var(--color-section-title); }
+.pf-view .pf-bd-row:nth-child(even) .pf-num { stroke: var(--color-pf-band); }
+.pf-view .pf-num-me { fill: var(--color-heading); color: var(--color-heading); }
+.pf-view .pf-num-bpi { fill: var(--color-pf-bpi); color: var(--color-pf-bpi); }
+.pf-view .pf-num-sor { fill: var(--color-pf-sor); color: var(--color-pf-sor); }
+.pf-view .pf-lg-num { font-size: 11px; font-weight: 700; margin-right: 4px; }
 .pf-view .pf-span { stroke: var(--color-pf-field); stroke-width: 2; }
-.pf-view .pf-cons { fill: none; stroke: var(--color-section-title); stroke-width: 2; }
-.pf-view circle.pf-bpi { fill: var(--color-pf-bpi); stroke: var(--color-bg-modal); stroke-width: 2; }
-.pf-view circle.pf-sor { fill: var(--color-pf-sor); stroke: var(--color-bg-modal); stroke-width: 2; }
-.pf-bpi-text { color: var(--color-pf-bpi); }
-.pf-sor-text { color: var(--color-pf-sor); }
+.pf-view .pf-cons { stroke: var(--color-section-title); stroke-width: 2; stroke-linecap: round; }
 
 .pf-bd-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 6px 12px; }
 .pf-seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 6px; background: var(--color-pf-band); border: 1px solid var(--color-pf-grid); }
 .pf-seg button { font: inherit; font-size: 12px; color: var(--color-avg-label); background: transparent; border: 0; border-radius: 4px; padding: 3px 9px; cursor: pointer; }
 .pf-seg button[aria-pressed="true"] { background: var(--color-bg-modal); color: var(--color-heading); font-weight: 600; }
 .pf-bd { display: flex; flex-direction: column; }
-.pf-bd-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) 64px; gap: 8px; align-items: center; min-height: 26px; }
+.pf-bd-row { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 8px; align-items: center; min-height: 26px; }
 .pf-bd-row[data-team]:nth-child(even) { background: var(--color-pf-band); border-radius: 4px; }
 .pf-bd-team { display: flex; align-items: center; gap: 7px; min-width: 0; padding-left: 4px; white-space: nowrap; }
 .pf-bd-team span { overflow: hidden; text-overflow: ellipsis; }
 .pf-bd-team .records-logo { width: 18px; height: 18px; object-fit: contain; flex: none; }
 .pf-bd-plot { min-width: 0; }
-.pf-bd-side { font-size: 12px; color: var(--color-avg-label); text-align: right; padding-right: 4px; }
-.pf-bd-axis .pf-bd-side { font-size: 11px; color: var(--color-section-title); }
 
 .pf-table-wrap { overflow: auto; max-height: 420px; border-top: 1px solid var(--color-pf-grid); }
 .pf-table { border-collapse: collapse; width: max-content; min-width: 100%; table-layout: auto; font-size: 12px; font-variant-numeric: tabular-nums; }
@@ -1887,5 +1885,5 @@ body.dark {
     .vp-boards { grid-template-columns: minmax(0, 1fr); }
     .pf-strip { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
     .pf-plot { grid-column: 1 / -1; grid-row: 2; }
-    .pf-bd-row { grid-template-columns: 112px minmax(0, 1fr) 48px; gap: 5px; }
+    .pf-bd-row { grid-template-columns: 112px minmax(0, 1fr); gap: 5px; }
 }
