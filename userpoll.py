@@ -1838,7 +1838,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
       <li><button class="settings-item" data-action="avgLines">Avg Lines ON</button></li>
       <li><button class="settings-item" data-action="compactTable">Compact Table</button></li>
       <li><button class="settings-item" data-action="darkMode">Dark Mode</button></li>
-      <li><button class="settings-item" data-action="highlightMode">Dim Highlights</button></li>
+      <li><button class="settings-item" data-action="highlightMode">Glow Highlights</button></li>
       <li><button class="settings-item" data-action="weekArrows">Nav Arrows ON</button></li>
       <li><button class="settings-item" data-action="weightedConsensus">Weighted Consensus ON</button></li>
     </ul>

@@ -8973,16 +8973,20 @@ function setWeekArrowsVisible(on) {
 setWeekArrowsVisible(_showWeekArrows);
 
 // ── Highlight mode ──────────────────────────────────────────────────────────
-// Glow (default): highlighted ballot cells get a glowing frame.
-// Dim (body.highlight-dim): other ballot logos fade, highlighted cells get a plain
-// frame. Outliers look the same in both (tag + bar). Toggled in Settings, remembered in localStorage.
-let _highlightDim = false;
-try { _highlightDim = localStorage.getItem("highlightMode") === "dim"; } catch (e) {}
+// Dim (default, body.highlight-dim): other ballot logos fade, highlighted cells get a
+// plain frame. Glow: highlighted ballot cells get a glowing frame. Outliers look the same in both (tag + bar). Toggled in Settings, remembered in localStorage.
+// Saved under "highlightStyle": the old "highlightMode" key was written on every load
+// while Glow was the default, so it was dropped to move everyone to Dim (2026-11-27).
+let _highlightDim = true;
+try {
+    localStorage.removeItem("highlightMode");
+    _highlightDim = localStorage.getItem("highlightStyle") !== "glow";
+} catch (e) {}
 function setHighlightDim(on) {
     _highlightDim = on;
     document.body.classList.toggle("highlight-dim", on);
     refreshSettingsLabels();
-    try { localStorage.setItem("highlightMode", on ? "dim" : "glow"); } catch (e) {}
+    try { localStorage.setItem("highlightStyle", on ? "dim" : "glow"); } catch (e) {}
 }
 setHighlightDim(_highlightDim);
 

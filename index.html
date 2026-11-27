@@ -2324,7 +2324,7 @@ body.dark {
       <li><button class="settings-item" data-action="avgLines">Avg Lines ON</button></li>
       <li><button class="settings-item" data-action="compactTable">Compact Table</button></li>
       <li><button class="settings-item" data-action="darkMode">Dark Mode</button></li>
-      <li><button class="settings-item" data-action="highlightMode">Dim Highlights</button></li>
+      <li><button class="settings-item" data-action="highlightMode">Glow Highlights</button></li>
       <li><button class="settings-item" data-action="weekArrows">Nav Arrows ON</button></li>
       <li><button class="settings-item" data-action="weightedConsensus">Weighted Consensus ON</button></li>
     </ul>
@@ -10259,13 +10259,16 @@ refreshSettingsLabels();
 try{localStorage.setItem("showWeekArrows",on?"1":"0");}catch(e){}
 }
 setWeekArrowsVisible(_showWeekArrows);
-let _highlightDim=false;
-try{_highlightDim=localStorage.getItem("highlightMode")==="dim";}catch(e){}
+let _highlightDim=true;
+try{
+localStorage.removeItem("highlightMode");
+_highlightDim=localStorage.getItem("highlightStyle")!=="glow";
+}catch(e){}
 function setHighlightDim(on){
 _highlightDim=on;
 document.body.classList.toggle("highlight-dim",on);
 refreshSettingsLabels();
-try{localStorage.setItem("highlightMode",on?"dim":"glow");}catch(e){}
+try{localStorage.setItem("highlightStyle",on?"dim":"glow");}catch(e){}
 }
 setHighlightDim(_highlightDim);
 let _showAvgLines=false;
