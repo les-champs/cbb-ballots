@@ -1740,7 +1740,7 @@ function bindVoterCells(root) {
             cell.appendChild(sim);
         }
 
-        // ⋯ opens the voter menu (Show movement, Show consensus, History, Sort by similarity, Open ballot; Pin on touch screens)
+        // ⋯ opens the voter menu (Show movement, Show consensus, Profile, Sort by similarity, Open ballot; Pin on touch screens)
         if (!cell.querySelector(".voter-menu-btn")) {
             const more = document.createElement("span");
             more.className = "voter-menu-btn";
@@ -1862,10 +1862,6 @@ const VOTER_MENU_ITEMS = [
         label: row => isRowConsensusShown(row) ? "Hide consensus" : "Show consensus",
         active: isRowConsensusShown,
         run: toggleRowConsensus,
-    },
-    {
-        id: "history", show: () => true, label: () => "History",
-        run: row => showVoterHistory(getVoterName(row)),
     },
     {
         id: "profile", show: voterMenuCanProfile, label: () => "Profile",
@@ -2176,10 +2172,10 @@ document.getElementById("voter-history-modal").addEventListener("click", e => {
     if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
 });
 
-// ── Voter profile (voter menu › Profile; PIN-locked) ─────────────────────────
-// How one official voter tends to vote over a season: six measures with the field's spread,
-// a compass (BPI↔SOR lean × distance from consensus), distance by week, the active week's
-// ballot team by team next to the consensus / BPI / SOR. The field-wide view (every profiled
+// ── Voter profile (voter menu › Profile) ─────────────────────────
+// One official voter's season: their ballots week by week (the Results grid), then the active
+// week's ballot team by team next to the consensus / BPI / SOR. (The six measure strips, compass
+// and distance-by-week chart are no longer shown here; the helpers stay for the Voters tab.) The field-wide view (every profiled
 // voter at once) is the Year window's Voters tab (showVotersPage()). Numbers come from profiles-YEAR.json (profiles.py, written by every
 // --rebuild; PROFILE_FILES lists the seasons); the team-by-team part reads the active week's
 // ballots from the DOM and its BPI/SOR snapshot via bpiSnapshotForTab(). Opens in
@@ -2233,9 +2229,9 @@ function profileSeasonAvailable(year) {
         && typeof PROFILE_FILES !== "undefined" && PROFILE_FILES.includes(Number(year));
 }
 
-// Voter menu: real ballots only (not Overall / Data Ballots / ranking rows), while unlocked
+// Voter menu: real ballots only (not Overall / Data Ballots / ranking rows)
 function voterMenuCanProfile(row) {
-    if (!isKeybindsUnlocked() || !voterMenuCanSimilar(row) || !row.classList.contains("voter-row")
+    if (!voterMenuCanSimilar(row) || !row.classList.contains("voter-row")
         || row.classList.contains("row-weighted-ranking")
         || row.closest(".ballot-section")?.id?.endsWith("-aggregate")) return false;
     return profileSeasonAvailable(document.querySelector(".week-tab.active")?.dataset.year);
@@ -2243,7 +2239,6 @@ function voterMenuCanProfile(row) {
 
 // name = voter to show; omitted = re-render the current one (week/year navigation, resize)
 async function showVoterProfile(name) {
-    if (!isKeybindsUnlocked()) return;
     const activeTab = document.querySelector(".week-tab.active");
     if (!activeTab || !profileSeasonAvailable(activeTab.dataset.year)) return;
     if (name) { _profile.name = name; _profile.compare = null; }
@@ -2257,7 +2252,7 @@ async function showVoterProfile(name) {
     table.classList.remove("week-stats-table");
     table.style.cssText = "display:block; white-space:normal; width:100%;";
     modal.dataset.chartType = "profile";
-    title.innerHTML = `${modalWeekArrowsHtml()}${year} Profile — ${_pfEsc(_profile.name)}`;
+    title.innerHTML = `${modalWeekArrowsHtml()}${year} #${_pfEsc(displayWeekNum(activeTab))} Profile — ${_pfEsc(_profile.name)}`;
     if (!wasOpen || !table.querySelector(".pf-view")) table.innerHTML = `<div class="pf-view"><div class="pf-empty">Loading…</div></div>`;
     modal.classList.add("open");
 
@@ -2312,56 +2307,15 @@ function _pfDistView(data) {
 const _pfDistFmt = v => Number.isInteger(v) ? String(v) : v.toFixed(1);
 
 function renderVoterProfile(table, data, snaps, activeTab) {
-    data = _pfDistView(data);
     const esc = _pfEsc;
     const year = data.season;
-    const voters = data.voters;
-    const me = voters.find(v => v.name === _profile.name)
-        || voters.find(v => v.name.toLowerCase() === _profile.name.toLowerCase());
-    const hasLean = data.leanWeeks.length > 0;
-    const metrics = PROFILE_METRICS.filter(m => m.k !== "lean" || hasLean);
-    const values = Object.fromEntries(metrics.map(m => [m.k, voters.map(v => v[m.k]).filter(x => x != null)]));
-
-    const outlierToggle = `<button type="button" class="pf-link" data-pf-outliers aria-pressed="${_profile.hideOutliers}" title="${_profile.hideOutliers
-        ? "Put voters back on the charts"
-        : `Leave values ${OUTLIER_SD_THRESHOLD}+ standard deviations from the field average off the charts`}">${_profile.hideOutliers ? "Show Outliers" : "Hide Outliers"}</button>`;
+    // The voter's season ballots (same grid as Functions › Results), then the active week team by team.
+    // The measure strips, compass and distance-by-week charts are hidden here (still on Year › Voters).
     let html = "";
-    if (me) {
-        const traits = [];
-        if (voters.length >= 10) for (const m of metrics) {
-            if (me[m.k] == null) continue;
-            const p = _pfPct(values[m.k], me[m.k]);
-            if (p >= PROFILE_TRAIT_PCT) traits.push([m.trait[1], p]);
-            else if (p <= 100 - PROFILE_TRAIT_PCT) traits.push([m.trait[0], 100 - p]);
-        }
-        traits.sort((a, b) => b[1] - a[1]);
-        html += `<div class="pf-head"><div class="pf-traits">${traits.length
-            ? traits.map(t => `<span class="pf-trait">${esc(t[0])}</span>`).join("")
-            : `<span class="pf-trait">Middle of the field on every measure</span>`}</div>
-            <div class="pf-facts"><span><b>${me.ballots}</b> ballots</span>${outlierToggle}</div></div>`;
-    } else {
-        html += `<div class="pf-note">${esc(_profile.name)} has no ${year} profile: profiles cover official voters with ${data.minBallots}+ ballots this season. Year › Voters lists every profiled voter.</div>
-            <div class="pf-head"><div></div><div class="pf-facts">${outlierToggle}</div></div>`;
-    }
-
-    html += `<div class="pf-strips">${metrics.map(m => {
-        const v = me?.[m.k];
-        const val = v == null
-            ? `<span class="pf-num">—</span><span class="pf-pct">${me ? (m.k === "loss" ? "Too few losses yet" : "Not enough data") : ""}</span>`
-            : `<span class="pf-num">${m.fmt(v)}${m.unit ? ` <small>${esc(m.unit)}</small>` : ""}</span><span class="pf-pct">${_pfOrdinal(_pfPct(values[m.k], v))} percentile${m.k === "lean" ? ` · ${me.leanBallots} ballot${me.leanBallots === 1 ? "" : "s"}` : ""}</span>`;
-        return `<div class="pf-strip" data-k="${m.k}"><div class="pf-lbl"><b>${esc(m.label)}</b><span>${esc(m.desc)}</span></div>
-            <div class="pf-plot"><div class="pf-svg"></div><div class="pf-ends"><span>← ${esc(m.lo)}</span><span>${esc(m.hi)} →</span></div></div>
-            <div class="pf-val">${val}</div></div>`;
-    }).join("")}</div>`;
-
-    html += `<div class="pf-charts">${hasLean ? `<div class="pf-chart"><div class="pf-sub">Voter compass</div>
-        <div class="pf-compass"></div></div>` : ""}
-        <div class="pf-chart"><div class="pf-sub">Distance from consensus by week</div>
-        <div class="pf-legend"><span><i class="pf-sw-line"></i>${esc(me ? me.name : "Selected voter")}</span><span><i class="pf-sw-dash"></i>Field median</span></div><div class="pf-weekly"></div></div></div>`;
-
-    const weekName = weekTextLabel(activeTab) || `Week ${displayWeekNum(activeTab)}`;
-    html += `<div class="pf-bd-head"><div class="pf-sub">Team by team — ${esc(weekName)}</div></div>
-        <div class="pf-bd-legend pf-legend"></div><div class="pf-bd"></div>`;
+    if (!data.voters.some(v => v.name.toLowerCase() === _profile.name.toLowerCase()))
+        html += `<div class="pf-note">${esc(_profile.name)} has no ${year} profile: profiles cover official voters with ${data.minBallots}+ ballots this season. Year › Voters lists every profiled voter.</div>`;
+    html += `<div class="pf-history" style="overflow-x:auto;"><table></table></div><hr class="pf-sep">`;
+    html += `<div class="pf-bd"></div><div class="pf-bd-legend pf-legend"></div>`;
 
     const view = document.createElement("div");
     view.className = "pf-view";
@@ -2369,37 +2323,10 @@ function renderVoterProfile(table, data, snaps, activeTab) {
     table.innerHTML = "";
     table.appendChild(view);
 
-    const drawMarks = () => {
-        const other = _profile.compare && _profile.compare !== me?.name ? voters.find(v => v.name === _profile.compare) || null : null;
-        view.querySelectorAll(".pf-strip").forEach(row => {
-            const m = metrics.find(x => x.k === row.dataset.k);
-            const host = row.querySelector(".pf-svg");
-            host.innerHTML = _pfStripSvg(m, voters, me, hasLean && m.k === "lean" ? data.consLean : null, Math.max(180, host.clientWidth), other);
-        });
-        const compass = view.querySelector(".pf-compass");
-        if (compass) compass.innerHTML = _pfCompassSvg(data, me, Math.max(260, compass.clientWidth), other);
-    };
-    drawMarks();
-    const weekly = view.querySelector(".pf-weekly");
-    weekly.innerHTML = _pfWeeklySvg(data, me, Math.max(260, weekly.clientWidth));
+    const yearTabs = getSortedTabs().filter(t => t.dataset.year === String(year)).reverse();
+    renderVoterHistoryTable(buildSeasonDataForUser(_profile.name, yearTabs), yearTabs, view.querySelector(".pf-history table"));
     _pfRenderBreakdown(view, activeTab, snaps);
-
-    view.addEventListener("click", e => {
-        if (e.target.closest("[data-pf-outliers]")) {
-            _profile.hideOutliers = !_profile.hideOutliers;
-            localStorage.setItem("pfHideOutliers", _profile.hideOutliers ? "1" : "0");
-            renderVoterProfile(table, data, snaps, activeTab);
-            return;
-        }
-        // Strip / compass dots compare instead of switching voter; a tag or the halo clears it
-        const cmp = e.target.closest("[data-pf-compare]");
-        if (cmp) {
-            const n = cmp.dataset.pfCompare;
-            _profile.compare = n && n !== _profile.compare && n !== me?.name ? n : null;
-            drawMarks();
-            return;
-        }
-    });
+    bindTeamLogos();
 }
 
 // Value tag: "Name value" pill on a stem over a dot at cx. Clicking it clears the comparison.

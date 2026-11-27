@@ -1835,6 +1835,7 @@ body.dark {
 .pf-view .pf-span { stroke: var(--color-pf-field); stroke-width: 2; }
 .pf-view .pf-cons { stroke: var(--color-section-title); stroke-width: 2; stroke-linecap: round; }
 
+.pf-sep { width: 75%; margin: 4px auto; border: 0; border-top: 1px solid var(--color-section-title); opacity: 0.5; }
 .pf-bd-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 6px 12px; }
 .pf-seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 6px; background: var(--color-pf-band); border: 1px solid var(--color-pf-grid); }
 .pf-seg button { font: inherit; font-size: 12px; color: var(--color-avg-label); background: transparent; border: 0; border-radius: 4px; padding: 3px 9px; cursor: pointer; }
@@ -4338,10 +4339,6 @@ active:isRowConsensusShown,
 run:toggleRowConsensus,
 },
 {
-id:"history",show:()=>true,label:()=>"History",
-run:row=>showVoterHistory(getVoterName(row)),
-},
-{
 id:"profile",show:voterMenuCanProfile,label:()=>"Profile",
 run:row=>showVoterProfile(getVoterName(row)),
 },
@@ -4647,13 +4644,12 @@ return!ON_AP_PAGE&&_apCurrentYear===null&&Number(year)>=PROFILE_FIRST_YEAR
 &&typeof PROFILE_FILES!=="undefined"&&PROFILE_FILES.includes(Number(year));
 }
 function voterMenuCanProfile(row){
-if(!isKeybindsUnlocked()||!voterMenuCanSimilar(row)||!row.classList.contains("voter-row")
+if(!voterMenuCanSimilar(row)||!row.classList.contains("voter-row")
 ||row.classList.contains("row-weighted-ranking")
 ||row.closest(".ballot-section")?.id?.endsWith("-aggregate"))return false;
 return profileSeasonAvailable(document.querySelector(".week-tab.active")?.dataset.year);
 }
 async function showVoterProfile(name){
-if(!isKeybindsUnlocked())return;
 const activeTab=document.querySelector(".week-tab.active");
 if(!activeTab||!profileSeasonAvailable(activeTab.dataset.year))return;
 if(name){_profile.name=name;_profile.compare=null;}
@@ -4667,7 +4663,7 @@ const wasOpen=modal.classList.contains("open")&&modal.dataset.chartType==="profi
 table.classList.remove("week-stats-table");
 table.style.cssText="display:block; white-space:normal; width:100%;";
 modal.dataset.chartType="profile";
-title.innerHTML=`${modalWeekArrowsHtml()}${year} Profile — ${_pfEsc(_profile.name)}`;
+title.innerHTML=`${modalWeekArrowsHtml()}${year} #${_pfEsc(displayWeekNum(activeTab))} Profile — ${_pfEsc(_profile.name)}`;
 if(!wasOpen||!table.querySelector(".pf-view"))table.innerHTML=`<div class="pf-view"><div class="pf-empty">Loading…</div></div>`;
 modal.classList.add("open");
 let data,snaps;
@@ -4713,86 +4709,22 @@ voters:data.voters.map(v=>({...v,dist:v.distW,weekly:v.weekly.map(r=>[r[0],r[3],
 }
 const _pfDistFmt=v=>Number.isInteger(v)?String(v):v.toFixed(1);
 function renderVoterProfile(table,data,snaps,activeTab){
-data=_pfDistView(data);
 const esc=_pfEsc;
 const year=data.season;
-const voters=data.voters;
-const me=voters.find(v=>v.name===_profile.name)
-||voters.find(v=>v.name.toLowerCase()===_profile.name.toLowerCase());
-const hasLean=data.leanWeeks.length>0;
-const metrics=PROFILE_METRICS.filter(m=>m.k!=="lean"||hasLean);
-const values=Object.fromEntries(metrics.map(m=>[m.k,voters.map(v=>v[m.k]).filter(x=>x!=null)]));
-const outlierToggle=`<button type="button" class="pf-link" data-pf-outliers aria-pressed="${_profile.hideOutliers}" title="${_profile.hideOutliers
-?"Put voters back on the charts"
-:`Leave values ${OUTLIER_SD_THRESHOLD}+ standard deviations from the field average off the charts`}">${_profile.hideOutliers?"Show Outliers":"Hide Outliers"}</button>`;
 let html="";
-if(me){
-const traits=[];
-if(voters.length>=10)for(const m of metrics){
-if(me[m.k]==null)continue;
-const p=_pfPct(values[m.k],me[m.k]);
-if(p>=PROFILE_TRAIT_PCT)traits.push([m.trait[1],p]);
-else if(p<=100 - PROFILE_TRAIT_PCT)traits.push([m.trait[0],100 - p]);
-}
-traits.sort((a,b)=>b[1]- a[1]);
-html +=`<div class="pf-head"><div class="pf-traits">${traits.length
-?traits.map(t=>`<span class="pf-trait">${esc(t[0])}</span>`).join("")
-:`<span class="pf-trait">Middle of the field on every measure</span>`}</div>
-            <div class="pf-facts"><span><b>${me.ballots}</b> ballots</span>${outlierToggle}</div></div>`;
-}else{
-html +=`<div class="pf-note">${esc(_profile.name)} has no ${year} profile: profiles cover official voters with ${data.minBallots}+ ballots this season. Year › Voters lists every profiled voter.</div>
-            <div class="pf-head"><div></div><div class="pf-facts">${outlierToggle}</div></div>`;
-}
-html +=`<div class="pf-strips">${metrics.map(m=>{
-const v=me?.[m.k];
-const val=v==null
-?`<span class="pf-num">—</span><span class="pf-pct">${me?(m.k==="loss"?"Too few losses yet":"Not enough data"):""}</span>`
-:`<span class="pf-num">${m.fmt(v)}${m.unit?` <small>${esc(m.unit)}</small>`:""}</span><span class="pf-pct">${_pfOrdinal(_pfPct(values[m.k],v))} percentile${m.k==="lean"?` · ${me.leanBallots} ballot${me.leanBallots===1?"":"s"}`:""}</span>`;
-return `<div class="pf-strip" data-k="${m.k}"><div class="pf-lbl"><b>${esc(m.label)}</b><span>${esc(m.desc)}</span></div>
-            <div class="pf-plot"><div class="pf-svg"></div><div class="pf-ends"><span>← ${esc(m.lo)}</span><span>${esc(m.hi)} →</span></div></div>
-            <div class="pf-val">${val}</div></div>`;
-}).join("")}</div>`;
-html +=`<div class="pf-charts">${hasLean?`<div class="pf-chart"><div class="pf-sub">Voter compass</div>
-        <div class="pf-compass"></div></div>`:""}
-        <div class="pf-chart"><div class="pf-sub">Distance from consensus by week</div>
-        <div class="pf-legend"><span><i class="pf-sw-line"></i>${esc(me?me.name:"Selected voter")}</span><span><i class="pf-sw-dash"></i>Field median</span></div><div class="pf-weekly"></div></div></div>`;
-const weekName=weekTextLabel(activeTab)||`Week ${displayWeekNum(activeTab)}`;
-html +=`<div class="pf-bd-head"><div class="pf-sub">Team by team — ${esc(weekName)}</div></div>
-        <div class="pf-bd-legend pf-legend"></div><div class="pf-bd"></div>`;
+if(!data.voters.some(v=>v.name.toLowerCase()===_profile.name.toLowerCase()))
+html +=`<div class="pf-note">${esc(_profile.name)} has no ${year} profile: profiles cover official voters with ${data.minBallots}+ ballots this season. Year › Voters lists every profiled voter.</div>`;
+html +=`<div class="pf-history" style="overflow-x:auto;"><table></table></div><hr class="pf-sep">`;
+html +=`<div class="pf-bd"></div><div class="pf-bd-legend pf-legend"></div>`;
 const view=document.createElement("div");
 view.className="pf-view";
 view.innerHTML=html;
 table.innerHTML="";
 table.appendChild(view);
-const drawMarks=()=>{
-const other=_profile.compare&&_profile.compare!==me?.name?voters.find(v=>v.name===_profile.compare)||null:null;
-view.querySelectorAll(".pf-strip").forEach(row=>{
-const m=metrics.find(x=>x.k===row.dataset.k);
-const host=row.querySelector(".pf-svg");
-host.innerHTML=_pfStripSvg(m,voters,me,hasLean&&m.k==="lean"?data.consLean:null,Math.max(180,host.clientWidth),other);
-});
-const compass=view.querySelector(".pf-compass");
-if(compass)compass.innerHTML=_pfCompassSvg(data,me,Math.max(260,compass.clientWidth),other);
-};
-drawMarks();
-const weekly=view.querySelector(".pf-weekly");
-weekly.innerHTML=_pfWeeklySvg(data,me,Math.max(260,weekly.clientWidth));
+const yearTabs=getSortedTabs().filter(t=>t.dataset.year===String(year)).reverse();
+renderVoterHistoryTable(buildSeasonDataForUser(_profile.name,yearTabs),yearTabs,view.querySelector(".pf-history table"));
 _pfRenderBreakdown(view,activeTab,snaps);
-view.addEventListener("click",e=>{
-if(e.target.closest("[data-pf-outliers]")){
-_profile.hideOutliers=!_profile.hideOutliers;
-localStorage.setItem("pfHideOutliers",_profile.hideOutliers?"1":"0");
-renderVoterProfile(table,data,snaps,activeTab);
-return;
-}
-const cmp=e.target.closest("[data-pf-compare]");
-if(cmp){
-const n=cmp.dataset.pfCompare;
-_profile.compare=n&&n!==_profile.compare&&n!==me?.name?n:null;
-drawMarks();
-return;
-}
-});
+bindTeamLogos();
 }
 let _pfMeasureCtx=null;
 function _pfTextW(t){
