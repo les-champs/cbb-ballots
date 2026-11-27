@@ -37,7 +37,7 @@ const OUTLIER_BALLOT_MIN_FLAGS = 4;
 const OUTLIER_FRINGE_FROM_RANK = 16;
 const OUTLIER_FRINGE_WEIGHT = 0.5;
 let _outliersMode = false;
-let _ballotFilter = "all";  // "all" | "exclude" | "only" (Table › Filter)
+let _ballotFilter = "all";  // "all" | "exclude" | "only" | "veterans" (Table › Filter)
 
 function svgColors() {
     const dark = isDarkMode();
@@ -1039,7 +1039,9 @@ function applyOutliers(weekBlock) {
 // Marks every real ballot row in a block's voter sections (Official / Provisional, or
 // the single AP section) with .ballot-checked, and outlier ballots with .ballot-outlier
 // too (OUTLIER_BALLOT_MIN_FLAGS). CSS hides rows per body class filter-exclude-outliers /
-// filter-only-outliers. Ranking rows, Data Ballots rows and the Aggregate section stay.
+// filter-only-outliers. Veteran ballots (RANKING_TENURE Veterans: 100+ career ballots,
+// AP_TENURE_COUNTS on AP tables) get .ballot-veteran for filter-veterans.
+// Ranking rows, Data Ballots rows and the Aggregate section stay.
 // Ballots and consensus don't change, so each section is marked once.
 function markOutlierBallots(weekBlock) {
     if (!weekBlock) return;
@@ -1049,6 +1051,7 @@ function markOutlierBallots(weekBlock) {
     consensus.forEach((t, i) => { cRank[t] = i + 1; });
     const sections = Array.from(weekBlock.querySelectorAll(".ballot-section"));
     const voterSections = sections.length === 1 ? sections : sections.slice(0, 2);
+    const careerBallots = ON_AP_PAGE || weekBlock.id.startsWith("week-ap-") ? AP_TENURE_COUNTS : TENURE_COUNTS;
     voterSections.forEach(section => {
         if (section._outlierBallotsMarked) return;
         section._outlierBallotsMarked = true;
@@ -1068,6 +1071,7 @@ function markOutlierBallots(weekBlock) {
             });
             flags += consensus.slice(0, OUTLIER_OMISSION_TOP_N).filter(t => !onBallot.has(t)).length;
             row.classList.add("ballot-checked");
+            row.classList.toggle("ballot-veteran", RANKING_TENURE.Veterans.test(careerBallots[name] ?? 0));
             row.classList.toggle("ballot-outlier", flags >= OUTLIER_BALLOT_MIN_FLAGS);
         });
     });
@@ -1084,6 +1088,7 @@ function setBallotFilter(mode) {
     _ballotFilter = mode === _ballotFilter ? "all" : mode;
     document.body.classList.toggle("filter-exclude-outliers", _ballotFilter === "exclude");
     document.body.classList.toggle("filter-only-outliers", _ballotFilter === "only");
+    document.body.classList.toggle("filter-veterans", _ballotFilter === "veterans");
     if (_ballotFilter !== "all") markOutlierBallots(activeWeekBlock());
     syncFilterRankingRow(activeWeekBlock());
     syncFilterMenu();
@@ -1097,8 +1102,12 @@ function setBallotFilter(mode) {
 // syncRankingRows() leaves it alone and places the Rankings rows below it.
 const FILTER_RANKING = {
     exclude: { label: "Normpoll",  tip: n => `Consensus of the ${n} official ballots that aren't outliers` },
-    only:    { label: "Unusupoll", tip: n => `Consensus of the ${n} official outlier ballots` },
+    only:    { label: "Unusupoll", tip: n => `Consensus of the ${n} official outlier ballots`,
+               keep: r => r.classList.contains("ballot-outlier") },
+    veterans: { label: "Vetpoll",  tip: n => `Consensus of the ${n} official ballots from veterans (100+ career ballots)`,
+               keep: r => r.classList.contains("ballot-veteran") },
 };
+FILTER_RANKING.exclude.keep = r => !r.classList.contains("ballot-outlier");
 
 // {pts, voters} over the block's official ballots that the filter mode keeps.
 function filteredBallotPoints(block, mode) {
@@ -1106,7 +1115,7 @@ function filteredBallotPoints(block, mode) {
     const pts = {};
     let voters = 0;
     block.querySelector(".ballot-section")?.querySelectorAll(".voter-row.ballot-checked").forEach(row => {
-        if (row.classList.contains("ballot-outlier") !== (mode === "only")) return;
+        if (!FILTER_RANKING[mode].keep(row)) return;
         const teams = Array.from(row.querySelectorAll(".logo-cell .team-logo")).slice(0, 25).map(l => l.dataset.team);
         if (!teams.length) return;
         voters++;

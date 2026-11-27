@@ -1727,16 +1727,19 @@ body.dark {
 .bt-type-dot.bt-provisional { background: var(--color-bt-provisional); }
 
 /* Functions › Table › Filter (markOutlierBallots() in script.js): hide outlier ballots,
-   or every checked ballot that isn't one. Unchecked rows (ranking rows, Data Ballots) stay. */
+   or every checked ballot that isn't one, or every checked non-veteran ballot. Unchecked rows (ranking rows, Data Ballots) stay. */
 body.filter-exclude-outliers .voter-row.ballot-outlier,
-body.filter-only-outliers .voter-row.ballot-checked:not(.ballot-outlier) { display: none; }
+body.filter-only-outliers .voter-row.ballot-checked:not(.ballot-outlier),
+body.filter-veterans .voter-row.ballot-checked:not(.ballot-veteran) { display: none; }
 /* Keep the zebra stripes alternating while a filter hides rows: stripe as if the hidden
    rows weren't there (same trick as the Records game-list rows). */
 @supports selector(:nth-child(1 of a)) {
     body.filter-exclude-outliers .ballot-section tbody > tr:nth-child(even),
-    body.filter-only-outliers .ballot-section tbody > tr:nth-child(even) { background-color: transparent; }
+    body.filter-only-outliers .ballot-section tbody > tr:nth-child(even),
+    body.filter-veterans .ballot-section tbody > tr:nth-child(even) { background-color: transparent; }
     body.filter-exclude-outliers .ballot-section tbody > tr:nth-child(even of :not(.ballot-outlier)),
     body.filter-only-outliers .ballot-section tbody > tr:nth-child(even of :not(.ballot-checked:not(.ballot-outlier))) { background-color: var(--color-bg-row-alt); }
+    body.filter-veterans .ballot-section tbody > tr:nth-child(even of :not(.ballot-checked:not(.ballot-veteran))) { background-color: var(--color-bg-row-alt); }
 }
 
 /* ─── Voter profile (voter menu › Profile; showVoterProfile()) ───────────── */
@@ -2162,6 +2165,7 @@ body.dark {
     <ul class="settings-list">
       <li><button type="button" class="settings-item" data-ballot-filter="exclude">Exclude Outliers</button></li>
       <li><button type="button" class="settings-item" data-ballot-filter="only">Only Outliers</button></li>
+      <li><button type="button" class="settings-item" data-ballot-filter="veterans">Only Veterans</button></li>
     </ul>
 </div>
 
@@ -3368,6 +3372,7 @@ const cRank={};
 consensus.forEach((t,i)=>{cRank[t]=i + 1;});
 const sections=Array.from(weekBlock.querySelectorAll(".ballot-section"));
 const voterSections=sections.length===1?sections:sections.slice(0,2);
+const careerBallots=ON_AP_PAGE||weekBlock.id.startsWith("week-ap-")?AP_TENURE_COUNTS:TENURE_COUNTS;
 voterSections.forEach(section=>{
 if(section._outlierBallotsMarked)return;
 section._outlierBallotsMarked=true;
@@ -3387,6 +3392,7 @@ flags +=cr===26&&i + 1>=OUTLIER_FRINGE_FROM_RANK?OUTLIER_FRINGE_WEIGHT:1;
 });
 flags +=consensus.slice(0,OUTLIER_OMISSION_TOP_N).filter(t=>!onBallot.has(t)).length;
 row.classList.add("ballot-checked");
+row.classList.toggle("ballot-veteran",RANKING_TENURE.Veterans.test(careerBallots[name]??0));
 row.classList.toggle("ballot-outlier",flags>=OUTLIER_BALLOT_MIN_FLAGS);
 });
 });
@@ -3400,20 +3406,25 @@ function setBallotFilter(mode){
 _ballotFilter=mode===_ballotFilter?"all":mode;
 document.body.classList.toggle("filter-exclude-outliers",_ballotFilter==="exclude");
 document.body.classList.toggle("filter-only-outliers",_ballotFilter==="only");
+document.body.classList.toggle("filter-veterans",_ballotFilter==="veterans");
 if(_ballotFilter!=="all")markOutlierBallots(activeWeekBlock());
 syncFilterRankingRow(activeWeekBlock());
 syncFilterMenu();
 }
 const FILTER_RANKING={
 exclude:{label:"Normpoll",tip:n=>`Consensus of the ${n} official ballots that aren't outliers`},
-only:{label:"Unusupoll",tip:n=>`Consensus of the ${n} official outlier ballots`},
+only:{label:"Unusupoll",tip:n=>`Consensus of the ${n} official outlier ballots`,
+keep:r=>r.classList.contains("ballot-outlier")},
+veterans:{label:"Vetpoll",tip:n=>`Consensus of the ${n} official ballots from veterans (100+ career ballots)`,
+keep:r=>r.classList.contains("ballot-veteran")},
 };
+FILTER_RANKING.exclude.keep=r=>!r.classList.contains("ballot-outlier");
 function filteredBallotPoints(block,mode){
 markOutlierBallots(block);
 const pts={};
 let voters=0;
 block.querySelector(".ballot-section")?.querySelectorAll(".voter-row.ballot-checked").forEach(row=>{
-if(row.classList.contains("ballot-outlier")!==(mode==="only"))return;
+if(!FILTER_RANKING[mode].keep(row))return;
 const teams=Array.from(row.querySelectorAll(".logo-cell .team-logo")).slice(0,25).map(l=>l.dataset.team);
 if(!teams.length)return;
 voters++;

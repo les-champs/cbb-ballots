@@ -1881,6 +1881,7 @@ def build_full_html(week_tabs_html, week_data_html, fragment_years=None, tenure_
     <ul class="settings-list">
       <li><button type="button" class="settings-item" data-ballot-filter="exclude">Exclude Outliers</button></li>
       <li><button type="button" class="settings-item" data-ballot-filter="only">Only Outliers</button></li>
+      <li><button type="button" class="settings-item" data-ballot-filter="veterans">Only Veterans</button></li>
     </ul>
 </div>
 

@@ -1707,16 +1707,19 @@ body.dark {
 .bt-type-dot.bt-provisional { background: var(--color-bt-provisional); }
 
 /* Functions › Table › Filter (markOutlierBallots() in script.js): hide outlier ballots,
-   or every checked ballot that isn't one. Unchecked rows (ranking rows, Data Ballots) stay. */
+   or every checked ballot that isn't one, or every checked non-veteran ballot. Unchecked rows (ranking rows, Data Ballots) stay. */
 body.filter-exclude-outliers .voter-row.ballot-outlier,
-body.filter-only-outliers .voter-row.ballot-checked:not(.ballot-outlier) { display: none; }
+body.filter-only-outliers .voter-row.ballot-checked:not(.ballot-outlier),
+body.filter-veterans .voter-row.ballot-checked:not(.ballot-veteran) { display: none; }
 /* Keep the zebra stripes alternating while a filter hides rows: stripe as if the hidden
    rows weren't there (same trick as the Records game-list rows). */
 @supports selector(:nth-child(1 of a)) {
     body.filter-exclude-outliers .ballot-section tbody > tr:nth-child(even),
-    body.filter-only-outliers .ballot-section tbody > tr:nth-child(even) { background-color: transparent; }
+    body.filter-only-outliers .ballot-section tbody > tr:nth-child(even),
+    body.filter-veterans .ballot-section tbody > tr:nth-child(even) { background-color: transparent; }
     body.filter-exclude-outliers .ballot-section tbody > tr:nth-child(even of :not(.ballot-outlier)),
     body.filter-only-outliers .ballot-section tbody > tr:nth-child(even of :not(.ballot-checked:not(.ballot-outlier))) { background-color: var(--color-bg-row-alt); }
+    body.filter-veterans .ballot-section tbody > tr:nth-child(even of :not(.ballot-checked:not(.ballot-veteran))) { background-color: var(--color-bg-row-alt); }
 }
 
 /* ─── Voter profile (voter menu › Profile; showVoterProfile()) ───────────── */
